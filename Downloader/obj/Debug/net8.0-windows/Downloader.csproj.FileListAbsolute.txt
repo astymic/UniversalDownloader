@@ -22,3 +22,4 @@ C:\Users\raikoben\source\repos\Downloader\Downloader\obj\Debug\net8.0-windows\re
 C:\Users\raikoben\source\repos\Downloader\Downloader\obj\Debug\net8.0-windows\Downloader.pdb
 C:\Users\raikoben\source\repos\Downloader\Downloader\obj\Debug\net8.0-windows\Downloader.genruntimeconfig.cache
 C:\Users\raikoben\source\repos\Downloader\Downloader\obj\Debug\net8.0-windows\ref\Downloader.dll
+C:\Users\raikoben\source\repos\Downloader\Downloader\obj\Debug\net8.0-windows\Downloader.sourcelink.json

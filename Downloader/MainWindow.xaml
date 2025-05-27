@@ -192,12 +192,20 @@
                                     CornerRadius="12"
                                     Padding="{TemplateBinding Padding}">
                                 <Grid>
-                                    <ContentPresenter x:Name="ContentSite" 
-                                                    IsHitTestVisible="False" 
+                                    <ContentPresenter x:Name="ContentSite"
+                                                    IsHitTestVisible="False"
                                                     Content="{TemplateBinding SelectionBoxItem}"
-                                                    ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                                    VerticalAlignment="Center"
-                                                    HorizontalAlignment="Left"/>
+                                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
+                                                    Margin="{TemplateBinding Padding}">
+                                        <ContentPresenter.ContentTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Label}" />
+                                            </DataTemplate>
+                                        </ContentPresenter.ContentTemplate>
+                                    </ContentPresenter>
+                                    
                                     <TextBox x:Name="PART_EditableTextBox" 
                                            Visibility="Hidden" 
                                            IsReadOnly="{TemplateBinding IsReadOnly}"/>
@@ -239,6 +247,11 @@
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="HasItems" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="SelectedIndex" Value="-1">
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
