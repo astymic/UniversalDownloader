@@ -9,8 +9,21 @@
         WindowStartupLocation="CenterScreen"
         FontFamily="Inter, Segoe UI, Arial"
         FontWeight="Normal"
+        WindowStyle="None"
+        AllowsTransparency="True"
         Background="Transparent"
-        Loaded="MainWindow_Loaded">
+        Loaded="MainWindow_Loaded"
+        StateChanged="MainWindow_StateChanged"
+        ResizeMode="CanResize"
+        SnapsToDevicePixels="True">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" 
+                      CornerRadius="0" 
+                      GlassFrameThickness="1"
+                      UseAeroCaptionButtons="False"
+                      ResizeBorderThickness="7"/>
+    </WindowChrome.WindowChrome>
 
     <Window.Resources>
         <!-- Color Resources -->
@@ -289,6 +302,61 @@
             </Setter>
         </Style>
 
+
+        <!-- Style for Window Control Buttons (Minimize, Maximize/Restore) -->
+        <Style TargetType="Button" x:Key="WindowControlButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="45"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" Name="buttonBorder">
+                            <TextBlock Text="{TemplateBinding Content}"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="buttonBorder" Property="Background" Value="#30FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Style for Window Close Button (different hover) -->
+        <Style TargetType="Button" x:Key="WindowCloseButton" BasedOn="{StaticResource WindowControlButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" Name="buttonBorder">
+                            <TextBlock Text="{TemplateBinding Content}"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="buttonBorder" Property="Background" Value="#E81123"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+
         <!-- Modern Label Style -->
         <Style TargetType="TextBlock" x:Key="ModernLabel">
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -306,9 +374,11 @@
     </Window.Resources>
 
     <!-- Main Window Content -->
-    <Border Background="{StaticResource BackgroundGradient}" 
+    <Border x:Name="MainWindowRootBorder" 
+            Background="{StaticResource BackgroundGradient}"
             CornerRadius="16" 
-            Effect="{StaticResource WindowShadow}">
+            Effect="{StaticResource WindowShadow}"
+            ClipToBounds="True">
         <Grid Margin="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -319,7 +389,9 @@
             <Border Grid.Row="0" 
                     Background="{StaticResource PrimaryGradient}" 
                     CornerRadius="16,16,0,0" 
-                    Height="50">
+                    Height="50"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
+                    SnapsToDevicePixels="True">
                 <Grid>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0" HorizontalAlignment="Center">
                         <Ellipse Width="12" Height="12" Fill="White" Opacity="0.9" Margin="0,0,8,0"/>
@@ -329,14 +401,24 @@
                                    FontSize="16" 
                                    VerticalAlignment="Center"/>
                     </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,0,0">
+                        <Button x:Name="MinimizeButton" Content="" Style="{StaticResource WindowControlButton}" Click="MinimizeButton_Click" ToolTip="Minimize"/>
+                        <Button x:Name="MaximizeRestoreButton" Content="" Style="{StaticResource WindowControlButton}" Click="MaximizeRestoreButton_Click" ToolTip="Maximize"/>
+                        <Button x:Name="CloseButton" Content="" Style="{StaticResource WindowCloseButton}" Click="CloseButton_Click" ToolTip="Close"/>
+                    </StackPanel>
                 </Grid>
             </Border>
 
             <!-- Main Content -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer Grid.Row="1" 
+                          VerticalScrollBarVisibility="Auto"
+                          Background="Transparent"
+                          Focusable="False">
                 <Border Background="{StaticResource CardBrush}" 
                         CornerRadius="0,0,16,16" 
-                        Padding="40">
+                        Padding="40"
+                        SnapsToDevicePixels="True">
                     <StackPanel MaxWidth="600">
 
                         <!-- Header Section -->
