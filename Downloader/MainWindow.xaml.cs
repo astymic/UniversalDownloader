@@ -40,7 +40,6 @@ namespace UniversalDownloader
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
             _httpClient.Timeout = TimeSpan.FromMinutes(10);
 
-            // _ytDlpExecutablePath is initialized in MainWindow.YtDlp.cs via its constructor logic, but path defined here
             _ytDlpExecutablePath = Path.Combine(AppContext.BaseDirectory, YtDlpFileName); // YtDlpFileName is in MainWindow.YtDlp.cs
         }
 
@@ -381,7 +380,6 @@ namespace UniversalDownloader
                     var selectedQuality = YouTubeQualityComboBox.SelectedItem as YouTubeQualityItem;
                     if (selectedQuality == null) { StatusTextBlock.Text = "Status: Invalid YouTube video quality selected."; await SetAppBusyState(false); return; }
 
-                    // Pass tempDownloadFolderPath to the yt-dlp download method
                     await DownloadYouTubeVideoWithYtDlp(url, selectedQuality.FormatCode, tempDownloadFolderPath);
                 }
                 else if (IsGoogleDriveLink(url))
@@ -403,22 +401,15 @@ namespace UniversalDownloader
                 if (DownloadProgressBar != null && DownloadProgressBar.IsIndeterminate) DownloadProgressBar.IsIndeterminate = false;
                 await SetAppBusyState(false);
 
-                // Smart cleanup: only clean if no "File Move Error" status is present,
-                // or always clean. This is a UX decision.
                 bool wasMoveError = StatusTextBlock.Text.Contains("File Move Error") || StatusTextBlock.Text.Contains("failed to move");
                 if (!wasMoveError) // Or some other condition to decide if cleanup is safe/desired
                 {
-                    //CleanUpTempFolder(tempDownloadFolderPath);
+                    CleanUpTempFolder(tempDownloadFolderPath);
                 }
                 else
                 {
                     Debug.WriteLine($"Skipping cleanup of {tempDownloadFolderPath} due to potential move error. File might be there.");
-                    // Optionally inform user:
-                    // StatusTextBlock.Text += $" File may be in {tempDownloadFolderPath}.";
                 }
-                //if (DownloadProgressBar != null && DownloadProgressBar.IsIndeterminate) DownloadProgressBar.IsIndeterminate = false;
-                //await SetAppBusyState(false);
-                // CleanUpTempFolder(tempDownloadFolderPath); // Optionally cleanup, or leave for user to see partials if desired
             }
         }
 

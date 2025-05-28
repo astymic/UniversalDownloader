@@ -270,7 +270,8 @@ namespace UniversalDownloader
 
             StatusTextBlock.Text = "Status: Fetching YouTube video qualities...";
             FileNameTextBlock.Text = "Fetching YouTube Info...";
-            var availableQualities = new List<YouTubeQualityItem>();
+
+            var qualitiesToAdd = new List<YouTubeQualityItem>();
             JArray ytDlpReportedFormats = null;
             string videoTitle = "Unknown Video";
 
@@ -279,7 +280,7 @@ namespace UniversalDownloader
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
                     FileName = _ytDlpExecutablePath,
-                    Arguments = $"-J --no-warnings --ignore-config --flat-playlist \"{videoUrl}\"",
+                    Arguments = $"-J --no-warnings --ignore-config --flat-playlist \"{videoUrl}\"", // -J for JSON output
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -314,63 +315,85 @@ namespace UniversalDownloader
                     if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed; return;
                 }
 
-                var distinctVideoHeights = new SortedSet<int>();
-                var audioFormatItems = new List<YouTubeQualityItem>();
-                var preMergedFormatItems = new List<YouTubeQualityItem>();
+                var allAvailableVideoHeights = new HashSet<int>();
+                var rawAudioFormats = new List<YouTubeQualityItem>();
 
                 foreach (JToken format in ytDlpReportedFormats)
                 {
-                    string vcodec = format["vcodec"]?.ToString() ?? "none";
-                    string acodec = format["acodec"]?.ToString() ?? "none";
-                    int height = format["height"]?.ToObject<int?>() ?? 0;
-                    if (vcodec != "none" && height > 0) distinctVideoHeights.Add(height);
+                    string vcodec = format["vcodec"]?.ToString()?.ToLower() ?? "none";
+                    string acodec = format["acodec"]?.ToString()?.ToLower() ?? "none";
+                    int? height = format["height"]?.ToObject<int?>();
+                    string protocol = format["protocol"]?.ToString()?.ToLower() ?? "";
 
-                    if (acodec != "none" && vcodec == "none")
+                    if (protocol.Contains("dash") || protocol.Contains("hls"))
                     {
-                        string formatId = format["format_id"]?.ToString();
-                        string ext = format["ext"]?.ToString() ?? "N/A";
-                        double abr = format["abr"]?.ToObject<double?>() ?? 0;
-                        string note = format["format_note"]?.ToString() ?? acodec;
-                        long? filesize = format["filesize"]?.ToObject<long?>() ?? format["filesize_approx"]?.ToObject<long?>();
-                        string sizeStr = filesize.HasValue ? $" ({Utilities.FormatBytesOutput(filesize.Value)})" : "";
-                        string label = $"Audio Only: {note.Replace("audio only", "").Trim()} ({ext}, ~{abr:F0}k) [{formatId}]{sizeStr}";
-                        if (!string.IsNullOrEmpty(formatId)) audioFormatItems.Add(new YouTubeQualityItem { Label = label, FormatCode = formatId, IsAudioOnly = true, SortPriority = (int)abr + 20000 });
+                        if (vcodec == "none" && acodec == "none") continue;
                     }
-                    else if (vcodec != "none" && acodec != "none")
+
+                    if (vcodec != "none" && vcodec != "unknown" && height.HasValue)
+                    {
+                        allAvailableVideoHeights.Add(height.Value);
+                    }
+                    else if (acodec != "none" && acodec != "unknown" && (vcodec == "none" || vcodec == "unknown"))
                     {
                         string formatId = format["format_id"]?.ToString();
+                        if (string.IsNullOrEmpty(formatId)) continue;
+                        double? abr = format["abr"]?.ToObject<double?>();
                         string ext = format["ext"]?.ToString() ?? "N/A";
-                        string resolutionStr = format["resolution"]?.ToString();
-                        string note = format["format_note"]?.ToString() ?? $"{height}p";
-                        int fps = format["fps"]?.ToObject<int?>() ?? 0;
                         long? filesize = format["filesize"]?.ToObject<long?>() ?? format["filesize_approx"]?.ToObject<long?>();
-                        string sizeStr = filesize.HasValue ? $" ({Utilities.FormatBytesOutput(filesize.Value)})" : "";
-                        string fpsStr = fps > 0 ? $"@{fps}fps" : "";
-                        string displayRes = note.Contains("p") && !note.Contains("DASH") ? note : (resolutionStr ?? (height > 0 ? $"{height}p" : "Video"));
-                        string label = $"Pre-merged: {displayRes} {fpsStr} ({ext}) [{formatId}]{sizeStr}";
-                        if (!string.IsNullOrEmpty(formatId)) preMergedFormatItems.Add(new YouTubeQualityItem { Label = label, FormatCode = formatId, IsAudioOnly = false, SortPriority = height + (fps > 30 ? 500 : 0) + 10000 });
+                        string filesizeStr = filesize.HasValue ? $" ({Utilities.FormatBytesOutput(filesize.Value)})" : "";
+                        string label = $"Audio Only ({ext}) ~{abr ?? 0:F0}k{filesizeStr}";
+                        rawAudioFormats.Add(new YouTubeQualityItem { Label = label, FormatCode = formatId, IsAudioOnly = true, SortPriority = (int)(abr ?? 0) });
                     }
                 }
 
-                availableQualities.Add(new YouTubeQualityItem { Label = "Best Available (Video+Audio Merged, MP4 H.264 Preferred)", FormatCode = "bestvideo[ext=mp4][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo[vcodec!*=av01][vcodec!*=vp09]+bestaudio/bestvideo+bestaudio/best", IsAudioOnly = false, SortPriority = 100001 });
-                availableQualities.Add(new YouTubeQualityItem { Label = "Audio Only (Best Available)", FormatCode = "bestaudio/best", IsAudioOnly = true, SortPriority = 90000 });
-                var targetResolutionTiers = new List<(int height, string labelName)> { (4320, "4320p (8K)"), (3840, "3840p (UHD)"), (2160, "2160p (4K)"), (1440, "1440p (2K)"), (1080, "1080p (FHD)"), (720, "720p (HD)"), (480, "480p"), (360, "360p"), (240, "240p"), (144, "144p") };
+                qualitiesToAdd.Add(new YouTubeQualityItem { Label = "Best Video + Best Audio", FormatCode = "bestvideo+bestaudio/best", IsAudioOnly = false, SortPriority = 2000000 });
+
+                var targetResolutionTiers = new List<(int height, string labelName)> {
+                    (4320, "8K"), (3840, "4K UHD"), (2160, "4K"), (1440, "1440p QHD"),
+                    (1080, "1080p FHD"), (720, "720p HD"), (480, "480p SD"), (360, "360p")
+                }.OrderByDescending(t => t.height).ToList(); 
+
+                var addedTierLabels = new HashSet<string>();
                 foreach (var tier in targetResolutionTiers)
                 {
-                    if (distinctVideoHeights.Any(h => h >= tier.height) || preMergedFormatItems.Any(pm => (pm.FormatCode.Contains($"{tier.height}") || (pm.Label.Contains($"{tier.height}p")))))
+                    if (allAvailableVideoHeights.Any(h => h >= tier.height)) 
                     {
-                        string formatCode = $"bestvideo[height<={tier.height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={tier.height}]+bestaudio/best[height<={tier.height}]";
-                        string label = $"{tier.labelName} (Merged, MP4 Preferred)";
-                        if (!availableQualities.Any(q => q.Label.StartsWith(tier.labelName))) availableQualities.Add(new YouTubeQualityItem { Label = label, FormatCode = formatCode, IsAudioOnly = false, SortPriority = tier.height * 10 });
+                        string tierLabel = $"{tier.labelName} ({tier.height}p)";
+                        if (addedTierLabels.Add(tierLabel))
+                        {
+                            qualitiesToAdd.Add(new YouTubeQualityItem
+                            {
+                                Label = tierLabel,
+                                FormatCode = $"bestvideo[height<={tier.height}][vcodec^=avc1|vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<={tier.height}]+bestaudio[ext=m4a]/bestvideo[height<={tier.height}][fps<=30]+bestaudio/best[height<={tier.height}]",
+                                IsAudioOnly = false,
+                                SortPriority = 1500000 + tier.height 
+                            });
+                        }
                     }
                 }
-                availableQualities.AddRange(audioFormatItems.GroupBy(a => a.FormatCode).Select(g => g.First()).OrderByDescending(a => a.SortPriority));
-                availableQualities.AddRange(preMergedFormatItems.GroupBy(p => p.FormatCode).Select(g => g.First()).OrderByDescending(p => p.SortPriority));
-                availableQualities = availableQualities.GroupBy(q => q.Label).Select(g => g.OrderByDescending(i => i.SortPriority).First()).OrderByDescending(q => q.SortPriority).ToList();
 
-                if (availableQualities.Any())
+                qualitiesToAdd.Add(new YouTubeQualityItem { Label = "Best Audio Only", FormatCode = "bestaudio/best", IsAudioOnly = true, SortPriority = 100000 });
+
+                if (rawAudioFormats.Any())
                 {
-                    YouTubeQualityComboBox.ItemsSource = availableQualities;
+                    var bestSpecificAudio = rawAudioFormats.OrderByDescending(a => a.SortPriority).First();
+                    if (bestSpecificAudio.Label != "Best Audio Only" && !qualitiesToAdd.Any(q => q.Label == bestSpecificAudio.Label))
+                    {
+                        bestSpecificAudio.SortPriority = 90000;
+                        qualitiesToAdd.Add(bestSpecificAudio);
+                    }
+                }
+
+                var finalSortedQualities = qualitiesToAdd
+                                     .GroupBy(q => q.Label)
+                                     .Select(g => g.OrderByDescending(i => i.SortPriority).First())
+                                     .OrderByDescending(q => q.SortPriority)
+                                     .ToList();
+
+                if (finalSortedQualities.Any())
+                {
+                    YouTubeQualityComboBox.ItemsSource = finalSortedQualities;
                     if (QualitySection != null) QualitySection.Visibility = Visibility.Visible;
                     await Dispatcher.InvokeAsync(() => { if (YouTubeQualityComboBox.Items.Count > 0) YouTubeQualityComboBox.SelectedIndex = 0; UpdateDownloadButtonState(); }, DispatcherPriority.ContextIdle);
                     StatusTextBlock.Text = "Status: YouTube qualities listed. Select quality to download.";
@@ -385,7 +408,7 @@ namespace UniversalDownloader
             catch (Newtonsoft.Json.JsonReaderException jsonEx) { StatusTextBlock.Text = $"Status: Error parsing yt-dlp output: {jsonEx.Message.Split('\n')[0]}."; FileNameTextBlock.Text = "YouTube Info Parse Error"; if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed; }
             catch (Exception ex) { StatusTextBlock.Text = $"Status: Error processing YouTube info: {ex.Message.Split('\n')[0]}."; FileNameTextBlock.Text = "YouTube Info Error"; if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed; }
         }
-
+        
         private async Task DownloadYouTubeVideoWithYtDlp(string videoUrl, string formatCode, string tempDownloadFolderPath)
         {
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null || YouTubeQualityComboBox == null) return;
@@ -400,7 +423,7 @@ namespace UniversalDownloader
             FileNameTextBlock.Text = "Preparing YouTube download...";
             DownloadProgressBar.Value = 0; DownloadProgressBar.Maximum = 100; DownloadProgressBar.IsIndeterminate = true;
             _currentDownloadingComponent = null;
-            string finalReportedFilePathInTemp = null; // This will be updated by ParseYtDlpProgress
+            string finalReportedFilePathInTemp = null;
 
             try
             {
@@ -416,7 +439,7 @@ namespace UniversalDownloader
                     StandardErrorEncoding = System.Text.Encoding.UTF8
                 };
 
-                string actualFileNameFromYtDlpOutput = "downloaded_video"; // Fallback name if parsing fails
+                string actualFileNameFromYtDlpOutput = "downloaded_video"; 
                 bool progressStartedForAnyComponent = false;
                 double lastReportedPercentageForComponent = 0;
 
@@ -441,14 +464,14 @@ namespace UniversalDownloader
                     {
                         if (_ytDlpCurrentComponentTotalBytes > 0 && DownloadProgressBar.Maximum == _ytDlpCurrentComponentTotalBytes) { DownloadProgressBar.Value = DownloadProgressBar.Maximum; }
                         else if (DownloadProgressBar.Maximum == 100) { DownloadProgressBar.Value = 100; }
-                        else { DownloadProgressBar.Value = DownloadProgressBar.Maximum; } // Fallback
+                        else { DownloadProgressBar.Value = DownloadProgressBar.Maximum; } 
 
-                        string fileToMove = finalReportedFilePathInTemp; // Trust the path reported by ParseYtDlpProgress first
+                        string fileToMove = finalReportedFilePathInTemp; 
 
                         if (string.IsNullOrEmpty(fileToMove) || !File.Exists(fileToMove))
                         {
                             Debug.WriteLine($"yt-dlp fallback: finalReportedFilePathInTemp was '{fileToMove}'. Searching temp folder '{tempDownloadFolderPath}'...");
-                            await Task.Delay(500); // Give a moment for file system to finalize write if needed
+                            await Task.Delay(500); 
 
                             if (Directory.Exists(tempDownloadFolderPath))
                             {
@@ -462,8 +485,8 @@ namespace UniversalDownloader
                                                   f.Extension.Equals(".mp3", StringComparison.OrdinalIgnoreCase) ||
                                                   f.Extension.Equals(".opus", StringComparison.OrdinalIgnoreCase) ||
                                                   f.Extension.Equals(".ogg", StringComparison.OrdinalIgnoreCase)))
-                                    .OrderByDescending(f => f.Length) // Prioritize larger files (often the main media)
-                                    .ThenByDescending(f => f.LastWriteTimeUtc) // Then by most recent
+                                    .OrderByDescending(f => f.Length) 
+                                    .ThenByDescending(f => f.LastWriteTimeUtc) 
                                     .ToList();
 
                                 if (potentialFiles.Any())
@@ -505,7 +528,7 @@ namespace UniversalDownloader
                             string extension = Path.GetExtension(targetPath);
                             while (File.Exists(targetPath))
                             {
-                                targetFileName = $"{fileNameOnly} ({count++}){extension}"; // Update the filename part
+                                targetFileName = $"{fileNameOnly} ({count++}){extension}"; 
                                 targetPath = Path.Combine(SelectedDirectory, targetFileName);
                                 if (count > 100) { StatusTextBlock.Text = "Status: Too many existing files with similar names."; FileNameTextBlock.Text = "Move Error"; goto EndYtDlpLogic; }
                             }
@@ -522,7 +545,6 @@ namespace UniversalDownloader
                                 Debug.WriteLine($"Error moving yt-dlp file: {moveEx.ToString()}");
                                 StatusTextBlock.Text = $"Status: Download complete to temp, but failed to move: {moveEx.Message.Split('\n')[0]}";
                                 FileNameTextBlock.Text = "File Move Error";
-                                // File remains in temp folder if move fails
                             }
                         }
                         else
@@ -591,7 +613,7 @@ namespace UniversalDownloader
                 }
                 progressStartedForAnyComponent = true;
                 Debug.WriteLine($"yt-dlp reported path: {finalReportedFilePathInTemp} (Processing: {isProcessingStep})");
-                return; // Prioritize these lines for file identification and status
+                return;
             }
 
             Match alreadyDownloadedMatch = Regex.Match(outputLine, @"\[download\]\s+""?([^""\r\n]+)""?\s+has already been downloaded");
