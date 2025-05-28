@@ -273,14 +273,13 @@ namespace UniversalDownloader
 
             var qualitiesToAdd = new List<YouTubeQualityItem>();
             JArray ytDlpReportedFormats = null;
-            string videoTitle = "Unknown Video";
 
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
                     FileName = _ytDlpExecutablePath,
-                    Arguments = $"-J --no-warnings --ignore-config --flat-playlist \"{videoUrl}\"", // -J for JSON output
+                    Arguments = $"-J --no-warnings --ignore-config --flat-playlist \"{videoUrl}\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -304,7 +303,7 @@ namespace UniversalDownloader
                         if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed; return;
                     }
                     JObject videoInfo = JObject.Parse(jsonOutput);
-                    videoTitle = Utilities.SanitizeFileName(videoInfo["title"]?.ToString() ?? "Unknown Title");
+                    string videoTitle = Utilities.SanitizeFileName(videoInfo["title"]?.ToString() ?? "Unknown Title");
                     FileNameTextBlock.Text = $"Video: {videoTitle}";
                     ytDlpReportedFormats = videoInfo["formats"] as JArray;
                 }
@@ -347,27 +346,29 @@ namespace UniversalDownloader
                     }
                 }
 
-                qualitiesToAdd.Add(new YouTubeQualityItem { Label = "Best Video + Best Audio", FormatCode = "bestvideo+bestaudio/best", IsAudioOnly = false, SortPriority = 2000000 });
+                qualitiesToAdd.Add(new YouTubeQualityItem { Label = "Best Video + Best Audio", FormatCode = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best", IsAudioOnly = false, SortPriority = 2000000 });
 
                 var targetResolutionTiers = new List<(int height, string labelName)> {
                     (4320, "8K"), (3840, "4K UHD"), (2160, "4K"), (1440, "1440p QHD"),
                     (1080, "1080p FHD"), (720, "720p HD"), (480, "480p SD"), (360, "360p")
-                }.OrderByDescending(t => t.height).ToList(); 
+                }.OrderByDescending(t => t.height).ToList();
 
                 var addedTierLabels = new HashSet<string>();
                 foreach (var tier in targetResolutionTiers)
                 {
-                    if (allAvailableVideoHeights.Any(h => h >= tier.height)) 
+                    if (allAvailableVideoHeights.Any(h => h >= tier.height))
                     {
                         string tierLabel = $"{tier.labelName} ({tier.height}p)";
                         if (addedTierLabels.Add(tierLabel))
                         {
+                            string formatCode = $"bestvideo[height<={tier.height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={tier.height}]+bestaudio/best[height<={tier.height}]";
+
                             qualitiesToAdd.Add(new YouTubeQualityItem
                             {
                                 Label = tierLabel,
-                                FormatCode = $"bestvideo[height<={tier.height}][vcodec^=avc1|vcodec^=h264]+bestaudio[ext=m4a]/bestvideo[height<={tier.height}]+bestaudio[ext=m4a]/bestvideo[height<={tier.height}][fps<=30]+bestaudio/best[height<={tier.height}]",
+                                FormatCode = formatCode,
                                 IsAudioOnly = false,
-                                SortPriority = 1500000 + tier.height 
+                                SortPriority = 1500000 + tier.height
                             });
                         }
                     }
@@ -400,7 +401,7 @@ namespace UniversalDownloader
                 }
                 else
                 {
-                    StatusTextBlock.Text = "Status: No downloadable formats could be determined."; FileNameTextBlock.Text = "No YouTube formats available.";
+                    StatusTextBlock.Text = "Status: No downloadable formats could be determined."; FileNameTextBlock.Text = "No YouTube formats found.";
                     if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed;
                 }
             }
