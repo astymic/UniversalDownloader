@@ -15,7 +15,8 @@
         Loaded="MainWindow_Loaded"
         StateChanged="MainWindow_StateChanged"
         ResizeMode="CanResize"
-        SnapsToDevicePixels="True">
+        SnapsToDevicePixels="True"
+        Icon="akashi.ico">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="50" 
