@@ -16,7 +16,6 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Ookii.Dialogs.Wpf;
 using Newtonsoft.Json.Linq;
-// using System.Windows.Shell; // WindowChrome is part of PresentationFramework, not Shell specifically.
 
 namespace UniversalDownloader
 {
@@ -205,19 +204,11 @@ namespace UniversalDownloader
             }
             else if (this.WindowState == WindowState.Normal)
             {
-                // If it became normal and we *were* pseudo-maximized, it means something else restored it (e.g. dragging title bar)
-                // or we clicked restore from an OS maximized state.
-                // If we were pseudo-maximized, dragging title bar will "restore" to the pseudo-maximized size,
-                // then clicking our restore button will go to true normal. This is an edge case of this method.
                 if (_isManuallyPseudoMaximized)
                 {
-                    // If OS made it normal while we thought we were pseudo-maximized (e.g., user dragged it)
-                    // then we are no longer pseudo-maximized by our definition.
-                    // The size will be whatever the user dragged it to.
                     // _isManuallyPseudoMaximized = false; // Let the button click handle this transition if it was initiated by button
                 }
                 // _isManuallyPseudoMaximized = false; // Generally, if OS sets to normal, clear our flag.
-                // Handled more explicitly in MaximizeRestoreButton_Click
 
                 if (MainWindowRootBorder != null)
                 {
