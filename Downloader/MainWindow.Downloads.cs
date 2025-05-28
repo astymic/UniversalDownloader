@@ -1,14 +1,15 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Windows; 
-using System.Windows.Controls; 
+using System.Windows;
+using System.Windows.Controls;
 
 namespace UniversalDownloader
 {
-    public partial class MainWindow 
+    public partial class MainWindow // Must be partial
     {
         private bool IsYouTubeLink(string url)
         {
@@ -48,10 +49,10 @@ namespace UniversalDownloader
                 if (!_isYtDlpReady)
                 {
                     if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: {YtDlpFileName} not found. Checking/Downloading...";
-                    await CheckAndEnsureYtDlpExistsAsync(); // Calls method in MainWindow.YtDlp.cs
+                    await CheckAndEnsureYtDlpExistsAsync();
                 }
 
-                if (_isYtDlpReady) await LoadYouTubeQualitiesWithYtDlp(url); // Calls method in MainWindow.YtDlp.cs
+                if (_isYtDlpReady) await LoadYouTubeQualitiesWithYtDlp(url);
                 else
                 {
                     if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: {YtDlpFileName} still not available. YouTube features disabled.";
@@ -94,8 +95,9 @@ namespace UniversalDownloader
                 FileNameTextBlock.Text = "Filename: (unable to determine - HTTP error)";
                 StatusTextBlock.Text = $"Status: Could not get file info (HTTP: {httpEx.StatusCode}). URL might be invalid or inaccessible.";
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Debug.WriteLine($"Error in TrySetFileNameFromUrlHeaders: {ex.Message}");
                 FileNameTextBlock.Text = "Filename: (unable to determine before download)";
                 StatusTextBlock.Text = "Status: Could not get file info. Proceed with download if URL is direct.";
             }
@@ -106,7 +108,7 @@ namespace UniversalDownloader
             string fileName = null;
             if (response.Content.Headers.ContentDisposition != null)
             {
-                fileName = response.Content.Headers.ContentDisposition.FileNameStar;
+                fileName = response.Content.Headers.ContentDisposition.FileNameStar; 
                 if (string.IsNullOrWhiteSpace(fileName)) { fileName = response.Content.Headers.ContentDisposition.FileName; }
             }
             if (string.IsNullOrWhiteSpace(fileName))
@@ -114,20 +116,25 @@ namespace UniversalDownloader
                 if (Uri.TryCreate(url, UriKind.Absolute, out Uri uri))
                 {
                     string pathFileName = Path.GetFileName(uri.LocalPath);
-                    if (!string.IsNullOrWhiteSpace(pathFileName) && (pathFileName.Contains(".") || !string.IsNullOrEmpty(Path.GetExtension(pathFileName)))) { fileName = pathFileName; }
+                    if (!string.IsNullOrWhiteSpace(pathFileName) && (pathFileName.Contains(".") || !string.IsNullOrEmpty(Path.GetExtension(pathFileName))))
+                    {
+                        fileName = pathFileName;
+                    }
                 }
             }
-            fileName = Utilities.SanitizeFileName(Uri.UnescapeDataString(fileName ?? "")); // Use Utilities
+            fileName = Utilities.SanitizeFileName(Uri.UnescapeDataString(fileName ?? ""));
             if (string.IsNullOrWhiteSpace(fileName) || string.IsNullOrWhiteSpace(Path.GetExtension(fileName)))
             {
-                string extension = Utilities.GetExtensionFromMimeType(response.Content.Headers.ContentType?.MediaType); // Use Utilities
-                if (string.IsNullOrWhiteSpace(fileName) || fileName == "downloaded_file") { fileName = (IsGoogleDriveLink(url) ? "gdrive_download" : "downloaded_file") + extension; }
-                else if (string.IsNullOrWhiteSpace(Path.GetExtension(fileName))) { fileName = Path.ChangeExtension(fileName, extension); }
+                string extension = Utilities.GetExtensionFromMimeType(response.Content.Headers.ContentType?.MediaType);
+                string baseName = (string.IsNullOrWhiteSpace(fileName) || fileName == "downloaded_file")
+                                  ? (IsGoogleDriveLink(url) ? "gdrive_download" : "downloaded_file")
+                                  : Path.GetFileNameWithoutExtension(fileName);
+                fileName = baseName + extension;
             }
-            return string.IsNullOrWhiteSpace(fileName) ? "unknown_file.dat" : fileName;
+            return string.IsNullOrWhiteSpace(fileName) ? "unknown_file.dat" : Utilities.SanitizeFileName(fileName); 
         }
 
-        private async Task DownloadGoogleDriveFile(string url)
+        private async Task DownloadGoogleDriveFile(string url, string tempDownloadFolderPath)
         {
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null) { return; }
             StatusTextBlock.Text = "Status: Preparing Google Drive download...";
@@ -147,50 +154,72 @@ namespace UniversalDownloader
                 return;
             }
             string directDownloadUrl = $"https://drive.google.com/uc?export=download&confirm=t&id={fileId}";
-            await DownloadDirectFile(directDownloadUrl, true);
+            await DownloadDirectFile(directDownloadUrl, tempDownloadFolderPath, true);
         }
 
-        private async Task DownloadDirectFile(string url, bool isGoogleDriveInitialAttempt = false)
+        private async Task DownloadDirectFile(string url, string tempDownloadFolderPath, bool isGoogleDriveInitialAttempt = false)
         {
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null) { return; }
             StatusTextBlock.Text = "Status: Starting direct download...";
             FileNameTextBlock.Text = "Connecting for direct download...";
-            string fileName = "unknown_file.dat";
+            string tempFileName = "unknown_file.dat";
+            string tempFilePath = null;
+
             try
             {
                 using (var request = new HttpRequestMessage(HttpMethod.Get, url))
                 using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
                 {
-                    if (isGoogleDriveInitialAttempt && (response.Content.Headers.ContentType?.MediaType?.Contains("text/html") ?? false) && response.RequestMessage.RequestUri.Host.Contains("google.com"))
+                    if (isGoogleDriveInitialAttempt && (response.Content.Headers.ContentType?.MediaType?.Contains("text/html") ?? false) &&
+                        (response.RequestMessage.RequestUri.Host.Contains("google.com") || response.RequestMessage.RequestUri.Host.Contains("drive.usercontent.google.com")))
                     {
                         string htmlContent = await response.Content.ReadAsStringAsync();
-                        var confirmLinkMatch = Regex.Match(htmlContent, @"<form\s+id=""downloadForm""[\s\S]*?action=""([^""]+)""");
+                        var confirmLinkMatch = Regex.Match(htmlContent, @"<form[^>]*id=[""']downloadForm[""'][^>]*action=[""']([^""']+)[""']", RegexOptions.IgnoreCase);
+                        if (!confirmLinkMatch.Success) 
+                        {
+                            confirmLinkMatch = Regex.Match(htmlContent, @"href=[""'](https?://drive\.google\.com/uc\?export=download[^""']+)[""']", RegexOptions.IgnoreCase);
+                        }
+
                         if (confirmLinkMatch.Success)
                         {
                             string newUrl = System.Net.WebUtility.HtmlDecode(confirmLinkMatch.Groups[1].Value);
-                            if (!newUrl.StartsWith("http")) { newUrl = new Uri(response.RequestMessage.RequestUri, newUrl).ToString(); }
+                            if (!newUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                            {
+                                newUrl = new Uri(response.RequestMessage.RequestUri, newUrl).ToString();
+                            }
                             StatusTextBlock.Text = "Status: Following Google Drive confirmation link..."; FileNameTextBlock.Text = "Google Drive: Confirming...";
-                            await Task.Delay(200); await DownloadDirectFile(newUrl, false); return;
+                            await Task.Delay(200);
+                            await DownloadDirectFile(newUrl, tempDownloadFolderPath, false);
+                            return;
                         }
-                        else { StatusTextBlock.Text = "Status: Google Drive may require confirmation or file is unavailable. Auto-link not found."; FileNameTextBlock.Text = "Google Drive: Confirmation needed/Error"; return; }
+                        else
+                        {
+                            StatusTextBlock.Text = "Status: Google Drive may require confirmation, or file is too large/unavailable for direct download. Auto-link not found.";
+                            FileNameTextBlock.Text = "Google Drive: Confirmation needed/Error";
+                            return;
+                        }
                     }
                     response.EnsureSuccessStatusCode();
-                    fileName = GetFileNameFromHeaders(response, url);
-                    FileNameTextBlock.Text = $"Downloading File: {fileName}";
-                    string outputPath = Path.Combine(SelectedDirectory, fileName);
-                    StatusTextBlock.Text = $"Status: Downloading '{fileName}'...";
-                    long? totalBytes = response.Content.Headers.ContentLength; int lastPercentage = -1;
+                    tempFileName = GetFileNameFromHeaders(response, url);
+                    tempFilePath = Path.Combine(tempDownloadFolderPath, tempFileName);
+
+                    FileNameTextBlock.Text = $"Downloading File: {tempFileName}";
+                    StatusTextBlock.Text = $"Status: Downloading '{tempFileName}'...";
+                    long? totalBytes = response.Content.Headers.ContentLength;
+                    int lastPercentage = -1;
+
                     if (DownloadProgressBar != null)
                     {
                         DownloadProgressBar.IsIndeterminate = !(totalBytes.HasValue && totalBytes.Value > 0);
-                        if (!DownloadProgressBar.IsIndeterminate) DownloadProgressBar.Maximum = 100;
+                        if (!DownloadProgressBar.IsIndeterminate) DownloadProgressBar.Maximum = 100; else DownloadProgressBar.Maximum = 0; // Reset max if indeterminate
+                        DownloadProgressBar.Value = 0;
                     }
 
-                    using (var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+                    using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
                     using (var stream = await response.Content.ReadAsStreamAsync())
                     {
                         byte[] buffer = new byte[81920]; int bytesRead; long totalBytesRead = 0;
-                        if (DownloadProgressBar != null && !DownloadProgressBar.IsIndeterminate) DownloadProgressBar.Value = 0;
+
                         while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
                         {
                             await fileStream.WriteAsync(buffer, 0, bytesRead); totalBytesRead += bytesRead;
@@ -200,37 +229,90 @@ namespace UniversalDownloader
                                 double percentage = (double)totalBytesRead / totalBytes.Value * 100;
                                 if ((int)percentage != lastPercentage)
                                 {
-                                    if (DownloadProgressBar != null) DownloadProgressBar.Value = percentage;
-                                    StatusTextBlock.Text = $"Downloading: {percentage:F1}% of {Utilities.FormatBytesOutput(totalBytes.Value)} | File: {fileName}"; // Use Utilities
+                                    if (DownloadProgressBar != null) DownloadProgressBar.Value = Math.Min(percentage, 100.0);
+                                    StatusTextBlock.Text = $"Downloading: {percentage:F1}% of {Utilities.FormatBytesOutput(totalBytes.Value)} | File: {tempFileName}";
                                     lastPercentage = (int)percentage;
                                 }
                             }
                             else
                             {
                                 if (DownloadProgressBar != null && !DownloadProgressBar.IsIndeterminate) DownloadProgressBar.IsIndeterminate = true;
-                                StatusTextBlock.Text = $"Status: Downloading '{fileName}' ({Utilities.FormatBytesOutput(totalBytesRead)})..."; // Use Utilities
+                                StatusTextBlock.Text = $"Status: Downloading '{tempFileName}' ({Utilities.FormatBytesOutput(totalBytesRead)})...";
                             }
                         }
                     }
-                    if (DownloadProgressBar != null) { DownloadProgressBar.IsIndeterminate = false; if (totalBytes.HasValue && totalBytes.Value > 0) DownloadProgressBar.Value = 100; }
-                    StatusTextBlock.Text = $"Status: File '{fileName}' downloaded successfully!"; FileNameTextBlock.Text = $"Completed: {fileName}";
+
+                    if (DownloadProgressBar != null)
+                    {
+                        DownloadProgressBar.IsIndeterminate = false;
+                        if (totalBytes.HasValue && totalBytes.Value > 0) DownloadProgressBar.Value = 100;
+                    }
+
+                    string finalTargetFileName = Path.GetFileName(tempFileName);
+                    string targetPath = Path.Combine(SelectedDirectory, finalTargetFileName);
+                    
+                    if (!Directory.Exists(SelectedDirectory))
+                    {
+                        Debug.WriteLine($"Destination directory does not exist: {SelectedDirectory}");
+                        StatusTextBlock.Text = $"Status: Error - Destination directory '{SelectedDirectory}' not found.";
+                        FileNameTextBlock.Text = "Move Error";
+                        goto EndDirectDownloadLogic; 
+                    }
+
+                    int count = 1;
+                    string fileNameOnly = Path.GetFileNameWithoutExtension(targetPath);
+                    string extension = Path.GetExtension(targetPath);
+                    while (File.Exists(targetPath))
+                    {
+                        finalTargetFileName = $"{fileNameOnly} ({count++}){extension}"; 
+                        targetPath = Path.Combine(SelectedDirectory, finalTargetFileName);
+                        if (count > 100)
+                        { 
+                            StatusTextBlock.Text = "Status: Too many existing files with similar names. Could not move.";
+                            FileNameTextBlock.Text = "Move Error";
+                            goto EndDirectDownloadLogic;
+                        }
+                    }
+                    try
+                    {
+                        File.Move(tempFilePath, targetPath);
+                        Debug.WriteLine($"Moved: {tempFilePath} TO {targetPath}");
+                        tempFilePath = null; 
+
+                        StatusTextBlock.Text = $"Status: File '{Path.GetFileName(targetPath)}' downloaded successfully!";
+                        FileNameTextBlock.Text = $"Completed: {Path.GetFileName(targetPath)}";
+                    }
+                    catch (Exception moveEx)
+                    {
+                        Debug.WriteLine($"Error moving file: {moveEx.ToString()}");
+                        StatusTextBlock.Text = $"Status: Download complete to temp, but failed to move: {moveEx.Message.Split('\n')[0]}";
+                        FileNameTextBlock.Text = "File Move Error";
+                    }
+                    EndDirectDownloadLogic:;
                 }
             }
             catch (HttpRequestException httpEx)
             {
-                if (isGoogleDriveInitialAttempt && httpEx.StatusCode == System.Net.HttpStatusCode.Forbidden) StatusTextBlock.Text = "Status: GDrive access forbidden (403). File not public/quota issue.";
-                else StatusTextBlock.Text = $"Status: HTTP Error - {httpEx.StatusCode?.ToString() ?? httpEx.Message.Split('\n')[0]}";
+                StatusTextBlock.Text = $"Status: HTTP Error - {httpEx.StatusCode?.ToString() ?? httpEx.Message.Split('\n')[0]}";
                 FileNameTextBlock.Text = $"File: (Download Failed - {httpEx.StatusCode?.ToString() ?? "HTTP"})";
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"Error in DownloadDirectFile: {ex.ToString()}"); // Log more details for debugging
                 if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Download Error - {ex.Message.Split('\n')[0]}.";
                 if (FileNameTextBlock != null) FileNameTextBlock.Text = "File: (Download Failed)";
-                if (!string.IsNullOrEmpty(fileName) && fileName != "unknown_file.dat" && !string.IsNullOrEmpty(SelectedDirectory) && Directory.Exists(SelectedDirectory))
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(tempFilePath) && File.Exists(tempFilePath))
                 {
-                    string partialPath = Path.Combine(SelectedDirectory, fileName);
-                    if (File.Exists(partialPath)) { try { File.Delete(partialPath); } catch { /* best effort */ } }
+                    try
+                    {
+                        Debug.WriteLine($"File left in temp (move failed or skipped): {tempFilePath}");
+                    }
+                    catch (Exception delEx) { Debug.WriteLine($"Error deleting temp file {tempFilePath} after failed move: {delEx.Message}"); }
                 }
+                CleanUpTempFolder(tempDownloadFolderPath); 
             }
         }
     }
