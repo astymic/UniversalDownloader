@@ -6,16 +6,19 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Net.Mime;
+using System.Runtime.InteropServices; 
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Ookii.Dialogs.Wpf;
 using Newtonsoft.Json.Linq;
+using System.Windows.Forms; 
+
 
 namespace UniversalDownloader
 {
@@ -36,6 +39,14 @@ namespace UniversalDownloader
         private bool _isManuallyPseudoMaximized = false;
         private Rect _normalWindowBoundsBeforePseudoMaximize;
 
+        // For WndProc
+        private const int WM_NCLBUTTONDBLCLK = 0x00A3; 
+        private const int HTCAPTION = 0x2;        
+
+        private Point _startPointMaximizedDrag;
+        private double _maximizedWindowWidthForDrag;
+
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -53,9 +64,73 @@ namespace UniversalDownloader
             _httpClient.Timeout = TimeSpan.FromMinutes(10);
 
             _ytDlpExecutablePath = Path.Combine(AppContext.BaseDirectory, YtDlpFileName);
-
-            // SourceInitialized += MainWindow_SourceInitialized; // Not using this with the pseudo-maximize approach
         }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            HwndSource source = PresentationSource.FromVisual(this) as HwndSource;
+            if (source != null)
+            {
+                source.AddHook(WndProc);
+            }
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WM_NCLBUTTONDBLCLK)
+            {
+                // wParam indicates the hit-test area. HTCAPTION is the title bar.
+                if (wParam.ToInt32() == HTCAPTION)
+                {
+                    // This is a double-click on the custom title bar area
+                    Dispatcher.Invoke(() =>
+                    {
+                        // Call our existing logic that handles maximize/restore to work area
+                        HandleDoubleClickMaximizeRestore();
+                    });
+
+                    handled = true;      // We've handled this message
+                    return (IntPtr)1;    // Prevent default processing by returning a non-zero value
+                                         // Some sources say IntPtr.Zero, others non-zero. For WM_NCLBUTTONDBLCLK,
+                                         // preventing default means not maximizing in the OS default way.
+                                         // Testing might be needed if (IntPtr)1 doesn't work as expected, try IntPtr.Zero.
+                }
+            }
+            return IntPtr.Zero; // Default processing for other messages
+        }
+
+        private void HandleDoubleClickMaximizeRestore()
+        {
+            // This method consolidates the logic for double-click on title bar
+            if (this.WindowState == WindowState.Maximized || _isManuallyPseudoMaximized)
+            {
+                // If already full screen (OS or pseudo), restore it.
+                // MaximizeRestoreButton_Click will handle the actual restoration.
+                MaximizeRestoreButton_Click(null, new RoutedEventArgs()); // Using dummy args
+            }
+            else
+            {
+                // Window is Normal, explicitly go to Pseudo-Maximize to WorkArea
+                _normalWindowBoundsBeforePseudoMaximize = new Rect(this.Left, this.Top, this.Width, this.Height);
+
+                this.Left = SystemParameters.WorkArea.Left;
+                this.Top = SystemParameters.WorkArea.Top;
+                this.Width = SystemParameters.WorkArea.Width;
+                this.Height = SystemParameters.WorkArea.Height;
+                _isManuallyPseudoMaximized = true;
+
+                // Ensure WindowState is Normal, as we are managing maximization manually
+                // This is a safeguard if OS tried to set it to Maximized concurrently
+                if (this.WindowState == WindowState.Maximized)
+                {
+                    this.WindowState = WindowState.Normal;
+                }
+
+                UpdateMaximizeRestoreButtonAndBorder(true); // true for maximized/pseudo-maximized state
+            }
+        }
+
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
@@ -86,28 +161,17 @@ namespace UniversalDownloader
             }
         }
 
-        // Helper method to find a visual child of a specific type
         public static T FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
         {
-            if (parent == null)
-            {
-                return null;
-            }
-
+            if (parent == null) return null;
             for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
             {
                 DependencyObject child = VisualTreeHelper.GetChild(parent, i);
-                if (child != null && child is T)
-                {
-                    return (T)child;
-                }
+                if (child != null && child is T) return (T)child;
                 else
                 {
                     T childOfChild = FindVisualChild<T>(child);
-                    if (childOfChild != null)
-                    {
-                        return childOfChild;
-                    }
+                    if (childOfChild != null) return childOfChild;
                 }
             }
             return null;
@@ -117,9 +181,44 @@ namespace UniversalDownloader
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            if (e.ClickCount == 2)
+            {
+                return; 
+            }
+
             if (e.ButtonState == MouseButtonState.Pressed)
             {
-                this.DragMove();
+                if (this.WindowState == WindowState.Maximized || _isManuallyPseudoMaximized)
+                {
+                    _startPointMaximizedDrag = e.GetPosition(this);
+                    _maximizedWindowWidthForDrag = this.ActualWidth;
+
+                    if (this.WindowState == WindowState.Maximized)
+                    {
+                        this.WindowState = WindowState.Normal; // StateChanged handles visuals
+                    }
+                    else if (_isManuallyPseudoMaximized)
+                    {
+                        RestoreFromPseudoMaximize(); // Use helper
+                    }
+
+                    Point currentScreenMousePosition = new Point(System.Windows.Forms.Control.MousePosition.X, System.Windows.Forms.Control.MousePosition.Y);
+                    if (this.ActualWidth > 0 && _maximizedWindowWidthForDrag > 0) // Avoid division by zero
+                    {
+                        this.Left = currentScreenMousePosition.X - (_startPointMaximizedDrag.X * (this.ActualWidth / _maximizedWindowWidthForDrag));
+                    }
+                    else
+                    {
+                        this.Left = currentScreenMousePosition.X - _startPointMaximizedDrag.X;
+                    }
+                    this.Top = currentScreenMousePosition.Y - _startPointMaximizedDrag.Y;
+
+                    this.DragMove();
+                }
+                else
+                {
+                    this.DragMove();
+                }
             }
         }
 
@@ -128,55 +227,83 @@ namespace UniversalDownloader
             this.WindowState = WindowState.Minimized;
         }
 
-        private void MaximizeRestoreButton_Click(object sender, RoutedEventArgs e)
+        private void UpdateMaximizeRestoreButtonAndBorder(bool isMaximizedOrPseudo)
         {
-            if (this.WindowState == WindowState.Maximized) // If truly OS maximized by WindowChrome
+            if (isMaximizedOrPseudo)
             {
-                this.WindowState = WindowState.Normal; // OS will restore
-                _isManuallyPseudoMaximized = false;
-                // StateChanged event will handle button icon updates
-            }
-            else if (_isManuallyPseudoMaximized) // If we are in our pseudo-maximized state
-            {
-                // Restore from pseudo-maximize
-                this.Left = _normalWindowBoundsBeforePseudoMaximize.Left;
-                this.Top = _normalWindowBoundsBeforePseudoMaximize.Top;
-                this.Width = _normalWindowBoundsBeforePseudoMaximize.Width;
-                this.Height = _normalWindowBoundsBeforePseudoMaximize.Height;
-                _isManuallyPseudoMaximized = false;
-
                 if (MaximizeRestoreButton != null)
                 {
-                    MaximizeRestoreButton.Content = ""; // Maximize icon (Segoe MDL2 Assets: )
-                    MaximizeRestoreButton.ToolTip = "Maximize";
-                }
-                if (MainWindowRootBorder != null)
-                {
-                    MainWindowRootBorder.CornerRadius = new CornerRadius(16); // Restore rounding
-                }
-            }
-            else // Is Normal, go to pseudo-maximize
-            {
-                _normalWindowBoundsBeforePseudoMaximize = new Rect(this.Left, this.Top, this.Width, this.Height);
-
-                this.Left = SystemParameters.WorkArea.Left;
-                this.Top = SystemParameters.WorkArea.Top;
-                this.Width = SystemParameters.WorkArea.Width;
-                this.Height = SystemParameters.WorkArea.Height;
-                _isManuallyPseudoMaximized = true;
-
-                if (MaximizeRestoreButton != null)
-                {
-                    MaximizeRestoreButton.Content = ""; // Restore icon (Segoe MDL2 Assets: )
+                    MaximizeRestoreButton.Content = ""; // Restore icon
                     MaximizeRestoreButton.ToolTip = "Restore";
                 }
                 if (MainWindowRootBorder != null)
                 {
-                    // Ensure rounded corners are maintained in pseudo-maximized state
+                    MainWindowRootBorder.CornerRadius = new CornerRadius(16); // Or 0 if OS maximized, but for pseudo let's keep it
+                    MainWindowRootBorder.Effect = null; // No shadow
+                }
+            }
+            else // Is Normal (and not pseudo-maximized)
+            {
+                if (MaximizeRestoreButton != null)
+                {
+                    MaximizeRestoreButton.Content = ""; // Maximize icon
+                    MaximizeRestoreButton.ToolTip = "Maximize";
+                }
+                if (MainWindowRootBorder != null)
+                {
                     MainWindowRootBorder.CornerRadius = new CornerRadius(16);
+                    MainWindowRootBorder.Effect = (System.Windows.Media.Effects.DropShadowEffect)FindResource("WindowShadow"); // Restore shadow
                 }
             }
         }
+
+        private void RestoreFromPseudoMaximize()
+        {
+            if (!_isManuallyPseudoMaximized) return;
+
+            this.Left = _normalWindowBoundsBeforePseudoMaximize.Left;
+            this.Top = _normalWindowBoundsBeforePseudoMaximize.Top;
+            this.Width = _normalWindowBoundsBeforePseudoMaximize.Width;
+            this.Height = _normalWindowBoundsBeforePseudoMaximize.Height;
+            _isManuallyPseudoMaximized = false;
+            UpdateMaximizeRestoreButtonAndBorder(false);
+        }
+
+        private void GoToPseudoMaximize()
+        {
+            _normalWindowBoundsBeforePseudoMaximize = new Rect(this.Left, this.Top, this.Width, this.Height);
+
+            this.Left = SystemParameters.WorkArea.Left;
+            this.Top = SystemParameters.WorkArea.Top;
+            this.Width = SystemParameters.WorkArea.Width;
+            this.Height = SystemParameters.WorkArea.Height;
+            _isManuallyPseudoMaximized = true;
+
+            if (this.WindowState == WindowState.Maximized)
+            {
+                this.WindowState = WindowState.Normal; // This will trigger StateChanged, which should be fine
+            }
+            UpdateMaximizeRestoreButtonAndBorder(true);
+        }
+
+
+        private void MaximizeRestoreButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (this.WindowState == WindowState.Maximized) // OS Maximized
+            {
+                this.WindowState = WindowState.Normal; // OS restores, StateChanged updates UI
+                _isManuallyPseudoMaximized = false; // Not pseudo anymore
+            }
+            else if (_isManuallyPseudoMaximized) // Pseudo-Maximized
+            {
+                RestoreFromPseudoMaximize();
+            }
+            else // Is Normal, go to Pseudo-Maximize
+            {
+                GoToPseudoMaximize();
+            }
+        }
+
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
@@ -185,43 +312,23 @@ namespace UniversalDownloader
 
         private void MainWindow_StateChanged(object sender, EventArgs e)
         {
-            if (this.WindowState == WindowState.Maximized)
+            if (this.WindowState == WindowState.Maximized) // OS Maximized
             {
-                // OS has maximized the window (likely via WindowChrome interactions like Aero Snap or Win+Up)
-                _isManuallyPseudoMaximized = false; // OS took over, clear our flag
-
-                if (MainWindowRootBorder != null)
-                {
-                    // Keep our designed rounding even when OS maximized
-                    MainWindowRootBorder.CornerRadius = new CornerRadius(16);
-                    MainWindowRootBorder.Margin = new Thickness(0); // Ensure no extra margin
-                }
-                if (MaximizeRestoreButton != null)
-                {
-                    MaximizeRestoreButton.Content = ""; // Restore icon (Segoe MDL2 Assets: )
-                    MaximizeRestoreButton.ToolTip = "Restore";
-                }
+                _isManuallyPseudoMaximized = false; // OS took over
+                UpdateMaximizeRestoreButtonAndBorder(true); // Update to restore icon, no shadow
             }
             else if (this.WindowState == WindowState.Normal)
             {
-                if (_isManuallyPseudoMaximized)
+                // If not pseudo-maximized, it's a true normal state (e.g., restored from OS max/min)
+                if (!_isManuallyPseudoMaximized)
                 {
-                    // _isManuallyPseudoMaximized = false; // Let the button click handle this transition if it was initiated by button
+                    UpdateMaximizeRestoreButtonAndBorder(false); // Update to maximize icon, with shadow
                 }
-                // _isManuallyPseudoMaximized = false; // Generally, if OS sets to normal, clear our flag.
-
-                if (MainWindowRootBorder != null)
+                else
                 {
-                    MainWindowRootBorder.CornerRadius = new CornerRadius(16);
-                    MainWindowRootBorder.Margin = new Thickness(0);
-                }
-                if (MaximizeRestoreButton != null && !_isManuallyPseudoMaximized) // Only change to Maximize if not in pseudo-maximized state
-                {
-                    MaximizeRestoreButton.Content = ""; // Maximize icon (Segoe MDL2 Assets: )
-                    MaximizeRestoreButton.ToolTip = "Maximize";
+                    UpdateMaximizeRestoreButtonAndBorder(true);
                 }
             }
-            // Minimized state is handled by the OS, usually no visual changes needed from us here for the border.
         }
 
         #endregion
@@ -594,7 +701,7 @@ namespace UniversalDownloader
 
         private void YouTubeQualityComboBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            ComboBox comboBox = sender as ComboBox;
+            System.Windows.Controls.ComboBox comboBox = sender as System.Windows.Controls.ComboBox;
             if (comboBox != null && comboBox.IsEnabled && !comboBox.IsDropDownOpen)
             {
                 var toggleButton = FindVisualChild<System.Windows.Controls.Primitives.ToggleButton>(comboBox);
