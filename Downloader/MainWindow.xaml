@@ -13,10 +13,10 @@
         AllowsTransparency="True"
         Background="Transparent"
         Loaded="MainWindow_Loaded"
-        StateChanged="MainWindow_StateChanged"
+        StateChanged="MainWindow_StateChanged" 
         ResizeMode="CanResize"
         SnapsToDevicePixels="True"
-        Icon="akashi.ico">
+        UseLayoutRounding="True">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="50" 
@@ -39,6 +39,14 @@
         <SolidColorBrush x:Key="TextSecondaryBrush" Color="#64748b"/>
         <SolidColorBrush x:Key="BorderBrush" Color="#e2e8f0"/>
         <SolidColorBrush x:Key="HoverBrush" Color="#f1f5f9"/>
+        <!-- Used for ScrollBar track background -->
+        <SolidColorBrush x:Key="ScrollBarThumbIdleBrush" Color="#a0aec0"/>
+        <!-- Lighter gray for idle thumb -->
+        <SolidColorBrush x:Key="ScrollBarThumbHoverBrush" Color="#718096"/>
+        <!-- Darker gray for hover thumb -->
+        <SolidColorBrush x:Key="ScrollBarThumbDraggingBrush" Color="#6366f1"/>
+        <!-- Primary color for dragging thumb -->
+
 
         <!-- Drop Shadow Effect -->
         <DropShadowEffect x:Key="CardShadow" BlurRadius="20" ShadowDepth="4" Color="#000000" Opacity="0.08"/>
@@ -83,20 +91,16 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                                           To="1.05" Duration="0:0:0.1"/>
-                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                                           To="1.05" Duration="0:0:0.1"/>
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.05" Duration="0:0:0.1"/>
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.05" Duration="0:0:0.1"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
                                 <Trigger.ExitActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                                           To="1.0" Duration="0:0:0.1"/>
-                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                                           To="1.0" Duration="0:0:0.1"/>
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.0" Duration="0:0:0.1"/>
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.0" Duration="0:0:0.1"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -200,30 +204,37 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
                         <Grid>
-                            <Border Background="{TemplateBinding Background}"
+                            <!-- This Border is what determines the visual width of the ComboBox -->
+                            <Border x:Name="MainBorder" 
+                                    Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="12"
-                                    Padding="{TemplateBinding Padding}">
-                                <Grid>
-                                    <ContentPresenter x:Name="ContentSite"
+                                    CornerRadius="12">
+                                <Grid Margin="{TemplateBinding Padding}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter x:Name="ContentSite" Grid.Column="0"
                                                     IsHitTestVisible="False"
                                                     Content="{TemplateBinding SelectionBoxItem}"
                                                     VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                                     HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                                     SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
-                                                    Margin="{TemplateBinding Padding}">
+                                                    Margin="0">
                                         <ContentPresenter.ContentTemplate>
                                             <DataTemplate>
                                                 <TextBlock Text="{Binding Label}" />
                                             </DataTemplate>
                                         </ContentPresenter.ContentTemplate>
                                     </ContentPresenter>
-                                    
-                                    <TextBox x:Name="PART_EditableTextBox" 
+
+                                    <TextBox x:Name="PART_EditableTextBox" Grid.Column="0"
                                            Visibility="Hidden" 
-                                           IsReadOnly="{TemplateBinding IsReadOnly}"/>
-                                    <ToggleButton x:Name="ToggleButton" 
+                                           IsReadOnly="{TemplateBinding IsReadOnly}"
+                                           Style="{x:Null}" Focusable="False" Background="Transparent" BorderThickness="0" Margin="0" Padding="0"/>
+
+                                    <ToggleButton x:Name="ToggleButton" Grid.Column="1"
                                                 Focusable="False"
                                                 IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
                                                 ClickMode="Press"
@@ -231,7 +242,7 @@
                                                 BorderThickness="0"
                                                 HorizontalAlignment="Right"
                                                 VerticalAlignment="Center"
-                                                Width="30">
+                                                Width="30" Margin="0,-2,0,-2">
                                         <Path Data="M7,10L12,15L17,10" Stroke="{StaticResource TextSecondaryBrush}" StrokeThickness="2"/>
                                     </ToggleButton>
                                 </Grid>
@@ -241,14 +252,16 @@
                                    IsOpen="{TemplateBinding IsDropDownOpen}"
                                    AllowsTransparency="True" 
                                    Focusable="False"
-                                   PopupAnimation="Slide">
-                                <Grid MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                   PopupAnimation="Slide"
+                                   StaysOpen="False">
+                                <Grid MaxHeight="{TemplateBinding MaxDropDownHeight}" 
+                                      MinWidth="{Binding ActualWidth, ElementName=MainBorder}">
                                     <Border Background="{StaticResource SurfaceBrush}"
                                             BorderBrush="{StaticResource BorderBrush}"
                                             BorderThickness="2"
                                             CornerRadius="12"
                                             Effect="{StaticResource CardShadow}">
-                                        <ScrollViewer>
+                                        <ScrollViewer x:Name="DropDownScrollViewer" SnapsToDevicePixels="True" VerticalScrollBarVisibility="Auto">
                                             <StackPanel IsItemsHost="True"/>
                                         </ScrollViewer>
                                     </Border>
@@ -257,15 +270,16 @@
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsFocused" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                             </Trigger>
                             <Trigger Property="HasItems" Value="True">
-                                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
                             </Trigger>
-                            <Trigger Property="SelectedIndex" Value="-1">
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="MainBorder" Property="Opacity" Value="0.6"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -302,7 +316,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
 
         <!-- Style for Window Control Buttons (Minimize, Maximize/Restore) -->
         <Style TargetType="Button" x:Key="WindowControlButton">
@@ -357,7 +370,6 @@
             </Setter>
         </Style>
 
-
         <!-- Modern Label Style -->
         <Style TargetType="TextBlock" x:Key="ModernLabel">
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -372,6 +384,131 @@
             <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
             <Setter Property="Margin" Value="8,4"/>
         </Style>
+
+        <!-- =============== CUSTOM SCROLLBAR STYLES START =============== -->
+        <Style x:Key="ScrollBarThumbStyle" TargetType="{x:Type Thumb}">
+            <Setter Property="OverridesDefaultStyle" Value="true"/>
+            <Setter Property="IsTabStop" Value="false"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Border x:Name="thumbBorder"
+                                Background="{StaticResource ScrollBarThumbIdleBrush}"
+                                CornerRadius="3"
+                                SnapsToDevicePixels="True"
+                                Opacity="0.6"/>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ScrollBar}}" Value="True">
+                                <Setter TargetName="thumbBorder" Property="Opacity" Value="0.8"/>
+                            </DataTrigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="thumbBorder" Property="Background" Value="{StaticResource ScrollBarThumbHoverBrush}"/>
+                                <Setter TargetName="thumbBorder" Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="thumbBorder" Property="Background" Value="{StaticResource ScrollBarThumbDraggingBrush}"/>
+                                <Setter TargetName="thumbBorder" Property="Opacity" Value="1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ScrollBarPageButtonStyle" TargetType="{x:Type RepeatButton}">
+            <Setter Property="OverridesDefaultStyle" Value="true"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Focusable" Value="false"/>
+            <Setter Property="IsTabStop" Value="false"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Rectangle Fill="{TemplateBinding Background}" Width="{TemplateBinding Width}" Height="{TemplateBinding Height}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Style for the (hidden) arrow buttons -->
+        <Style x:Key="ScrollBarLineButtonStyle" TargetType="{x:Type RepeatButton}">
+            <Setter Property="OverridesDefaultStyle" Value="true"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Focusable" Value="false"/>
+            <Setter Property="IsTabStop" Value="false"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Border Background="Transparent"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type ScrollBar}">
+            <Setter Property="Stylus.IsPressAndHoldEnabled" Value="false"/>
+            <Setter Property="Stylus.IsFlicksEnabled" Value="false"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <!-- Track background -->
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{StaticResource ScrollBarThumbIdleBrush}"/>
+            <!-- Fallback for thumb -->
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="MinWidth" Value="8"/>
+            <Setter Property="Height" Value="8"/>
+            <Setter Property="MinHeight" Value="8"/>
+            <Setter Property="Opacity" Value="1"/>
+            <!-- ScrollBar itself is fully opaque, thumb handles its own opacity -->
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid x:Name="Bg" SnapsToDevicePixels="true" Background="{TemplateBinding Background}">
+                            <Track x:Name="PART_Track"
+                                   IsDirectionReversed="true">
+                                <!-- Default for Vertical, will be changed by trigger -->
+                                <Track.DecreaseRepeatButton>
+                                    <!-- For clicking on track above thumb (PageUp) -->
+                                    <RepeatButton Style="{StaticResource ScrollBarPageButtonStyle}" Command="{x:Static ScrollBar.PageUpCommand}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <!-- For clicking on track below thumb (PageDown) -->
+                                    <RepeatButton Style="{StaticResource ScrollBarPageButtonStyle}" Command="{x:Static ScrollBar.PageDownCommand}" />
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource ScrollBarThumbStyle}" />
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Orientation" Value="Horizontal">
+                                <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <!-- Style triggers for Orientation specific default Width/Height -->
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Width" Value="Auto"/>
+                    <Setter Property="Height" Value="8"/>
+                    <Setter Property="MinHeight" Value="8"/>
+                    <Setter Property="MinWidth" Value="0"/>
+                    <!-- Allow it to be very small if content is small -->
+                </Trigger>
+                <Trigger Property="Orientation" Value="Vertical">
+                    <Setter Property="Height" Value="Auto"/>
+                    <Setter Property="Width" Value="8"/>
+                    <Setter Property="MinWidth" Value="8"/>
+                    <Setter Property="MinHeight" Value="0"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <!-- =============== CUSTOM SCROLLBAR STYLES END =============== -->
+
     </Window.Resources>
 
     <!-- Main Window Content -->
@@ -383,7 +520,9 @@
         <Grid Margin="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
+                <!-- TitleBar -->
                 <RowDefinition Height="*"/>
+                <!-- Content -->
             </Grid.RowDefinitions>
 
             <!-- Custom Title Bar -->
@@ -412,11 +551,15 @@
                 </Grid>
             </Border>
 
-            <!-- Main Content -->
+            <!-- Main Content ScrollViewer -->
             <ScrollViewer Grid.Row="1" 
-                          VerticalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto" 
+                          HorizontalScrollBarVisibility="Disabled"
                           Background="Transparent"
-                          Focusable="False">
+                          PanningMode="VerticalOnly" 
+                          CanContentScroll="True"
+                          Focusable="False"
+                          Padding="0">
                 <Border Background="{StaticResource CardBrush}" 
                         CornerRadius="0,0,16,16" 
                         Padding="40"
@@ -566,7 +709,7 @@
                                            FontSize="13"
                                            LineHeight="20">
                                     Direct file links, Google Drive, YouTube, and many more platforms are supported. 
-                                    The application will automatically download required tools (yt-dlp, ffmpeg) as needed.
+                                    The application will automatically download required tools (yt-dlp) as needed.
                                 </TextBlock>
                             </StackPanel>
                         </Border>
