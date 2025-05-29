@@ -9,7 +9,6 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows; 
-using System.Windows.Controls;
 using System.Windows.Threading;
 using Newtonsoft.Json.Linq;
 
@@ -85,6 +84,9 @@ namespace UniversalDownloader
 
         private async Task CheckAndEnsureYtDlpExistsAsync(bool forceUpdateCheck = false)
         {
+            _isManagingYtDlp = true;
+            UpdateUiElementStates($"Status: Managing {YtDlpFileName}...");
+
             _isYtDlpReady = false;
             if (FileNameTextBlock != null) FileNameTextBlock.Text = "";
 
@@ -188,6 +190,9 @@ namespace UniversalDownloader
             {
                 if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Local {YtDlpFileName} exists but may be non-functional. YouTube features might be limited.";
             }
+
+            _isManagingYtDlp = false;
+            UpdateUiElementStates();
         }
 
         private async Task<bool> TryDownloadYtDlpInternalAsync()
@@ -396,7 +401,10 @@ namespace UniversalDownloader
                 {
                     YouTubeQualityComboBox.ItemsSource = finalSortedQualities;
                     if (QualitySection != null) QualitySection.Visibility = Visibility.Visible;
-                    await Dispatcher.InvokeAsync(() => { if (YouTubeQualityComboBox.Items.Count > 0) YouTubeQualityComboBox.SelectedIndex = 0; UpdateDownloadButtonState(); }, DispatcherPriority.ContextIdle);
+                    await Dispatcher.InvokeAsync(() => {
+                        if (YouTubeQualityComboBox.Items.Count > 0) YouTubeQualityComboBox.SelectedIndex = 0;
+                        UpdateUiElementStates();
+                    }, DispatcherPriority.ContextIdle);
                     StatusTextBlock.Text = "Status: YouTube qualities listed. Select quality to download.";
                 }
                 else

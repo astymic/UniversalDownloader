@@ -5,7 +5,6 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
 
 namespace UniversalDownloader
 {
@@ -25,22 +24,13 @@ namespace UniversalDownloader
 
         private async Task ProcessUrlChange(string url, bool isInitialLoad = false)
         {
-            if (_isAppBusy && !isInitialLoad && StatusTextBlock != null && !StatusTextBlock.Text.Contains("Checking for") && !StatusTextBlock.Text.Contains("Initializing..."))
-            {
-                return;
-            }
-
-            await SetAppBusyState(true, "Status: Processing URL...");
-
             if (YouTubeQualityComboBox != null) YouTubeQualityComboBox.ItemsSource = null;
             if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed;
 
             if (string.IsNullOrWhiteSpace(url) || url == "Paste URL here...")
             {
                 if (FileNameTextBlock != null) FileNameTextBlock.Text = string.Empty;
-                if (StatusTextBlock != null) StatusTextBlock.Text = _isYtDlpReady ? "Status: Ready. Paste a URL." : $"Status: {YtDlpFileName} not ready. YouTube features disabled.";
-                await SetAppBusyState(false);
-                return;
+                return; 
             }
 
             if (IsYouTubeLink(url))
@@ -52,14 +42,18 @@ namespace UniversalDownloader
                     await CheckAndEnsureYtDlpExistsAsync();
                 }
 
-                if (_isYtDlpReady) await LoadYouTubeQualitiesWithYtDlp(url);
+                if (_isYtDlpReady)
+                {
+                    if (StatusTextBlock != null) StatusTextBlock.Text = "Status: Fetching YouTube qualities...";
+                    await LoadYouTubeQualitiesWithYtDlp(url);
+                }
                 else
                 {
                     if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: {YtDlpFileName} still not available. YouTube features disabled.";
                     if (FileNameTextBlock != null) FileNameTextBlock.Text = "YouTube features disabled.";
                 }
             }
-            else
+            else // Not YouTube
             {
                 if (IsGoogleDriveLink(url))
                 {
@@ -69,10 +63,9 @@ namespace UniversalDownloader
                 else
                 {
                     if (FileNameTextBlock != null) FileNameTextBlock.Text = "Fetching file info...";
-                    await TrySetFileNameFromUrlHeaders(url);
+                    await TrySetFileNameFromUrlHeaders(url); 
                 }
             }
-            await SetAppBusyState(false);
         }
 
         private async Task TrySetFileNameFromUrlHeaders(string url)
