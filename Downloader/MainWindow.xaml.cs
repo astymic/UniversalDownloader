@@ -20,11 +20,11 @@ namespace UniversalDownloader
         private string _selectedDirectory;
         private HttpClient _httpClient;
 
-        // Specific Busy Flags (Option 2)
+        // Specific Busy Flags 
         private bool _isInitializing = false;
         private bool _isProcessingUrl = false;
-        private bool _isManagingYtDlp = false; // Covers checking, downloading yt-dlp itself
-        private bool _isDownloadingFile = false; // For actual content download (YouTube, Drive, Direct)
+        private bool _isManagingYtDlp = false; 
+        private bool _isDownloadingFile = false; 
 
         private const string SettingsKeyLastDownloadPath = "LastDownloadPath";
 
@@ -44,14 +44,13 @@ namespace UniversalDownloader
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
             _httpClient.Timeout = TimeSpan.FromMinutes(10);
 
-            // _ytDlpExecutablePath is still initialized here as it's a fundamental path
             _ytDlpExecutablePath = Path.Combine(AppContext.BaseDirectory, YtDlpFileName);
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             _isInitializing = true;
-            UpdateUiElementStates("Status: Initializing..."); // Initial busy state
+            UpdateUiElementStates("Status: Initializing...");
 
             LoadSettings();
 
@@ -66,18 +65,17 @@ namespace UniversalDownloader
                 UrlTextBox.Foreground = (Brush)FindResource("TextSecondaryBrush");
             }
 
-            await CheckAndEnsureYtDlpExistsAsync(); // This will manage its own busy flag (_isManagingYtDlp)
+            await CheckAndEnsureYtDlpExistsAsync(); 
 
             _isInitializing = false;
-            UpdateUiElementStates(); // Clear initializing state
+            UpdateUiElementStates(); 
 
             if (UrlTextBox != null && !string.IsNullOrWhiteSpace(UrlTextBox.Text) && UrlTextBox.Text != "Paste URL here...")
             {
-                await ProcessUrlChange(UrlTextBox.Text, true); // This will manage _isProcessingUrl
+                await ProcessUrlChange(UrlTextBox.Text, true); 
             }
             else
             {
-                // Set initial status after all initial tasks
                 UpdateUiElementStates(_isYtDlpReady ? "Status: Ready. Paste a URL." : $"Status: {YtDlpFileName} not ready. YouTube features disabled.");
             }
         }
@@ -104,7 +102,7 @@ namespace UniversalDownloader
                         }
                     }
                     OnPropertyChanged(nameof(SelectedDirectory));
-                    UpdateUiElementStates(); // Update button states based on new directory
+                    UpdateUiElementStates();
                     _ = SaveSettingAsync(SettingsKeyLastDownloadPath, value);
                 }
             }
@@ -160,7 +158,7 @@ namespace UniversalDownloader
             catch (Exception ex) { Debug.WriteLine($"Failed to write setting '{key}' asynchronously: {ex.Message}"); }
         }
 
-        private void SaveSetting(string key, string value) // Synchronous for specific cases like timestamp
+        private void SaveSetting(string key, string value) 
         {
             string settingsFile = GetSettingsFilePath(); JObject settings;
             if (File.Exists(settingsFile))
@@ -196,7 +194,7 @@ namespace UniversalDownloader
         }
 
 
-        // New central UI state updater
+        // UI state updater
         private void UpdateUiElementStates(string statusMessageUpdate = null)
         {
             Dispatcher.InvokeAsync(() =>
@@ -255,7 +253,7 @@ namespace UniversalDownloader
         }
 
 
-        // UI Event Handlers directly tied to simple input or actions
+        // UI Event Handlers 
         private void UrlTextBox_GotFocus(object sender, RoutedEventArgs e)
         {
             if (UrlTextBox.Text == "Paste URL here...")

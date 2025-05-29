@@ -583,133 +583,135 @@ namespace UniversalDownloader
             }
         }
 
+
+        private static readonly Regex YtDlpProgressRegex = new Regex(
+           @"\[download\]\s+(?<percent>[\d\.]+?)%\s+of\s+(?:~?\s*)?(?<total_size_str>[\d\.]+[KMGTPEZiY]?i?B|unknown)(?:\s+at\s+(?<speed>[\d\.]+[KMGTPEZiY]?i?B/s|\S+))?(?:\s+ETA\s+(?<eta>[\d:SMPH]+|\S+))?(?:\s+in\s+[\d:SMPH]+)?",
+           RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        private static readonly Regex YtDlpDestinationRegex = new Regex(
+            @"\[download\]\s+Destination:\s*(?<path>.+)",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        private static readonly Regex YtDlpAlreadyDownloadedRegex = new Regex(
+            @"\[download\]\s+(?:""?)(?<path>.+?)(?:""?)?\s+has already been downloaded",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        private static readonly Regex YtDlpProcessingRegex = new Regex(
+            @"\[(?<type>Merger|ExtractAudio|VideoRemuxer|Fixup[^\]]*)\]\s+(?:Merging formats into|Destination|Extracting audio to|Remuxing video to)\s*(?:""?)(?<path>.+?)(?:""?)?$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
         private void ParseYtDlpProgress(string outputLine,
                                  ref string baseFileNameFromYtDlpOutput, 
                                  ref bool progressStartedForAnyComponent,
                                  ref double lastKnownPercentageForComponent,
-                                 ref string finalReportedFilePathInTemp) 
+                                 ref string finalReportedFilePathInTemp)
         {
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null) return;
             outputLine = outputLine.Trim();
-            
-            Match finalFileMatch = Regex.Match(outputLine, @"(?:\[download\] Destination:|\\[Merger\\] Merging formats into ""|\\[ExtractAudio\\] Destination: |\\[VideoRemuxer\\] Destination: |\\[Fixup[^\]]*\\] Destination: )\s*(?:""?)([^""\r\n]+)");
-            if (finalFileMatch.Success)
+            Debug.WriteLine($"YT-DLP RAW: {outputLine}"); 
+
+            Match destMatch = YtDlpDestinationRegex.Match(outputLine);
+            if (destMatch.Success)
             {
-                string reportedPath = finalFileMatch.Groups[1].Value.Trim('"', ' ');
+                string newComponentPath = destMatch.Groups["path"].Value.Trim('"', ' ');
+                _currentDownloadingComponent = newComponentPath;
+                finalReportedFilePathInTemp = newComponentPath;
 
-                bool isProcessingStep = outputLine.Contains("[Merger]") || outputLine.Contains("[ExtractAudio]") ||
-                                        outputLine.Contains("[VideoRemuxer]") || outputLine.Contains("[Fixup");
+                FileNameTextBlock.Text = $"Downloading: {Path.GetFileName(_currentDownloadingComponent)}";
+                StatusTextBlock.Text = $"Status: Starting download of {Path.GetFileName(_currentDownloadingComponent)}...";
 
-                _currentDownloadingComponent = reportedPath; 
-                finalReportedFilePathInTemp = reportedPath;  
-
-                if (isProcessingStep)
-                {
-                    FileNameTextBlock.Text = $"Processing: {Path.GetFileName(_currentDownloadingComponent)}";
-                    StatusTextBlock.Text = $"Status: yt-dlp - {outputLine}"; 
-                    if (!DownloadProgressBar.IsIndeterminate) DownloadProgressBar.IsIndeterminate = true;
-                    _ytDlpCurrentComponentTotalBytes = 0;
-                }
-                else // It's a "[download] Destination:" line for a component
-                {
-                    FileNameTextBlock.Text = $"Downloading: {Path.GetFileName(_currentDownloadingComponent)}";
-                    
-                    _ytDlpCurrentComponentTotalBytes = -1;
-                    DownloadProgressBar.IsIndeterminate = true;
-                    DownloadProgressBar.Value = 0;
-                    DownloadProgressBar.Maximum = 100; 
-                    lastKnownPercentageForComponent = 0;
-                }
+                _ytDlpCurrentComponentTotalBytes = -1;
+                DownloadProgressBar.IsIndeterminate = true;
+                DownloadProgressBar.Value = 0;
+                DownloadProgressBar.Maximum = 100;
+                lastKnownPercentageForComponent = 0;
                 progressStartedForAnyComponent = true;
-                Debug.WriteLine($"yt-dlp reported path: {finalReportedFilePathInTemp} (Processing: {isProcessingStep})");
+                Debug.WriteLine($"YT-DLP DEST: {_currentDownloadingComponent}");
                 return;
             }
 
-            Match alreadyDownloadedMatch = Regex.Match(outputLine, @"\[download\]\s+""?([^""\r\n]+)""?\s+has already been downloaded");
+            Match alreadyDownloadedMatch = YtDlpAlreadyDownloadedRegex.Match(outputLine);
             if (alreadyDownloadedMatch.Success)
             {
-                _currentDownloadingComponent = alreadyDownloadedMatch.Groups[1].Value.Trim('"', ' ');
+                _currentDownloadingComponent = alreadyDownloadedMatch.Groups["path"].Value.Trim('"', ' ');
                 finalReportedFilePathInTemp = _currentDownloadingComponent;
                 FileNameTextBlock.Text = $"File: {Path.GetFileName(finalReportedFilePathInTemp)} (already exists)";
                 StatusTextBlock.Text = "Status: File already downloaded by yt-dlp.";
                 DownloadProgressBar.IsIndeterminate = false;
-                DownloadProgressBar.Maximum = 100;
-                DownloadProgressBar.Value = 100;
-                lastKnownPercentageForComponent = 100;
-                _ytDlpCurrentComponentTotalBytes = 0; 
+                DownloadProgressBar.Maximum = 100; DownloadProgressBar.Value = 100;
+                lastKnownPercentageForComponent = 100; _ytDlpCurrentComponentTotalBytes = 0; 
                 progressStartedForAnyComponent = true;
-                Debug.WriteLine($"yt-dlp reported already downloaded: {finalReportedFilePathInTemp}");
-                return; 
+                Debug.WriteLine($"YT-DLP ALREADY_DOWNLOADED: {finalReportedFilePathInTemp}");
+                return;
             }
-            
-            Match progressMatch = Regex.Match(outputLine, @"\[download\]\s+(?<percent>[\d\.]+?)%\s+of\s+(?:~?\s*)?(?<total_size_str>[\d\.]+[KMGT]?i?B|unknown)(?:\s+at\s+(?<speed>[\d\.]+[KMGT]?i?B/s))?(?:\s+ETA\s+(?<eta>[\d:]+))?(\s+in\s+[\d:]+)?|\[download\]\s+100%\s+of\s+(?<total_size_full_str>[\d\.]+[KMGT]?i?B)\s+in\s+[\d:]+");
+
+            Match processingMatch = YtDlpProcessingRegex.Match(outputLine);
+            if (processingMatch.Success)
+            {
+                string processingType = processingMatch.Groups["type"].Value;
+                string processingPath = processingMatch.Groups["path"].Value.Trim('"', ' ');
+                _currentDownloadingComponent = processingPath;
+                finalReportedFilePathInTemp = processingPath;
+                FileNameTextBlock.Text = $"Processing ({processingType}): {Path.GetFileName(_currentDownloadingComponent)}";
+                StatusTextBlock.Text = $"Status: yt-dlp - {processingType}...";
+                DownloadProgressBar.IsIndeterminate = true; DownloadProgressBar.Value = 0;
+                _ytDlpCurrentComponentTotalBytes = -2;
+                lastKnownPercentageForComponent = 0; progressStartedForAnyComponent = true;
+                Debug.WriteLine($"YT-DLP PROCESSING ({processingType}): {finalReportedFilePathInTemp}");
+                return;
+            }
+
+            Match progressMatch = YtDlpProgressRegex.Match(outputLine);
             if (progressMatch.Success)
             {
-                progressStartedForAnyComponent = true;
-                double currentPercent = 0.0;
-                string totalSizeStringForDisplay;
-
-                if (progressMatch.Groups["percent"].Success && !string.IsNullOrEmpty(progressMatch.Groups["percent"].Value))
+                if (_ytDlpCurrentComponentTotalBytes == -2) 
                 {
-                    if (!double.TryParse(progressMatch.Groups["percent"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out currentPercent))
-                    {
-                        Debug.WriteLine($"Failed to parse percent from yt-dlp progress: {progressMatch.Groups["percent"].Value}");
-                        return;
-                    }
-                    totalSizeStringForDisplay = progressMatch.Groups["total_size_str"].Value;
-                }
-                else if (progressMatch.Groups["total_size_full_str"].Success && !string.IsNullOrEmpty(progressMatch.Groups["total_size_full_str"].Value)) // Handles "100% of X in Y"
-                {
-                    currentPercent = 100.0;
-                    totalSizeStringForDisplay = progressMatch.Groups["total_size_full_str"].Value;
-                }
-                else
-                {
-                    Debug.WriteLine($"yt-dlp progress regex matched but no percent/total_size_full_str group found: {outputLine}");
+                    Debug.WriteLine($"YT-DLP Ignoring progress line during processing: {outputLine}");
                     return;
                 }
 
-                if (_ytDlpCurrentComponentTotalBytes == -1 || (_ytDlpCurrentComponentTotalBytes == 0 && totalSizeStringForDisplay.ToLower() != "unknown"))
-                {
-                    long parsedTotalBytes = Utilities.ParseYtDlpSizeStringToBytes(totalSizeStringForDisplay);
-                    _ytDlpCurrentComponentTotalBytes = parsedTotalBytes > 0 ? parsedTotalBytes : 0; 
+                progressStartedForAnyComponent = true;
+                double currentPercent = 0.0;
+                string totalSizeString = progressMatch.Groups["total_size_str"].Value;
 
-                    if (_ytDlpCurrentComponentTotalBytes > 0)
-                    {
-                        DownloadProgressBar.Maximum = _ytDlpCurrentComponentTotalBytes;
-                        DownloadProgressBar.IsIndeterminate = false;
-                    }
-                    else // Size is unknown or zero
-                    {
-                        DownloadProgressBar.Maximum = 100; // Use percentage based max
-                        DownloadProgressBar.IsIndeterminate = false; // Still show percentage progress
-                    }
+                if (!double.TryParse(progressMatch.Groups["percent"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out currentPercent))
+                {
+                    Debug.WriteLine($"Failed to parse percent from yt-dlp progress: {progressMatch.Groups["percent"].Value}");
+                    return;
+                }
+
+                long currentLineTotalBytes = Utilities.ParseYtDlpSizeStringToBytes(totalSizeString);
+
+                if (_ytDlpCurrentComponentTotalBytes == -1 ||
+                    (_ytDlpCurrentComponentTotalBytes == 0 && currentLineTotalBytes > 0) ||
+                    (currentLineTotalBytes > 0 && _ytDlpCurrentComponentTotalBytes != currentLineTotalBytes))
+                {
+                    _ytDlpCurrentComponentTotalBytes = currentLineTotalBytes; 
+                    Debug.WriteLine($"YT-DLP Updated Total Component Bytes: {_ytDlpCurrentComponentTotalBytes} from '{totalSizeString}'");
                 }
 
                 string speed = progressMatch.Groups["speed"].Value;
                 string eta = progressMatch.Groups["eta"].Value;
-                string componentNameDisplay = string.IsNullOrWhiteSpace(Path.GetFileName(_currentDownloadingComponent)) ? baseFileNameFromYtDlpOutput : Path.GetFileName(_currentDownloadingComponent);
+                string componentNameDisplay = Path.GetFileName(_currentDownloadingComponent);
+                if (string.IsNullOrEmpty(componentNameDisplay)) componentNameDisplay = baseFileNameFromYtDlpOutput;
 
-                if (DownloadProgressBar.IsIndeterminate && _ytDlpCurrentComponentTotalBytes >= 0) 
+                if (DownloadProgressBar.IsIndeterminate && _ytDlpCurrentComponentTotalBytes >= 0)
                 {
                     DownloadProgressBar.IsIndeterminate = false;
                 }
 
-                if (_ytDlpCurrentComponentTotalBytes > 0)
+                if (_ytDlpCurrentComponentTotalBytes > 0) 
                 {
-                    if (DownloadProgressBar.Maximum != _ytDlpCurrentComponentTotalBytes)
-                    {
-                        DownloadProgressBar.Maximum = _ytDlpCurrentComponentTotalBytes;
-                    }
+                    DownloadProgressBar.Maximum = _ytDlpCurrentComponentTotalBytes;
                     long currentDownloadedBytes = (long)((currentPercent / 100.0) * _ytDlpCurrentComponentTotalBytes);
-                    DownloadProgressBar.Value = Math.Min(currentDownloadedBytes, _ytDlpCurrentComponentTotalBytes); 
-                    StatusTextBlock.Text = $"Downloading ({componentNameDisplay}): {currentPercent:F1}% ({Utilities.FormatBytesOutput(currentDownloadedBytes)} / {Utilities.FormatBytesOutput(_ytDlpCurrentComponentTotalBytes)}) | Speed: {speed} | ETA: {eta}";
+                    DownloadProgressBar.Value = Math.Min(currentDownloadedBytes, _ytDlpCurrentComponentTotalBytes);
+                    StatusTextBlock.Text = $"Downloading ({componentNameDisplay}): {currentPercent:F1}% of {Utilities.FormatBytesOutput(_ytDlpCurrentComponentTotalBytes)} | Speed: {speed} | ETA: {eta}";
                 }
-                else // Size unknown or zero, work with percentages
+                else 
                 {
-                    if (DownloadProgressBar.Maximum != 100) DownloadProgressBar.Maximum = 100; 
-                    DownloadProgressBar.Value = Math.Min(currentPercent, 100.0); 
-                    StatusTextBlock.Text = $"Downloading ({componentNameDisplay}): {currentPercent:F1}% of {totalSizeStringForDisplay} | Speed: {speed} | ETA: {eta}";
+                    DownloadProgressBar.Maximum = 100;
+                    DownloadProgressBar.Value = Math.Min(currentPercent, 100.0);
+                    StatusTextBlock.Text = $"Downloading ({componentNameDisplay}): {currentPercent:F1}% of {totalSizeString} | Speed: {speed} | ETA: {eta}";
                 }
                 lastKnownPercentageForComponent = currentPercent;
             }
