@@ -7,12 +7,16 @@
       "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\downloader\\downloader\\mainwindow.downloads.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.downloads.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\downloader\\downloader\\simpleclipconverter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\simpleclipconverter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\downloader\\downloader\\mainwindow.ytdlp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.ytdlp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\downloader\\downloader\\mainwindow.downloads.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.downloads.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\downloader\\downloader\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -26,7 +30,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Bookmark",
@@ -35,6 +39,19 @@
             {
               "$type": "Bookmark",
               "Name": "ST:128:0:{75188d03-9892-4ae2-abf1-207126247ce5}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "SimpleClipConverter.cs",
+              "DocumentMoniker": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\SimpleClipConverter.cs",
+              "RelativeDocumentMoniker": "Downloader\\SimpleClipConverter.cs",
+              "ToolTip": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\SimpleClipConverter.cs",
+              "RelativeToolTip": "Downloader\\SimpleClipConverter.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-05-29T12:40:30.232Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -50,7 +67,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 3,
               "Title": "MainWindow.Downloads.cs",
               "DocumentMoniker": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\MainWindow.Downloads.cs",
               "RelativeDocumentMoniker": "Downloader\\MainWindow.Downloads.cs",
@@ -69,13 +86,14 @@
               "RelativeDocumentMoniker": "Downloader\\MainWindow.YtDlp.cs",
               "ToolTip": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\MainWindow.YtDlp.cs",
               "RelativeToolTip": "Downloader\\MainWindow.YtDlp.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAAAfAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAAdAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-05-28T10:06:16.437Z"
+              "WhenOpened": "2025-05-28T10:06:16.437Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "MainWindow.xaml.cs",
               "DocumentMoniker": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\MainWindow.xaml.cs",
               "RelativeDocumentMoniker": "Downloader\\MainWindow.xaml.cs",
@@ -83,7 +101,8 @@
               "RelativeToolTip": "Downloader\\MainWindow.xaml.cs",
               "ViewState": "AgIAABoBAAAAAAAAAAAQwC0BAAAiAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-05-17T16:58:45.652Z"
+              "WhenOpened": "2025-05-17T16:58:45.652Z",
+              "EditorCaption": ""
             }
           ]
         }
