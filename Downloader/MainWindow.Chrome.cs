@@ -21,6 +21,11 @@ namespace UniversalDownloader
         private Point _startPointMaximizedDrag;
         private double _maximizedWindowWidthForDrag;
 
+        private Screen GetScreenFromWindow()
+        {
+            WindowInteropHelper windowInteropHelper = new WindowInteropHelper(this);
+            return Screen.FromHandle(windowInteropHelper.Handle);
+        }
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
@@ -56,7 +61,7 @@ namespace UniversalDownloader
             }
             else
             {
-                GoToPseudoMaximize(true); // true to indicate it's from a user action like double click
+                GoToPseudoMaximize(true); 
             }
         }
 
@@ -155,39 +160,57 @@ namespace UniversalDownloader
 
         private void GoToPseudoMaximize(bool fromUserAction = false)
         {
-            // Only save current bounds if not already pseudo-maximized or if forced by user action
             if (fromUserAction || !_isManuallyPseudoMaximized)
             {
                 _normalWindowBoundsBeforePseudoMaximize = new Rect(this.Left, this.Top, this.Width, this.Height);
             }
 
-            this.Left = SystemParameters.WorkArea.Left;
-            this.Top = SystemParameters.WorkArea.Top;
-            this.Width = SystemParameters.WorkArea.Width;
-            this.Height = SystemParameters.WorkArea.Height;
+            Screen currentScreen = GetScreenFromWindow();
+            if (currentScreen != null)
+            {
+                // Use the WorkArea of the current screen
+                this.Left = currentScreen.WorkingArea.Left;
+                this.Top = currentScreen.WorkingArea.Top;
+                this.Width = currentScreen.WorkingArea.Width;
+                this.Height = currentScreen.WorkingArea.Height;
+            }
+            else
+            {
+                this.Left = SystemParameters.WorkArea.Left;
+                this.Top = SystemParameters.WorkArea.Top;
+                this.Width = SystemParameters.WorkArea.Width;
+                this.Height = SystemParameters.WorkArea.Height;
+                System.Diagnostics.Debug.WriteLine("Warning: Could not determine current screen for pseudo-maximize. Falling back to primary.");
+            }
+
             _isManuallyPseudoMaximized = true;
 
-            if (this.WindowState == WindowState.Maximized)
+            if (this.WindowState == WindowState.Maximized) 
             {
                 this.WindowState = WindowState.Normal;
             }
             UpdateMaximizeRestoreButtonAndBorder(true);
         }
 
+
         private void MaximizeRestoreButton_Click(object sender, RoutedEventArgs e)
         {
-            if (this.WindowState == WindowState.Maximized)
+            if (this.WindowState == WindowState.Maximized) 
             {
-                this.WindowState = WindowState.Normal;
-                _isManuallyPseudoMaximized = false;
+                if (!_isManuallyPseudoMaximized) 
+                {
+                    _normalWindowBoundsBeforePseudoMaximize = this.RestoreBounds;
+                }
+                this.WindowState = WindowState.Normal; 
+                GoToPseudoMaximize(true); 
             }
-            else if (_isManuallyPseudoMaximized)
+            else if (_isManuallyPseudoMaximized) 
             {
                 RestoreFromPseudoMaximize();
             }
-            else
+            else 
             {
-                GoToPseudoMaximize(true); // true because it's a direct button click
+                GoToPseudoMaximize(true);
             }
         }
 
@@ -208,10 +231,6 @@ namespace UniversalDownloader
                 if (!_isManuallyPseudoMaximized)
                 {
                     UpdateMaximizeRestoreButtonAndBorder(false);
-                }
-                else
-                {
-                    UpdateMaximizeRestoreButtonAndBorder(true);
                 }
             }
         }
