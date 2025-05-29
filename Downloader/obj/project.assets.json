@@ -197,9 +197,9 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\Downloader.csproj",
-      "projectName": "Downloader",
-      "projectPath": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\Downloader.csproj",
+      "projectUniqueName": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\UniversalDownloader.csproj",
+      "projectName": "UniversalDownloader",
+      "projectPath": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\UniversalDownloader.csproj",
       "packagesPath": "C:\\Users\\raikoben\\.nuget\\packages\\",
       "outputPath": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\obj\\",
       "projectStyle": "PackageReference",
@@ -234,8 +234,7 @@
         "enableAudit": "true",
         "auditLevel": "low",
         "auditMode": "direct"
-      },
-      "SdkAnalysisLevel": "9.0.200"
+      }
     },
     "frameworks": {
       "net8.0-windows7.0": {
@@ -289,7 +288,7 @@
             "privateAssets": "none"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.203/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.408/PortableRuntimeIdentifierGraph.json"
       }
     },
     "runtimes": {

@@ -40,7 +40,7 @@ namespace UniversalDownloader
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
             _httpClient.Timeout = TimeSpan.FromMinutes(10);
 
-            _ytDlpExecutablePath = Path.Combine(AppContext.BaseDirectory, YtDlpFileName); // YtDlpFileName is in MainWindow.YtDlp.cs
+            _ytDlpExecutablePath = Path.Combine(AppContext.BaseDirectory, YtDlpFileName); 
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -49,10 +49,10 @@ namespace UniversalDownloader
 
             await SetAppBusyState(true, "Status: Initializing...");
 
-            if (DirectoryPathTextBox != null && string.IsNullOrEmpty(SelectedDirectory)) // Check SelectedDirectory property
+            if (DirectoryPathTextBox != null && string.IsNullOrEmpty(SelectedDirectory)) 
             {
                 DirectoryPathTextBox.Foreground = (Brush)FindResource("TextSecondaryBrush");
-                DirectoryPathTextBox.Text = "No directory selected"; // Ensure placeholder if still null/empty
+                DirectoryPathTextBox.Text = "No directory selected"; 
             }
 
             if (UrlTextBox != null && UrlTextBox.Text == "Paste URL here...")
@@ -106,7 +106,7 @@ namespace UniversalDownloader
 
         private void LoadSettings()
         {
-            string settingsFile = GetSettingsFilePath(); // This method is in MainWindow.YtDlp.cs, consider moving it to Utilities or this file
+            string settingsFile = GetSettingsFilePath(); 
             if (File.Exists(settingsFile))
             {
                 try
@@ -115,20 +115,20 @@ namespace UniversalDownloader
                     if (settings.TryGetValue(SettingsKeyLastDownloadPath, out JToken pathToken))
                     {
                         string savedPath = pathToken.ToString();
-                        if (Directory.Exists(savedPath)) // Check if saved path is still valid
+                        if (Directory.Exists(savedPath)) 
                         {
-                            SelectedDirectory = savedPath; // Use the property to trigger UI updates and saving
+                            SelectedDirectory = savedPath; 
                         }
                         else
                         {
-                            SelectedDirectory = null; // Path invalid, reset
+                            SelectedDirectory = null; 
                         }
                     }
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"Error loading settings: {ex.Message}");
-                    SelectedDirectory = null; // Reset on error
+                    SelectedDirectory = null; 
                 }
             }
         }
@@ -137,7 +137,7 @@ namespace UniversalDownloader
         {
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string appFolder = Path.Combine(appDataPath, "UniversalDownloader");
-            Directory.CreateDirectory(appFolder); // Ensure it exists
+            Directory.CreateDirectory(appFolder); 
             return Path.Combine(appFolder, "settings.json");
         }
 
@@ -185,7 +185,7 @@ namespace UniversalDownloader
                 settings = new JObject();
             }
 
-            string lastRunDateKey = $"{settingKey}_LastCheckDate"; // More specific key for the date
+            string lastRunDateKey = $"{settingKey}_LastCheckDate"; 
             if (settings.TryGetValue(lastRunDateKey, out JToken lastRunToken))
             {
                 if (DateTime.TryParse(lastRunToken.ToString(), out DateTime lastRunDate))
@@ -247,7 +247,7 @@ namespace UniversalDownloader
             {
                 return false;
             }
-            if (string.IsNullOrWhiteSpace(SelectedDirectory) || !Directory.Exists(SelectedDirectory)) // Check property
+            if (string.IsNullOrWhiteSpace(SelectedDirectory) || !Directory.Exists(SelectedDirectory)) 
             {
                 return false;
             }
@@ -280,7 +280,6 @@ namespace UniversalDownloader
         }
 
 
-        // UI Event Handlers directly tied to simple input or actions
         private void UrlTextBox_GotFocus(object sender, RoutedEventArgs e)
         {
             if (UrlTextBox.Text == "Paste URL here...")
@@ -311,7 +310,7 @@ namespace UniversalDownloader
 
             if (dialog.ShowDialog(this).GetValueOrDefault())
             {
-                SelectedDirectory = dialog.SelectedPath; // Property setter handles UI and saving
+                SelectedDirectory = dialog.SelectedPath; 
             }
         }
 
@@ -402,7 +401,7 @@ namespace UniversalDownloader
                 await SetAppBusyState(false);
 
                 bool wasMoveError = StatusTextBlock.Text.Contains("File Move Error") || StatusTextBlock.Text.Contains("failed to move");
-                if (!wasMoveError) // Or some other condition to decide if cleanup is safe/desired
+                if (!wasMoveError) 
                 {
                     CleanUpTempFolder(tempDownloadFolderPath);
                 }
@@ -419,7 +418,7 @@ namespace UniversalDownloader
             {
                 string baseTempPath = Path.GetTempPath(); // AppData\Local\Temp
                 string appTempFolder = Path.Combine(baseTempPath, "UniversalDownloader_TempDownloads");
-                Directory.CreateDirectory(appTempFolder); // Ensure base app temp folder exists
+                Directory.CreateDirectory(appTempFolder); 
 
                 string uniqueDownloadFolder = Path.Combine(appTempFolder, Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(uniqueDownloadFolder);
@@ -440,13 +439,12 @@ namespace UniversalDownloader
             }
             try
             {
-                Directory.Delete(tempFolderPath, true); // true for recursive delete
+                Directory.Delete(tempFolderPath, true); 
                 Debug.WriteLine($"Cleaned up temp folder: {tempFolderPath}");
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error cleaning up temp folder {tempFolderPath}: {ex.Message}");
-                // Log or handle as needed; often, it's okay if cleanup fails silently for temp files
             }
         }
     }

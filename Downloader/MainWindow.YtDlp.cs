@@ -664,7 +664,7 @@ namespace UniversalDownloader
                 if (_ytDlpCurrentComponentTotalBytes == -1 || (_ytDlpCurrentComponentTotalBytes == 0 && totalSizeStringForDisplay.ToLower() != "unknown"))
                 {
                     long parsedTotalBytes = Utilities.ParseYtDlpSizeStringToBytes(totalSizeStringForDisplay);
-                    _ytDlpCurrentComponentTotalBytes = parsedTotalBytes > 0 ? parsedTotalBytes : 0; // Avoid negative
+                    _ytDlpCurrentComponentTotalBytes = parsedTotalBytes > 0 ? parsedTotalBytes : 0; 
 
                     if (_ytDlpCurrentComponentTotalBytes > 0)
                     {
@@ -682,7 +682,7 @@ namespace UniversalDownloader
                 string eta = progressMatch.Groups["eta"].Value;
                 string componentNameDisplay = string.IsNullOrWhiteSpace(Path.GetFileName(_currentDownloadingComponent)) ? baseFileNameFromYtDlpOutput : Path.GetFileName(_currentDownloadingComponent);
 
-                if (DownloadProgressBar.IsIndeterminate && _ytDlpCurrentComponentTotalBytes >= 0) // If size became known, switch from indeterminate
+                if (DownloadProgressBar.IsIndeterminate && _ytDlpCurrentComponentTotalBytes >= 0) 
                 {
                     DownloadProgressBar.IsIndeterminate = false;
                 }
@@ -694,13 +694,13 @@ namespace UniversalDownloader
                         DownloadProgressBar.Maximum = _ytDlpCurrentComponentTotalBytes;
                     }
                     long currentDownloadedBytes = (long)((currentPercent / 100.0) * _ytDlpCurrentComponentTotalBytes);
-                    DownloadProgressBar.Value = Math.Min(currentDownloadedBytes, _ytDlpCurrentComponentTotalBytes); // Cap value at maximum
+                    DownloadProgressBar.Value = Math.Min(currentDownloadedBytes, _ytDlpCurrentComponentTotalBytes); 
                     StatusTextBlock.Text = $"Downloading ({componentNameDisplay}): {currentPercent:F1}% ({Utilities.FormatBytesOutput(currentDownloadedBytes)} / {Utilities.FormatBytesOutput(_ytDlpCurrentComponentTotalBytes)}) | Speed: {speed} | ETA: {eta}";
                 }
                 else // Size unknown or zero, work with percentages
                 {
-                    if (DownloadProgressBar.Maximum != 100) DownloadProgressBar.Maximum = 100; // Max is 100%
-                    DownloadProgressBar.Value = Math.Min(currentPercent, 100.0); // Cap value at 100
+                    if (DownloadProgressBar.Maximum != 100) DownloadProgressBar.Maximum = 100; 
+                    DownloadProgressBar.Value = Math.Min(currentPercent, 100.0); 
                     StatusTextBlock.Text = $"Downloading ({componentNameDisplay}): {currentPercent:F1}% of {totalSizeStringForDisplay} | Speed: {speed} | ETA: {eta}";
                 }
                 lastKnownPercentageForComponent = currentPercent;

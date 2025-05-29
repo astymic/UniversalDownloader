@@ -9,7 +9,7 @@ using System.Windows.Controls;
 
 namespace UniversalDownloader
 {
-    public partial class MainWindow // Must be partial
+    public partial class MainWindow
     {
         private bool IsYouTubeLink(string url)
         {
@@ -211,7 +211,7 @@ namespace UniversalDownloader
                     if (DownloadProgressBar != null)
                     {
                         DownloadProgressBar.IsIndeterminate = !(totalBytes.HasValue && totalBytes.Value > 0);
-                        if (!DownloadProgressBar.IsIndeterminate) DownloadProgressBar.Maximum = 100; else DownloadProgressBar.Maximum = 0; // Reset max if indeterminate
+                        if (!DownloadProgressBar.IsIndeterminate) DownloadProgressBar.Maximum = 100; else DownloadProgressBar.Maximum = 0; 
                         DownloadProgressBar.Value = 0;
                     }
 
@@ -298,7 +298,7 @@ namespace UniversalDownloader
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error in DownloadDirectFile: {ex.ToString()}"); // Log more details for debugging
+                Debug.WriteLine($"Error in DownloadDirectFile: {ex.ToString()}");
                 if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Download Error - {ex.Message.Split('\n')[0]}.";
                 if (FileNameTextBlock != null) FileNameTextBlock.Text = "File: (Download Failed)";
             }

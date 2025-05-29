@@ -1,2 +1,2 @@
-C:\Users\raikoben\source\repos\Downloader\Downloader\bin\Release\net8.0-windows\win-x64\publish\Downloader.pdb
-C:\Users\raikoben\source\repos\Downloader\Downloader\bin\Release\net8.0-windows\win-x64\publish\Downloader.exe
+C:\Users\raikoben\source\repos\Downloader\Downloader\bin\Release\net8.0-windows\win-x64\publish\UniversalDownloader.pdb
+C:\Users\raikoben\source\repos\Downloader\Downloader\bin\Release\net8.0-windows\win-x64\publish\UniversalDownloader.exe
