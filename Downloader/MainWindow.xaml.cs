@@ -110,7 +110,6 @@ namespace UniversalDownloader
             }
         }
 
-        // --- Start of Settings Management (Moved from previous response) ---
         private string GetSettingsFilePath()
         {
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -195,15 +194,14 @@ namespace UniversalDownloader
             string lastRunDateKey = $"{settingKey}_LastCheckDate";
             SaveSetting(lastRunDateKey, DateTime.UtcNow.ToString("o"));
         }
-        // --- End of Settings Management ---
 
 
         // New central UI state updater
         private void UpdateUiElementStates(string statusMessageUpdate = null)
         {
-            Dispatcher.InvokeAsync(() => // Ensure UI updates on UI thread
+            Dispatcher.InvokeAsync(() =>
             {
-                bool canBrowse = !_isInitializing && !_isDownloadingFile; // Browse almost always enabled unless downloading content
+                bool canBrowse = !_isInitializing && !_isDownloadingFile; 
                 bool canInputUrl = !_isInitializing && !_isProcessingUrl && !_isManagingYtDlp && !_isDownloadingFile;
                 bool canDownloadAction = CanInitiateDownload() && !_isInitializing && !_isProcessingUrl && !_isManagingYtDlp && !_isDownloadingFile;
 
@@ -213,7 +211,7 @@ namespace UniversalDownloader
                 if (DownloadButton != null)
                 {
                     bool youtubeSpecificConditionsMet = true;
-                    if (IsYouTubeLink(UrlTextBox?.Text ?? string.Empty)) // Check IsYouTubeLink from Downloads.cs
+                    if (IsYouTubeLink(UrlTextBox?.Text ?? string.Empty)) 
                     {
                         youtubeSpecificConditionsMet = _isYtDlpReady && (YouTubeQualityComboBox?.SelectedItem != null) && (QualitySection?.Visibility == Visibility.Visible);
                     }
@@ -229,7 +227,6 @@ namespace UniversalDownloader
                 {
                     StatusTextBlock.Text = statusMessageUpdate;
                 }
-                // If no explicit statusMessageUpdate, don't change the existing status unless it's a clear "Ready" state
                 else if (StatusTextBlock != null && !IsAnyOperationInProgress())
                 {
                     StatusTextBlock.Text = _isYtDlpReady ? "Status: Ready. Paste a URL." : $"Status: {YtDlpFileName} not ready. YouTube features disabled.";
@@ -279,7 +276,6 @@ namespace UniversalDownloader
 
         private void BrowseButton_Click(object sender, RoutedEventArgs e)
         {
-            // No _isAppBusy check needed here as the button's IsEnabled state is now managed by UpdateUiElementStates
             var dialog = new VistaFolderBrowserDialog
             {
                 Description = "Select a folder to download files into",
@@ -296,10 +292,10 @@ namespace UniversalDownloader
         private async void UrlTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (YouTubeQualityComboBox == null || StatusTextBlock == null || FileNameTextBlock == null || QualitySection == null) return;
-            if (_isProcessingUrl || _isDownloadingFile || _isManagingYtDlp) return; // Don't process if other ops are active
+            if (_isProcessingUrl || _isDownloadingFile || _isManagingYtDlp) return; 
 
             string currentUrl = UrlTextBox.Text;
-            await ProcessUrlChange(currentUrl); // ProcessUrlChange will set _isProcessingUrl and call UpdateUiElementStates
+            await ProcessUrlChange(currentUrl); 
         }
 
         private void YouTubeQualityComboBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -320,7 +316,7 @@ namespace UniversalDownloader
 
         private void YouTubeQualityComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            UpdateUiElementStates(); // Re-evaluate download button based on selection
+            UpdateUiElementStates();
         }
 
         private async void DownloadButton_Click(object sender, RoutedEventArgs e)
@@ -328,7 +324,6 @@ namespace UniversalDownloader
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null || UrlTextBox == null) return;
 
             string url = UrlTextBox.Text;
-            // CanInitiateDownload is already checked by UpdateUiElementStates for button IsEnabled, but double check
             if (!CanInitiateDownload() || (IsYouTubeLink(url) && YouTubeQualityComboBox.SelectedItem == null))
             {
                 UpdateUiElementStates("Status: Please enter a valid URL, select directory, and quality (if YouTube).");
@@ -353,13 +348,11 @@ namespace UniversalDownloader
                 {
                     if (!_isYtDlpReady)
                     {
-                        // This should ideally be caught by button state, but as a safeguard
                         _isDownloadingFile = false;
                         UpdateUiElementStates($"Status: {YtDlpFileName} is not available. YouTube download aborted.");
                         return;
                     }
                     var selectedQuality = YouTubeQualityComboBox.SelectedItem as YouTubeQualityItem;
-                    // Null check for selectedQuality already implicitly handled by CanInitiateDownload via UpdateUiElementStates
                     await DownloadYouTubeVideoWithYtDlp(url, selectedQuality.FormatCode, tempDownloadFolderPath);
                 }
                 else if (IsGoogleDriveLink(url))
@@ -381,13 +374,12 @@ namespace UniversalDownloader
             {
                 _isDownloadingFile = false;
                 if (DownloadProgressBar != null && DownloadProgressBar.IsIndeterminate) DownloadProgressBar.IsIndeterminate = false;
-                UpdateUiElementStates(); // Update UI based on download completion/failure (status text is set by download methods)
+                UpdateUiElementStates(); 
 
-                // Smart cleanup based on status
                 bool wasMoveError = StatusTextBlock.Text.Contains("File Move Error") || StatusTextBlock.Text.Contains("failed to move");
                 bool wasDownloadError = StatusTextBlock.Text.Contains("Download Failed") || StatusTextBlock.Text.Contains("download aborted") || StatusTextBlock.Text.Contains("download corrupted");
 
-                if (!wasMoveError || wasDownloadError) // Clean up if no move error, or if download itself failed (nothing to recover from temp)
+                if (!wasMoveError || wasDownloadError) 
                 {
                     CleanUpTempFolder(tempDownloadFolderPath);
                 }

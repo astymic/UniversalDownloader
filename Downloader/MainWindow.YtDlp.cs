@@ -47,7 +47,7 @@ namespace UniversalDownloader
                 using (Process process = Process.Start(psi))
                 {
                     string versionOutput = await process.StandardOutput.ReadToEndAsync();
-                    await process.WaitForExitAsync(); // Use async version
+                    await process.WaitForExitAsync(); 
                     if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(versionOutput))
                     {
                         return versionOutput.Trim();
@@ -65,7 +65,7 @@ namespace UniversalDownloader
         {
             try
             {
-                using (var tempHttpClient = new HttpClient()) // Use a temp client for this specific API call
+                using (var tempHttpClient = new HttpClient()) 
                 {
                     tempHttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("UniversalDownloaderApp/1.0");
                     HttpResponseMessage response = await tempHttpClient.GetAsync(YtDlpVersionApiUrl);
