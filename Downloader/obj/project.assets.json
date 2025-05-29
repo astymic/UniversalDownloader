@@ -197,9 +197,9 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\UniversalDownloader.csproj",
-      "projectName": "UniversalDownloader",
-      "projectPath": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\UniversalDownloader.csproj",
+      "projectUniqueName": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\Universal Downloader.csproj",
+      "projectName": "Universal Downloader",
+      "projectPath": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\Universal Downloader.csproj",
       "packagesPath": "C:\\Users\\raikoben\\.nuget\\packages\\",
       "outputPath": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\obj\\",
       "projectStyle": "PackageReference",

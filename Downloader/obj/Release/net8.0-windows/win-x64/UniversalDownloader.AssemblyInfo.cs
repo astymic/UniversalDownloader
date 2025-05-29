@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("UniversalDownloader")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+19e70b7d13083f8e5308a2079e2900eb04f1be17")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b90f92184d1f196a17f86a524528db18a892928c")]
 [assembly: System.Reflection.AssemblyProductAttribute("UniversalDownloader")]
 [assembly: System.Reflection.AssemblyTitleAttribute("UniversalDownloader")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
