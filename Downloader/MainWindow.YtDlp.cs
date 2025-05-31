@@ -85,6 +85,7 @@ namespace UniversalDownloader
         private async Task CheckAndEnsureYtDlpExistsAsync(bool forceUpdateCheck = false)
         {
             _isManagingYtDlp = true;
+            var ytdlpManageCts = new CancellationTokenSource();
             UpdateUiElementStates($"Status: Managing {YtDlpFileName}...");
 
             _isYtDlpReady = false;
@@ -142,7 +143,7 @@ namespace UniversalDownloader
                 }
                 SetLastRunTimestamp("YtDlpUpdateCheck");
             }
-            else if (fileExists && localVersion != null) // File exists, valid, and no update check was due/forced
+            else if (fileExists && localVersion != null) 
             {
                 if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: {YtDlpFileName} (version {localVersion}) found.";
                 _isYtDlpReady = true;
@@ -151,13 +152,22 @@ namespace UniversalDownloader
 
             if (needsDownload)
             {
-                if (!fileExists && !updateAvailable) // Initial download message if not an update
+                if (!fileExists && !updateAvailable) 
                 {
                     if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: {YtDlpFileName} not found. Attempting to download...";
                     if (FileNameTextBlock != null) FileNameTextBlock.Text = $"Downloading: {YtDlpFileName}";
                 }
 
-                bool downloaded = await TryDownloadYtDlpInternalAsync();
+                bool downloaded = false;
+                try
+                {
+                    downloaded = await TryDownloadYtDlpInternalAsync(ytdlpManageCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    _isYtDlpReady = false;
+                }
+
                 if (downloaded)
                 {
                     string newLocalVersion = await GetLocalYtDlpVersionAsync();
@@ -182,20 +192,21 @@ namespace UniversalDownloader
                     _isYtDlpReady = false;
                 }
             }
-            else if (!_isYtDlpReady && fileExists && localVersion != null) // File exists, no download, but ensure ready state
+            else if (!_isYtDlpReady && fileExists && localVersion != null) 
             {
-                _isYtDlpReady = true; // Already confirmed localVersion is not null
+                _isYtDlpReady = true; 
             }
-            else if (!_isYtDlpReady && fileExists && localVersion == null) // File exists, but was problematic and no download occurred (e.g. update check failed and user skipped)
+            else if (!_isYtDlpReady && fileExists && localVersion == null) 
             {
                 if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Local {YtDlpFileName} exists but may be non-functional. YouTube features might be limited.";
             }
 
+            ytdlpManageCts.Dispose();
             _isManagingYtDlp = false;
             UpdateUiElementStates();
         }
 
-        private async Task<bool> TryDownloadYtDlpInternalAsync()
+        private async Task<bool> TryDownloadYtDlpInternalAsync(CancellationToken cancellationToken)
         {
             if (DownloadProgressBar != null)
             {
@@ -206,10 +217,10 @@ namespace UniversalDownloader
             {
                 using (var downloadClient = new HttpClient())
                 {
-                    downloadClient.Timeout = TimeSpan.FromMinutes(10); // Increased timeout for potentially large file
+                    downloadClient.Timeout = TimeSpan.FromMinutes(10); 
                     if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Downloading {YtDlpFileName} from {YtDlpDownloadUrl}...";
 
-                    var response = await downloadClient.GetAsync(YtDlpDownloadUrl, HttpCompletionOption.ResponseHeadersRead);
+                    var response = await downloadClient.GetAsync(YtDlpDownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                     response.EnsureSuccessStatusCode();
                     long? totalDownloadSize = response.Content.Headers.ContentLength;
                     long totalBytesRead = 0;
@@ -221,26 +232,27 @@ namespace UniversalDownloader
                         if (!DownloadProgressBar.IsIndeterminate) DownloadProgressBar.Maximum = 100;
                     }
 
-                    using (var contentStream = await response.Content.ReadAsStreamAsync())
-                    using (var fileStream = new FileStream(_ytDlpExecutablePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true)) // Increased buffer
+                    using (var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken))
+                    using (var fileStream = new FileStream(_ytDlpExecutablePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
                     {
-                        byte[] buffer = new byte[81920]; // Matched buffer size
+                        byte[] buffer = new byte[81920]; 
                         int bytesRead;
-                        while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                        {
-                            await fileStream.WriteAsync(buffer, 0, bytesRead);
-                            totalBytesRead += bytesRead;
-                            if (totalDownloadSize.HasValue && totalDownloadSize.Value > 0)
+                            while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
                             {
-                                if (DownloadProgressBar != null && DownloadProgressBar.IsIndeterminate) DownloadProgressBar.IsIndeterminate = false;
-                                double percentage = (double)totalBytesRead / totalDownloadSize.Value * 100;
-                                if ((int)percentage != lastPercentage)
+                                cancellationToken.ThrowIfCancellationRequested();
+                                await fileStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                                totalBytesRead += bytesRead;
+                                if (totalDownloadSize.HasValue && totalDownloadSize.Value > 0)
                                 {
-                                    if (DownloadProgressBar != null) DownloadProgressBar.Value = percentage;
-                                    if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Downloading {YtDlpFileName}... {percentage:F0}%";
-                                    lastPercentage = (int)percentage;
+                                    if (DownloadProgressBar != null && DownloadProgressBar.IsIndeterminate) DownloadProgressBar.IsIndeterminate = false;
+                                    double percentage = (double)totalBytesRead / totalDownloadSize.Value * 100;
+                                    if ((int)percentage != lastPercentage)
+                                    {
+                                        if (DownloadProgressBar != null) DownloadProgressBar.Value = percentage;
+                                        if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Downloading {YtDlpFileName}... {percentage:F0}%";
+                                        lastPercentage = (int)percentage;
+                                    }
                                 }
-                            }
                             else
                             {
                                 if (DownloadProgressBar != null && !DownloadProgressBar.IsIndeterminate) DownloadProgressBar.IsIndeterminate = true;
@@ -251,6 +263,13 @@ namespace UniversalDownloader
                     if (DownloadProgressBar != null && !DownloadProgressBar.IsIndeterminate) DownloadProgressBar.Value = 100;
                     return true;
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.WriteLine("yt-dlp.exe download was canceled.");
+                if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Download of {YtDlpFileName} canceled.";
+                if (File.Exists(_ytDlpExecutablePath)) { try { File.Delete(_ytDlpExecutablePath); } catch { /* best effort */ } }
+                return false;
             }
             catch (Exception ex)
             {
@@ -308,8 +327,8 @@ namespace UniversalDownloader
                         if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed; return;
                     }
                     JObject videoInfo = JObject.Parse(jsonOutput);
-                    string videoTitle = Utilities.SanitizeFileName(videoInfo["title"]?.ToString() ?? "Unknown Title");
-                    FileNameTextBlock.Text = $"Video: {videoTitle}";
+                    string rawVideoTitle = videoInfo["title"]?.ToString() ?? "Unknown Video";
+                    FileNameTextBlock.Text = Utilities.SanitizeFileName(rawVideoTitle);
                     ytDlpReportedFormats = videoInfo["formats"] as JArray;
                 }
 
@@ -418,7 +437,7 @@ namespace UniversalDownloader
             catch (Exception ex) { StatusTextBlock.Text = $"Status: Error processing YouTube info: {ex.Message.Split('\n')[0]}."; FileNameTextBlock.Text = "YouTube Info Error"; if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed; }
         }
         
-        private async Task DownloadYouTubeVideoWithYtDlp(string videoUrl, string formatCode, string tempDownloadFolderPath)
+        private async Task DownloadYouTubeVideoWithYtDlp(string videoUrl, string formatCode, string tempDownloadFolderPath, CancellationToken cancellationToken)
         {
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null || YouTubeQualityComboBox == null) return;
             if (!_isYtDlpReady) { StatusTextBlock.Text = $"Status: {YtDlpFileName} is not available. Cannot download YouTube video."; return; }
@@ -432,6 +451,7 @@ namespace UniversalDownloader
             FileNameTextBlock.Text = "Preparing YouTube download...";
             DownloadProgressBar.Value = 0; DownloadProgressBar.Maximum = 100; DownloadProgressBar.IsIndeterminate = true;
             _currentDownloadingComponent = null;
+            _currentYtDlpProcess = null;
             string finalReportedFilePathInTemp = null;
 
             try
@@ -454,6 +474,7 @@ namespace UniversalDownloader
 
                 using (Process process = new Process())
                 {
+                    _currentYtDlpProcess = process;
                     process.StartInfo = psi; process.EnableRaisingEvents = true;
 
                     process.OutputDataReceived += (s, e) =>
@@ -466,8 +487,32 @@ namespace UniversalDownloader
                     process.Start();
                     process.BeginOutputReadLine();
                     process.BeginErrorReadLine();
-                    await process.WaitForExitAsync();
                     DownloadProgressBar.IsIndeterminate = false;
+
+                    try
+                    {
+                        await process.WaitForExitAsync(cancellationToken);
+                    }
+                    catch (TaskCanceledException) 
+                    {
+                        Debug.WriteLine("WaitForExitAsync was canceled.");
+                        if (!_currentYtDlpProcess.HasExited)
+                        {
+                            try { _currentYtDlpProcess.Kill(true); } catch { /* ignore */ }
+                        }
+                        throw new OperationCanceledException("yt-dlp download canceled.", cancellationToken); 
+                    }
+
+
+                    DownloadProgressBar.IsIndeterminate = false;
+                    _currentYtDlpProcess = null;
+
+                    if (cancellationToken.IsCancellationRequested) 
+                    {
+                        StatusTextBlock.Text = "Status: YouTube download canceled during completion processing.";
+                        FileNameTextBlock.Text = "Download Canceled";
+                        throw new OperationCanceledException("yt-dlp download canceled.", cancellationToken);
+                    }
 
                     if (process.ExitCode == 0)
                     {
@@ -503,7 +548,7 @@ namespace UniversalDownloader
                                     fileToMove = potentialFiles.First().FullName;
                                     Debug.WriteLine($"yt-dlp fallback found: {fileToMove}");
                                 }
-                                else // Still no media file, check for *any* non-part file
+                                else
                                 {
                                     var anyFiles = new DirectoryInfo(tempDownloadFolderPath)
                                         .GetFiles()
@@ -546,8 +591,15 @@ namespace UniversalDownloader
                             {
                                 File.Move(fileToMove, targetPath);
                                 Debug.WriteLine($"Moved yt-dlp file: {fileToMove} TO {targetPath}");
-                                StatusTextBlock.Text = $"Status: YouTube download '{Path.GetFileName(targetPath)}' complete!";
-                                FileNameTextBlock.Text = $"Completed: {Path.GetFileName(targetPath)}";
+
+                                if (FileNameTextBlock != null)
+                                {
+                                    string finalCleanTitle = Path.GetFileNameWithoutExtension(targetPath);
+                                    finalCleanTitle = Regex.Replace(finalCleanTitle, @"\s*\[[^\]]+\]\s*$", "").Trim();
+                                    finalCleanTitle = Regex.Replace(finalCleanTitle, @"\s*\(Audio\)\s*$", "").Trim();
+                                    FileNameTextBlock.Text = Utilities.SanitizeFileName(finalCleanTitle);
+                                }
+                                StatusTextBlock.Text = $"Status: Download complete! Saved as '{Path.GetFileName(targetPath)}'";
                             }
                             catch (Exception moveEx)
                             {
@@ -575,11 +627,12 @@ namespace UniversalDownloader
                 EndYtDlpLogic:;
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch (Win32Exception ex) { StatusTextBlock.Text = $"Status: {YtDlpFileName} execution error. {ex.Message.Split('\n')[0]}"; _isYtDlpReady = false; DownloadProgressBar.Value = 0; DownloadProgressBar.IsIndeterminate = false; }
             catch (Exception ex) { StatusTextBlock.Text = $"Status: Error during YouTube download: {ex.Message.Split('\n')[0]}"; FileNameTextBlock.Text = "YouTube Download Error"; DownloadProgressBar.Value = 0; DownloadProgressBar.IsIndeterminate = false; }
             finally
             {
-                 CleanUpTempFolder(tempDownloadFolderPath);
+                _currentYtDlpProcess = null;
             }
         }
 
@@ -608,7 +661,23 @@ namespace UniversalDownloader
         {
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null) return;
             outputLine = outputLine.Trim();
-            Debug.WriteLine($"YT-DLP RAW: {outputLine}"); 
+            string currentOperationStatus = "";
+
+            Action<string> UpdateCleanTitle = (fullPathOrName) => {
+                if (FileNameTextBlock != null)
+                {
+                    if (string.IsNullOrEmpty(fullPathOrName))
+                    {
+                        FileNameTextBlock.Text = "Processing..."; 
+                        return;
+                    }
+                    string fileName = Path.GetFileNameWithoutExtension(fullPathOrName); 
+                    fileName = Regex.Replace(fileName, @"\s*\[[^\]]+\]\s*$", "").Trim();
+                    fileName = Regex.Replace(fileName, @"\s*\(Audio\)\s*$", "").Trim();
+                    fileName = Utilities.SanitizeFileName(fileName); 
+                    FileNameTextBlock.Text = string.IsNullOrWhiteSpace(fileName) ? "Untitled Video" : fileName;
+                }
+            };
 
             Match destMatch = YtDlpDestinationRegex.Match(outputLine);
             if (destMatch.Success)
@@ -617,8 +686,8 @@ namespace UniversalDownloader
                 _currentDownloadingComponent = newComponentPath;
                 finalReportedFilePathInTemp = newComponentPath;
 
-                FileNameTextBlock.Text = $"Downloading: {Path.GetFileName(_currentDownloadingComponent)}";
-                StatusTextBlock.Text = $"Status: Starting download of {Path.GetFileName(_currentDownloadingComponent)}...";
+                UpdateCleanTitle(_currentDownloadingComponent);
+                currentOperationStatus = $"Status: Starting download of {Path.GetFileName(_currentDownloadingComponent)}...";
 
                 _ytDlpCurrentComponentTotalBytes = -1;
                 DownloadProgressBar.IsIndeterminate = true;
@@ -627,6 +696,7 @@ namespace UniversalDownloader
                 lastKnownPercentageForComponent = 0;
                 progressStartedForAnyComponent = true;
                 Debug.WriteLine($"YT-DLP DEST: {_currentDownloadingComponent}");
+                if (StatusTextBlock != null) StatusTextBlock.Text = currentOperationStatus;
                 return;
             }
 
@@ -635,13 +705,16 @@ namespace UniversalDownloader
             {
                 _currentDownloadingComponent = alreadyDownloadedMatch.Groups["path"].Value.Trim('"', ' ');
                 finalReportedFilePathInTemp = _currentDownloadingComponent;
-                FileNameTextBlock.Text = $"File: {Path.GetFileName(finalReportedFilePathInTemp)} (already exists)";
-                StatusTextBlock.Text = "Status: File already downloaded by yt-dlp.";
+
+                UpdateCleanTitle(finalReportedFilePathInTemp);
+                currentOperationStatus = $"Status: File {Path.GetFileName(finalReportedFilePathInTemp)} already downloaded.";
+
                 DownloadProgressBar.IsIndeterminate = false;
                 DownloadProgressBar.Maximum = 100; DownloadProgressBar.Value = 100;
-                lastKnownPercentageForComponent = 100; _ytDlpCurrentComponentTotalBytes = 0; 
+                lastKnownPercentageForComponent = 100; _ytDlpCurrentComponentTotalBytes = 0;
                 progressStartedForAnyComponent = true;
                 Debug.WriteLine($"YT-DLP ALREADY_DOWNLOADED: {finalReportedFilePathInTemp}");
+                if (StatusTextBlock != null) StatusTextBlock.Text = currentOperationStatus;
                 return;
             }
 
@@ -652,23 +725,22 @@ namespace UniversalDownloader
                 string processingPath = processingMatch.Groups["path"].Value.Trim('"', ' ');
                 _currentDownloadingComponent = processingPath;
                 finalReportedFilePathInTemp = processingPath;
-                FileNameTextBlock.Text = $"Processing ({processingType}): {Path.GetFileName(_currentDownloadingComponent)}";
-                StatusTextBlock.Text = $"Status: yt-dlp - {processingType}...";
+
+                UpdateCleanTitle(_currentDownloadingComponent);
+                currentOperationStatus = $"Status: yt-dlp - {processingType} {Path.GetFileName(_currentDownloadingComponent)}...";
+
                 DownloadProgressBar.IsIndeterminate = true; DownloadProgressBar.Value = 0;
                 _ytDlpCurrentComponentTotalBytes = -2;
                 lastKnownPercentageForComponent = 0; progressStartedForAnyComponent = true;
                 Debug.WriteLine($"YT-DLP PROCESSING ({processingType}): {finalReportedFilePathInTemp}");
+                if (StatusTextBlock != null) StatusTextBlock.Text = currentOperationStatus;
                 return;
             }
 
             Match progressMatch = YtDlpProgressRegex.Match(outputLine);
             if (progressMatch.Success)
             {
-                if (_ytDlpCurrentComponentTotalBytes == -2) 
-                {
-                    Debug.WriteLine($"YT-DLP Ignoring progress line during processing: {outputLine}");
-                    return;
-                }
+                if (_ytDlpCurrentComponentTotalBytes == -2) return; 
 
                 progressStartedForAnyComponent = true;
                 double currentPercent = 0.0;
@@ -676,44 +748,47 @@ namespace UniversalDownloader
 
                 if (!double.TryParse(progressMatch.Groups["percent"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out currentPercent))
                 {
-                    Debug.WriteLine($"Failed to parse percent from yt-dlp progress: {progressMatch.Groups["percent"].Value}");
+                    Debug.WriteLine($"Failed to parse percent: {progressMatch.Groups["percent"].Value}");
                     return;
                 }
 
                 long currentLineTotalBytes = Utilities.ParseYtDlpSizeStringToBytes(totalSizeString);
-
                 if (_ytDlpCurrentComponentTotalBytes == -1 ||
                     (_ytDlpCurrentComponentTotalBytes == 0 && currentLineTotalBytes > 0) ||
                     (currentLineTotalBytes > 0 && _ytDlpCurrentComponentTotalBytes != currentLineTotalBytes))
                 {
-                    _ytDlpCurrentComponentTotalBytes = currentLineTotalBytes; 
-                    Debug.WriteLine($"YT-DLP Updated Total Component Bytes: {_ytDlpCurrentComponentTotalBytes} from '{totalSizeString}'");
+                    _ytDlpCurrentComponentTotalBytes = currentLineTotalBytes;
+                    Debug.WriteLine($"YT-DLP Updated Total Bytes: {_ytDlpCurrentComponentTotalBytes} from '{totalSizeString}'");
                 }
 
                 string speed = progressMatch.Groups["speed"].Value;
                 string eta = progressMatch.Groups["eta"].Value;
-                string componentNameDisplay = Path.GetFileName(_currentDownloadingComponent);
-                if (string.IsNullOrEmpty(componentNameDisplay)) componentNameDisplay = baseFileNameFromYtDlpOutput;
+
 
                 if (DownloadProgressBar.IsIndeterminate && _ytDlpCurrentComponentTotalBytes >= 0)
                 {
                     DownloadProgressBar.IsIndeterminate = false;
                 }
 
-                if (_ytDlpCurrentComponentTotalBytes > 0) 
+                if (_ytDlpCurrentComponentTotalBytes > 0)
                 {
                     DownloadProgressBar.Maximum = _ytDlpCurrentComponentTotalBytes;
                     long currentDownloadedBytes = (long)((currentPercent / 100.0) * _ytDlpCurrentComponentTotalBytes);
                     DownloadProgressBar.Value = Math.Min(currentDownloadedBytes, _ytDlpCurrentComponentTotalBytes);
-                    StatusTextBlock.Text = $"Downloading ({componentNameDisplay}): {currentPercent:F1}% of {Utilities.FormatBytesOutput(_ytDlpCurrentComponentTotalBytes)} | Speed: {speed} | ETA: {eta}";
+                    currentOperationStatus = $"Downloading: {currentPercent:F1}% of {Utilities.FormatBytesOutput(_ytDlpCurrentComponentTotalBytes)}";
                 }
-                else 
+                else
                 {
                     DownloadProgressBar.Maximum = 100;
                     DownloadProgressBar.Value = Math.Min(currentPercent, 100.0);
-                    StatusTextBlock.Text = $"Downloading ({componentNameDisplay}): {currentPercent:F1}% of {totalSizeString} | Speed: {speed} | ETA: {eta}";
+                    currentOperationStatus = $"Downloading: {currentPercent:F1}% of {totalSizeString}";
                 }
+
+                if (!string.IsNullOrWhiteSpace(speed)) currentOperationStatus += $" | Speed: {speed}";
+                if (!string.IsNullOrWhiteSpace(eta)) currentOperationStatus += $" | ETA: {eta}";
+
                 lastKnownPercentageForComponent = currentPercent;
+                if (StatusTextBlock != null) StatusTextBlock.Text = currentOperationStatus;
             }
         }
     }

@@ -127,7 +127,7 @@ namespace UniversalDownloader
             return string.IsNullOrWhiteSpace(fileName) ? "unknown_file.dat" : Utilities.SanitizeFileName(fileName); 
         }
 
-        private async Task DownloadGoogleDriveFile(string url, string tempDownloadFolderPath)
+        private async Task DownloadGoogleDriveFile(string url, string tempDownloadFolderPath, CancellationToken cancellationToken)
         {
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null) { return; }
             StatusTextBlock.Text = "Status: Preparing Google Drive download...";
@@ -147,10 +147,10 @@ namespace UniversalDownloader
                 return;
             }
             string directDownloadUrl = $"https://drive.google.com/uc?export=download&confirm=t&id={fileId}";
-            await DownloadDirectFile(directDownloadUrl, tempDownloadFolderPath, true);
+            await DownloadDirectFile(directDownloadUrl, tempDownloadFolderPath, cancellationToken, true);
         }
 
-        private async Task DownloadDirectFile(string url, string tempDownloadFolderPath, bool isGoogleDriveInitialAttempt = false)
+        private async Task DownloadDirectFile(string url, string tempDownloadFolderPath, CancellationToken cancellationToken, bool isGoogleDriveInitialAttempt = false)
         {
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null) { return; }
             StatusTextBlock.Text = "Status: Starting direct download...";
@@ -161,8 +161,9 @@ namespace UniversalDownloader
             try
             {
                 using (var request = new HttpRequestMessage(HttpMethod.Get, url))
-                using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
+                using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (isGoogleDriveInitialAttempt && (response.Content.Headers.ContentType?.MediaType?.Contains("text/html") ?? false) &&
                         (response.RequestMessage.RequestUri.Host.Contains("google.com") || response.RequestMessage.RequestUri.Host.Contains("drive.usercontent.google.com")))
                     {
@@ -182,7 +183,7 @@ namespace UniversalDownloader
                             }
                             StatusTextBlock.Text = "Status: Following Google Drive confirmation link..."; FileNameTextBlock.Text = "Google Drive: Confirming...";
                             await Task.Delay(200);
-                            await DownloadDirectFile(newUrl, tempDownloadFolderPath, false);
+                            await DownloadDirectFile(newUrl, tempDownloadFolderPath, cancellationToken, false);
                             return;
                         }
                         else
@@ -193,11 +194,16 @@ namespace UniversalDownloader
                         }
                     }
                     response.EnsureSuccessStatusCode();
+
                     tempFileName = GetFileNameFromHeaders(response, url);
                     tempFilePath = Path.Combine(tempDownloadFolderPath, tempFileName);
-
-                    FileNameTextBlock.Text = $"Downloading File: {tempFileName}";
+                    if (FileNameTextBlock != null)
+                    {
+                        string cleanDisplayTitle = Path.GetFileNameWithoutExtension(tempFileName);
+                        FileNameTextBlock.Text = Utilities.SanitizeFileName(cleanDisplayTitle);
+                    }
                     StatusTextBlock.Text = $"Status: Downloading '{tempFileName}'...";
+
                     long? totalBytes = response.Content.Headers.ContentLength;
                     int lastPercentage = -1;
 
@@ -209,13 +215,15 @@ namespace UniversalDownloader
                     }
 
                     using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
-                    using (var stream = await response.Content.ReadAsStreamAsync())
+                    using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
                     {
                         byte[] buffer = new byte[81920]; int bytesRead; long totalBytesRead = 0;
 
-                        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
                         {
-                            await fileStream.WriteAsync(buffer, 0, bytesRead); totalBytesRead += bytesRead;
+                            cancellationToken.ThrowIfCancellationRequested();
+                            await fileStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                            totalBytesRead += bytesRead;
                             if (totalBytes.HasValue && totalBytes.Value > 0)
                             {
                                 if (DownloadProgressBar != null && DownloadProgressBar.IsIndeterminate) DownloadProgressBar.IsIndeterminate = false;
@@ -268,12 +276,15 @@ namespace UniversalDownloader
                     }
                     try
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         File.Move(tempFilePath, targetPath);
-                        Debug.WriteLine($"Moved: {tempFilePath} TO {targetPath}");
-                        tempFilePath = null; 
-
-                        StatusTextBlock.Text = $"Status: File '{Path.GetFileName(targetPath)}' downloaded successfully!";
-                        FileNameTextBlock.Text = $"Completed: {Path.GetFileName(targetPath)}";
+                        tempFilePath = null;
+                        if (FileNameTextBlock != null)
+                        {
+                            string finalCleanTitle = Path.GetFileNameWithoutExtension(targetPath);
+                            FileNameTextBlock.Text = Utilities.SanitizeFileName(finalCleanTitle);
+                        }
+                        StatusTextBlock.Text = $"Status: Download complete! Saved as '{Path.GetFileName(targetPath)}'";
                     }
                     catch (Exception moveEx)
                     {
@@ -284,6 +295,7 @@ namespace UniversalDownloader
                     EndDirectDownloadLogic:;
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch (HttpRequestException httpEx)
             {
                 StatusTextBlock.Text = $"Status: HTTP Error - {httpEx.StatusCode?.ToString() ?? httpEx.Message.Split('\n')[0]}";
