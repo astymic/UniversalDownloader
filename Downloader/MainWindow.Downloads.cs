@@ -22,49 +22,114 @@ namespace UniversalDownloader
             return Regex.IsMatch(url, @"drive\.google\.com/(file/d/|open\?id=|uc\?id=)", RegexOptions.IgnoreCase);
         }
 
+        private bool IsSpotifyLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) { return false; }
+            return Regex.IsMatch(url, @"open\.spotify\.com/(track|album|playlist)/", RegexOptions.IgnoreCase);
+        }
+
+        private bool IsSoundCloudLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) { return false; }
+            return Regex.IsMatch(url, @"soundcloud\.com/", RegexOptions.IgnoreCase);
+        }
+
+        private bool IsKnownAudioPlatformLink(string url)
+        {
+            return IsSpotifyLink(url) || IsSoundCloudLink(url); // Add more here like Bandcamp, Deezer etc.
+        }
+
+
         private async Task ProcessUrlChange(string url, bool isInitialLoad = false)
         {
             if (YouTubeQualityComboBox != null) YouTubeQualityComboBox.ItemsSource = null;
-            if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed;
+            if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed; // Default to hidden
 
             if (string.IsNullOrWhiteSpace(url) || url == "Paste URL here...")
             {
                 if (FileNameTextBlock != null) FileNameTextBlock.Text = string.Empty;
-                return; 
+                return;
             }
+
+            if (IsYouTubeLink(url) || IsKnownAudioPlatformLink(url))
+            {
+                if (!_isYtDlpReady)
+                {
+                    if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: {YtDlpFileName} dependency check...";
+                    await CheckAndEnsureYtDlpExistsAsync();
+                    if (!_isYtDlpReady) // If still not ready after check
+                    {
+                        if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: {YtDlpFileName} not available. Platform features disabled.";
+                        if (FileNameTextBlock != null) FileNameTextBlock.Text = "Required tool missing.";
+                        return; // Can't proceed with these platforms
+                    }
+                }
+            }
+
 
             if (IsYouTubeLink(url))
             {
                 if (FileNameTextBlock != null) FileNameTextBlock.Text = "Processing YouTube URL...";
-                if (!_isYtDlpReady)
-                {
-                    if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: {YtDlpFileName} not found. Checking/Downloading...";
-                    await CheckAndEnsureYtDlpExistsAsync();
-                }
+                if (StatusTextBlock != null) StatusTextBlock.Text = "Status: Fetching YouTube qualities...";
+                await LoadYouTubeQualitiesWithYtDlp(url); // This shows QualitySection if successful
+            }
+            else if (IsKnownAudioPlatformLink(url))
+            {
+                string platformName = IsSpotifyLink(url) ? "Spotify" : IsSoundCloudLink(url) ? "SoundCloud" : "Audio Platform";
+                if (FileNameTextBlock != null) FileNameTextBlock.Text = $"Processing {platformName} link...";
+                if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Ready to download audio from {platformName}.";
+                await TrySetAudioTitleFromYtDlp(url, platformName);
+            }
+            else if (IsGoogleDriveLink(url))
+            {
+                if (FileNameTextBlock != null) FileNameTextBlock.Text = "Google Drive link detected.";
+                if (StatusTextBlock != null) StatusTextBlock.Text = "Status: Ready to download Google Drive link.";
+            }
+            else // Potentially direct link or other yt-dlp supported (non-audio-specific UI)
+            {
+                if (FileNameTextBlock != null) FileNameTextBlock.Text = "Fetching file info...";
+                await TrySetFileNameFromUrlHeaders(url);
+            }
+        }
 
-                if (_isYtDlpReady)
+        private async Task TrySetAudioTitleFromYtDlp(string url, string platformName)
+        {
+            if (!_isYtDlpReady || FileNameTextBlock == null) return;
+
+            FileNameTextBlock.Text = $"Fetching title from {platformName}...";
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
                 {
-                    if (StatusTextBlock != null) StatusTextBlock.Text = "Status: Fetching YouTube qualities...";
-                    await LoadYouTubeQualitiesWithYtDlp(url);
-                }
-                else
+                    FileName = _ytDlpExecutablePath,
+                    Arguments = $"--get-title --no-warnings \"{url}\"",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = System.Text.Encoding.UTF8
+                };
+
+                using (Process process = Process.Start(psi))
                 {
-                    if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: {YtDlpFileName} still not available. YouTube features disabled.";
-                    if (FileNameTextBlock != null) FileNameTextBlock.Text = "YouTube features disabled.";
+                    string titleOutput = await process.StandardOutput.ReadToEndAsync();
+                    await process.WaitForExitAsync();
+                    if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(titleOutput))
+                    {
+                        FileNameTextBlock.Text = Utilities.SanitizeFileName(titleOutput.Trim());
+                        if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Ready to download audio: {FileNameTextBlock.Text}";
+                    }
+                    else
+                    {
+                        FileNameTextBlock.Text = $"{platformName} item (title unavailable)";
+                        if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Ready to download from {platformName}. Could not fetch title.";
+                    }
                 }
             }
-            else // Not YouTube
+            catch (Exception ex)
             {
-                if (IsGoogleDriveLink(url))
-                {
-                    if (FileNameTextBlock != null) FileNameTextBlock.Text = "Google Drive link detected.";
-                    if (StatusTextBlock != null) StatusTextBlock.Text = "Status: Ready to download Google Drive link.";
-                }
-                else
-                {
-                    if (FileNameTextBlock != null) FileNameTextBlock.Text = "Fetching file info...";
-                    await TrySetFileNameFromUrlHeaders(url); 
-                }
+                Debug.WriteLine($"Error fetching audio title with yt-dlp: {ex.Message}");
+                FileNameTextBlock.Text = $"{platformName} item (error fetching title)";
+                if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Ready to download from {platformName}. Error fetching title.";
             }
         }
 

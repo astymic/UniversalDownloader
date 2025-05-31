@@ -437,18 +437,22 @@ namespace UniversalDownloader
             catch (Exception ex) { StatusTextBlock.Text = $"Status: Error processing YouTube info: {ex.Message.Split('\n')[0]}."; FileNameTextBlock.Text = "YouTube Info Error"; if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed; }
         }
         
-        private async Task DownloadYouTubeVideoWithYtDlp(string videoUrl, string formatCode, string tempDownloadFolderPath, CancellationToken cancellationToken)
+        private async Task DownloadWithYtDlpAsync(string itemUrl, string formatSelection,
+                                                 string tempDownloadFolderPath, CancellationToken cancellationToken,
+                                                 bool extractAudio = false, string audioFormat = "best")
         {
-            if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null || YouTubeQualityComboBox == null) return;
-            if (!_isYtDlpReady) { StatusTextBlock.Text = $"Status: {YtDlpFileName} is not available. Cannot download YouTube video."; return; }
+            if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null) return;
+            if (!_isYtDlpReady) { StatusTextBlock.Text = $"Status: {YtDlpFileName} is not available."; return; }
 
             _ytDlpCurrentComponentTotalBytes = -1;
-            var selectedQualityItem = YouTubeQualityComboBox.SelectedItem as YouTubeQualityItem;
-            string baseFileNameTemplate = selectedQualityItem != null && selectedQualityItem.IsAudioOnly ? "%(title)s [%(id)s] (Audio).%(ext)s" : "%(title)s [%(id)s].%(ext)s";
+
+            string baseFileNameTemplate = extractAudio ? "%(title)s.%(ext)s" : "%(title)s.%(ext)s";
+
             string outputTemplateInTemp = Path.Combine(tempDownloadFolderPath, baseFileNameTemplate);
 
-            StatusTextBlock.Text = $"Status: Downloading YouTube (format: {formatCode})...";
-            FileNameTextBlock.Text = "Preparing YouTube download...";
+            if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Preparing download via yt-dlp...";
+            if (FileNameTextBlock != null && extractAudio) FileNameTextBlock.Text = "Preparing audio download...";
+
             DownloadProgressBar.Value = 0; DownloadProgressBar.Maximum = 100; DownloadProgressBar.IsIndeterminate = true;
             _currentDownloadingComponent = null;
             _currentYtDlpProcess = null;
@@ -456,10 +460,60 @@ namespace UniversalDownloader
 
             try
             {
+                string arguments;
+                string currentBaseFileNameTemplate;
+                if (extractAudio && (IsSpotifyLink(itemUrl) || IsSoundCloudLink(itemUrl)))
+                {
+                    currentBaseFileNameTemplate = "%(artist)s - %(title)s.%(ext)s";
+                }
+                else if (extractAudio || (YouTubeQualityComboBox.SelectedItem as YouTubeQualityItem)?.IsAudioOnly == true)
+                {
+                    currentBaseFileNameTemplate = "%(title)s (Audio).%(ext)s";
+                }
+                else
+                {
+                    currentBaseFileNameTemplate = "%(title)s [%(id)s].%(ext)s";
+                }
+                if (IsYouTubeLink(itemUrl) && !currentBaseFileNameTemplate.Contains("%(id)s"))
+                {
+                    var extPart = Path.GetExtension(currentBaseFileNameTemplate);
+                    var namePart = Path.GetFileNameWithoutExtension(currentBaseFileNameTemplate);
+                    currentBaseFileNameTemplate = $"{namePart} [%(id)s]{extPart}";
+                }
+
+
+                if (extractAudio && (IsSpotifyLink(itemUrl) || IsSoundCloudLink(itemUrl)))
+                {
+                    arguments = $"-o \"{outputTemplateInTemp}\" " +
+                                $"--extract-audio " +
+                                $"--audio-format {audioFormat} " +
+                                $"--audio-quality 0 " + 
+                                $"--no-continue --progress --newline --no-warnings --ignore-config " +
+                                $"\"{itemUrl}\"";
+                }
+                else if (extractAudio) 
+                {
+                    arguments = $"-o \"{outputTemplateInTemp}\" " +
+                                $"--extract-audio " +
+                                $"--audio-format {audioFormat} " +
+                                $"--audio-quality 0 " +
+                                $"-f \"{(string.IsNullOrWhiteSpace(formatSelection) ? "bestaudio/best" : formatSelection)}\" " + 
+                                $"--no-continue --progress --newline --no-warnings --ignore-config " +
+                                $"\"{itemUrl}\"";
+                }
+                else 
+                {
+                    arguments = $"-o \"{outputTemplateInTemp}\" " +
+                                $"-f \"{formatSelection}\" " +
+                                $"--no-continue --progress --newline --no-warnings --ignore-config " +
+                                $"\"{itemUrl}\"";
+                }
+
+
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
                     FileName = _ytDlpExecutablePath,
-                    Arguments = $"-f \"{formatCode}\" -o \"{outputTemplateInTemp}\" --no-continue --progress --newline --no-warnings --ignore-config \"{videoUrl}\"",
+                    Arguments = arguments,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -468,7 +522,7 @@ namespace UniversalDownloader
                     StandardErrorEncoding = System.Text.Encoding.UTF8
                 };
 
-                string actualFileNameFromYtDlpOutput = "downloaded_video"; 
+                string actualFileNameFromYtDlpOutput = extractAudio ? "extracted_audio" : "downloaded_video";
                 bool progressStartedForAnyComponent = false;
                 double lastReportedPercentageForComponent = 0;
 
@@ -591,7 +645,8 @@ namespace UniversalDownloader
                             {
                                 File.Move(fileToMove, targetPath);
                                 Debug.WriteLine($"Moved yt-dlp file: {fileToMove} TO {targetPath}");
-
+                                
+                                string contentType = extractAudio ? "Audio track" : "YouTube content";
                                 if (FileNameTextBlock != null)
                                 {
                                     string finalCleanTitle = Path.GetFileNameWithoutExtension(targetPath);

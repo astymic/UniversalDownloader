@@ -299,8 +299,7 @@ namespace UniversalDownloader
         }
 
         private async void UrlTextBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            if (YouTubeQualityComboBox == null || StatusTextBlock == null || FileNameTextBlock == null || QualitySection == null) return;
+        {            if (YouTubeQualityComboBox == null || StatusTextBlock == null || FileNameTextBlock == null || QualitySection == null) return;
             if (_isProcessingUrl || _isDownloadingFile || _isManagingYtDlp) return;
 
             _isProcessingUrl = true;
@@ -352,9 +351,9 @@ namespace UniversalDownloader
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null || UrlTextBox == null) return;
 
             string url = UrlTextBox.Text;
-            if (!CanInitiateDownload() || (IsYouTubeLink(url) && YouTubeQualityComboBox.SelectedItem == null))
+            if (!CanInitiateDownload() || (IsYouTubeLink(url) && !IsKnownAudioPlatformLink(url) && YouTubeQualityComboBox.SelectedItem == null))
             {
-                UpdateUiElementStates("Status: Please enter a valid URL, select directory, and quality (if YouTube).");
+                UpdateUiElementStates("Status: Please enter a valid URL, select directory, and quality (if applicable).");
                 return;
             }
 
@@ -362,14 +361,18 @@ namespace UniversalDownloader
             _cancellationTokenSource = new CancellationTokenSource();
             UpdateUiElementStates("Status: Preparing to download...");
 
-            if (DownloadProgressBar != null) { DownloadProgressBar.Value = 0; DownloadProgressBar.IsIndeterminate = true; }
+            if (DownloadProgressBar != null) 
+            { 
+                DownloadProgressBar.Value = 0; 
+                DownloadProgressBar.IsIndeterminate = true; 
+            }
 
             string tempDownloadFolderPath = CreateTempDownloadFolder();
-            if (string.IsNullOrEmpty(tempDownloadFolderPath))
-            {
-                _isDownloadingFile = false;
-                UpdateUiElementStates("Status: Could not create temporary download folder.");
-                return;
+            if (string.IsNullOrEmpty(tempDownloadFolderPath)) 
+            { 
+                _isDownloadingFile = false; 
+                UpdateUiElementStates("Status: Could not create temp folder."); 
+                return; 
             }
 
             try
@@ -383,7 +386,12 @@ namespace UniversalDownloader
                         return;
                     }
                     var selectedQuality = YouTubeQualityComboBox.SelectedItem as YouTubeQualityItem;
-                    await DownloadYouTubeVideoWithYtDlp(url, selectedQuality.FormatCode, tempDownloadFolderPath, _cancellationTokenSource.Token);
+                    await DownloadWithYtDlpAsync(url, selectedQuality.FormatCode, tempDownloadFolderPath, _cancellationTokenSource.Token, extractAudio: selectedQuality.IsAudioOnly);
+                }
+                else if (IsKnownAudioPlatformLink(url)) 
+                {
+                    if (!_isYtDlpReady) { _isDownloadingFile = false; UpdateUiElementStates($"Status: {YtDlpFileName} is not available."); return; }
+                    await DownloadWithYtDlpAsync(url, "bestaudio/best", tempDownloadFolderPath, _cancellationTokenSource.Token, extractAudio: true, audioFormat: "mp3"); 
                 }
                 else if (IsGoogleDriveLink(url))
                 {
