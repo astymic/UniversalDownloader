@@ -23,8 +23,8 @@ namespace UniversalDownloader
         // Specific Busy Flags 
         private bool _isInitializing = false;
         private bool _isProcessingUrl = false;
-        private bool _isManagingYtDlp = false; 
-        private bool _isDownloadingFile = false; 
+        private bool _isManagingYtDlp = false;
+        private bool _isDownloadingFile = false;
 
         private const string SettingsKeyLastDownloadPath = "LastDownloadPath";
 
@@ -69,14 +69,14 @@ namespace UniversalDownloader
                 UrlTextBox.Foreground = (Brush)FindResource("TextSecondaryBrush");
             }
 
-            await CheckAndEnsureYtDlpExistsAsync(); 
+            await CheckAndEnsureYtDlpExistsAsync();
 
             _isInitializing = false;
-            UpdateUiElementStates(); 
+            UpdateUiElementStates();
 
             if (UrlTextBox != null && !string.IsNullOrWhiteSpace(UrlTextBox.Text) && UrlTextBox.Text != "Paste URL here...")
             {
-                await ProcessUrlChange(UrlTextBox.Text, true); 
+                await ProcessUrlChange(UrlTextBox.Text, true);
             }
             else
             {
@@ -162,7 +162,7 @@ namespace UniversalDownloader
             catch (Exception ex) { Debug.WriteLine($"Failed to write setting '{key}' asynchronously: {ex.Message}"); }
         }
 
-        private void SaveSetting(string key, string value) 
+        private void SaveSetting(string key, string value)
         {
             string settingsFile = GetSettingsFilePath(); JObject settings;
             if (File.Exists(settingsFile))
@@ -203,7 +203,7 @@ namespace UniversalDownloader
         {
             Dispatcher.InvokeAsync(() =>
             {
-                bool canBrowse = !_isInitializing && !_isDownloadingFile; 
+                bool canBrowse = !_isInitializing && !_isDownloadingFile;
                 bool canInputUrl = !_isInitializing && !_isProcessingUrl && !_isManagingYtDlp && !_isDownloadingFile;
                 bool canDownloadAction = CanInitiateDownload() && !_isInitializing && !_isProcessingUrl && !_isManagingYtDlp && !_isDownloadingFile;
 
@@ -299,11 +299,12 @@ namespace UniversalDownloader
         }
 
         private async void UrlTextBox_TextChanged(object sender, TextChangedEventArgs e)
-        {            if (YouTubeQualityComboBox == null || StatusTextBlock == null || FileNameTextBlock == null || QualitySection == null) return;
+        {
+            if (YouTubeQualityComboBox == null || StatusTextBlock == null || FileNameTextBlock == null || QualitySection == null) return;
             if (_isProcessingUrl || _isDownloadingFile || _isManagingYtDlp) return;
 
             _isProcessingUrl = true;
-            UpdateUiElementStates("Status: Processing URL..."); 
+            UpdateUiElementStates("Status: Processing URL...");
 
             string currentUrl = UrlTextBox.Text;
             try
@@ -321,7 +322,7 @@ namespace UniversalDownloader
             finally
             {
                 _isProcessingUrl = false;
-                UpdateUiElementStates(); 
+                UpdateUiElementStates();
             }
         }
 
@@ -361,18 +362,18 @@ namespace UniversalDownloader
             _cancellationTokenSource = new CancellationTokenSource();
             UpdateUiElementStates("Status: Preparing to download...");
 
-            if (DownloadProgressBar != null) 
-            { 
-                DownloadProgressBar.Value = 0; 
-                DownloadProgressBar.IsIndeterminate = true; 
+            if (DownloadProgressBar != null)
+            {
+                DownloadProgressBar.Value = 0;
+                DownloadProgressBar.IsIndeterminate = true;
             }
 
             string tempDownloadFolderPath = CreateTempDownloadFolder();
-            if (string.IsNullOrEmpty(tempDownloadFolderPath)) 
-            { 
-                _isDownloadingFile = false; 
-                UpdateUiElementStates("Status: Could not create temp folder."); 
-                return; 
+            if (string.IsNullOrEmpty(tempDownloadFolderPath))
+            {
+                _isDownloadingFile = false;
+                UpdateUiElementStates("Status: Could not create temp folder.");
+                return;
             }
 
             try
@@ -388,10 +389,10 @@ namespace UniversalDownloader
                     var selectedQuality = YouTubeQualityComboBox.SelectedItem as YouTubeQualityItem;
                     await DownloadWithYtDlpAsync(url, selectedQuality.FormatCode, tempDownloadFolderPath, _cancellationTokenSource.Token, extractAudio: selectedQuality.IsAudioOnly);
                 }
-                else if (IsKnownAudioPlatformLink(url)) 
+                else if (IsKnownAudioPlatformLink(url))
                 {
                     if (!_isYtDlpReady) { _isDownloadingFile = false; UpdateUiElementStates($"Status: {YtDlpFileName} is not available."); return; }
-                    await DownloadWithYtDlpAsync(url, "bestaudio/best", tempDownloadFolderPath, _cancellationTokenSource.Token, extractAudio: true, audioFormat: "mp3"); 
+                    await DownloadWithYtDlpAsync(url, "bestaudio/best", tempDownloadFolderPath, _cancellationTokenSource.Token, extractAudio: true, audioFormat: "mp3");
                 }
                 else if (IsGoogleDriveLink(url))
                 {
@@ -402,7 +403,7 @@ namespace UniversalDownloader
                     await DownloadDirectFile(url, tempDownloadFolderPath, _cancellationTokenSource.Token);
                 }
             }
-            catch (OperationCanceledException) 
+            catch (OperationCanceledException)
             {
                 if (StatusTextBlock != null) StatusTextBlock.Text = "Status: Download canceled by user.";
                 if (FileNameTextBlock != null) FileNameTextBlock.Text = "Download Canceled";
@@ -417,17 +418,17 @@ namespace UniversalDownloader
             finally
             {
                 _isDownloadingFile = false;
-                _currentYtDlpProcess = null; 
-                _cancellationTokenSource?.Dispose(); 
+                _currentYtDlpProcess = null;
+                _cancellationTokenSource?.Dispose();
                 _cancellationTokenSource = null;
 
                 if (DownloadProgressBar != null && DownloadProgressBar.IsIndeterminate) DownloadProgressBar.IsIndeterminate = false;
-                UpdateUiElementStates(); 
+                UpdateUiElementStates();
 
                 bool wasMoveError = StatusTextBlock.Text.Contains("File Move Error") || StatusTextBlock.Text.Contains("failed to move");
                 bool wasDownloadError = StatusTextBlock.Text.Contains("Download Failed") || StatusTextBlock.Text.Contains("download aborted") || StatusTextBlock.Text.Contains("download corrupted");
 
-                if (!wasMoveError || wasDownloadError) 
+                if (!wasMoveError || wasDownloadError)
                 {
                     CleanUpTempFolder(tempDownloadFolderPath);
                 }
@@ -441,7 +442,7 @@ namespace UniversalDownloader
 
         private void CancelDownloadButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_isDownloadingFile) 
+            if (_isDownloadingFile)
             {
                 StatusTextBlock.Text = "Status: Canceling download...";
                 FileNameTextBlock.Text = "Canceling...";
@@ -452,7 +453,7 @@ namespace UniversalDownloader
                 {
                     try
                     {
-                        _currentYtDlpProcess.Kill(true); 
+                        _currentYtDlpProcess.Kill(true);
                         Debug.WriteLine("yt-dlp process killed for cancellation.");
                     }
                     catch (Exception ex)

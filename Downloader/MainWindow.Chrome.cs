@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Interop; 
+using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Forms;  
+using System.Windows.Forms;
 
 namespace UniversalDownloader
 {
-    public partial class MainWindow 
+    public partial class MainWindow
     {
         // For WndProc
         private const int WM_NCLBUTTONDBLCLK = 0x00A3; // Non-client left button double-click
@@ -61,7 +61,7 @@ namespace UniversalDownloader
             }
             else
             {
-                GoToPseudoMaximize(true); 
+                GoToPseudoMaximize(true);
             }
         }
 
@@ -127,7 +127,7 @@ namespace UniversalDownloader
                 }
                 if (MainWindowRootBorder != null)
                 {
-                    MainWindowRootBorder.CornerRadius = new CornerRadius(16);
+                    MainWindowRootBorder.CornerRadius = new CornerRadius(0);
                     MainWindowRootBorder.Effect = null;
                 }
             }
@@ -185,7 +185,7 @@ namespace UniversalDownloader
 
             _isManuallyPseudoMaximized = true;
 
-            if (this.WindowState == WindowState.Maximized) 
+            if (this.WindowState == WindowState.Maximized)
             {
                 this.WindowState = WindowState.Normal;
             }
@@ -195,20 +195,20 @@ namespace UniversalDownloader
 
         private void MaximizeRestoreButton_Click(object sender, RoutedEventArgs e)
         {
-            if (this.WindowState == WindowState.Maximized) 
+            if (this.WindowState == WindowState.Maximized)
             {
-                if (!_isManuallyPseudoMaximized) 
+                if (!_isManuallyPseudoMaximized)
                 {
                     _normalWindowBoundsBeforePseudoMaximize = this.RestoreBounds;
                 }
-                this.WindowState = WindowState.Normal; 
-                GoToPseudoMaximize(true); 
+                this.WindowState = WindowState.Normal;
+                GoToPseudoMaximize(true);
             }
-            else if (_isManuallyPseudoMaximized) 
+            else if (_isManuallyPseudoMaximized)
             {
                 RestoreFromPseudoMaximize();
             }
-            else 
+            else
             {
                 GoToPseudoMaximize(true);
             }

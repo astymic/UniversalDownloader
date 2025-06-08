@@ -81,5 +81,38 @@ namespace UniversalDownloader
             };
             return mapping.TryGetValue(mimeType.Split(';')[0].Trim(), out var extension) ? extension : ".dat";
         }
+
+        /// <summary>
+        /// Finds a unique file path in a given directory by appending a number (e.g., " (1)") if the file already exists.
+        /// </summary>
+        /// <param name="directory">The target directory.</param>
+        /// <param name="desiredFileName">The desired name of the file.</param>
+        /// <returns>A unique file path.</returns>
+        /// <exception cref="IOException">Thrown if a unique name cannot be found after 100 attempts.</exception>
+        public static string GetUniqueFilePath(string directory, string desiredFileName)
+        {
+            string targetPath = Path.Combine(directory, desiredFileName);
+
+            if (!File.Exists(targetPath))
+            {
+                return targetPath;
+            }
+
+            int count = 1;
+            string fileNameOnly = Path.GetFileNameWithoutExtension(desiredFileName);
+            string extension = Path.GetExtension(desiredFileName);
+
+            while (File.Exists(targetPath))
+            {
+                if (count > 100)
+                {
+                    throw new IOException("Could not find a unique filename after 100 attempts.");
+                }
+                string newFileName = $"{fileNameOnly} ({count++}){extension}";
+                targetPath = Path.Combine(directory, newFileName);
+            }
+
+            return targetPath;
+        }
     }
 }

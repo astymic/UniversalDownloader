@@ -5,7 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:UniversalDownloader"
         mc:Ignorable="d"
-        Title="Universal File Downloader" Height="650" Width="900"
+        Title="Universal File Downloader" Height="770" Width="900"
+        MinHeight="600" MinWidth="700"
         WindowStartupLocation="CenterScreen"
         FontFamily="Inter, Segoe UI, Arial"
         FontWeight="Normal"
@@ -451,8 +452,7 @@
                     Background="Transparent"
                     CornerRadius="0,0,16,16"
                     ClipToBounds="True"
-                    BorderBrush="{StaticResource CardBrush}"
-                    BorderThickness="0,0,0,16">
+                    Padding="0,0,0,16">
                 <ScrollViewer x:Name="MainScrollViewer"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
@@ -468,44 +468,44 @@
                             SnapsToDevicePixels="True">
                         <StackPanel MaxWidth="600" Background="Transparent">
 
-                        <!-- Header Section -->
-                        <TextBlock Text="Download Any File" FontSize="32" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextAlignment="Center" Margin="0,0,0,8"/>
-                        <TextBlock Text="Paste any URL and download files with ease" Style="{StaticResource SecondaryLabel}" TextAlignment="Center" FontSize="16" Margin="0,0,0,40"/>
+                            <!-- Header Section -->
+                            <TextBlock Text="Download Any File" FontSize="32" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextAlignment="Center" Margin="0,0,0,8"/>
+                            <TextBlock Text="Paste any URL and download files with ease" Style="{StaticResource SecondaryLabel}" TextAlignment="Center" FontSize="16" Margin="0,0,0,40"/>
 
-                        <!-- URL Input Section -->
-                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="24" Margin="0,0,0,24" Effect="{StaticResource CardShadow}">
-                            <StackPanel>
-                                <TextBlock Text="🔗 URL" Style="{StaticResource ModernLabel}"/>
-                                <TextBox x:Name="UrlTextBox" Style="{StaticResource ModernTextBox}" TextChanged="UrlTextBox_TextChanged" GotFocus="UrlTextBox_GotFocus" LostFocus="UrlTextBox_LostFocus" Text="Paste URL here..." Foreground="{StaticResource TextSecondaryBrush}" Margin="0"/>
-                            </StackPanel>
-                        </Border>
+                            <!-- URL Input Section -->
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="24" Margin="0,0,0,24" Effect="{StaticResource CardShadow}">
+                                <StackPanel>
+                                    <TextBlock Text="🔗 URL" Style="{StaticResource ModernLabel}"/>
+                                    <TextBox x:Name="UrlTextBox" Style="{StaticResource ModernTextBox}" TextChanged="UrlTextBox_TextChanged" GotFocus="UrlTextBox_GotFocus" LostFocus="UrlTextBox_LostFocus" Text="Paste URL here..." Foreground="{StaticResource TextSecondaryBrush}" Margin="0"/>
+                                </StackPanel>
+                            </Border>
 
-                        <!-- Download Location Section -->
-                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="24" Margin="0,0,0,24" Effect="{StaticResource CardShadow}">
-                            <StackPanel>
-                                <TextBlock Text="📁 Download Location" Style="{StaticResource ModernLabel}"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="DirectoryPathTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" IsReadOnly="True" Text="No directory selected" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,8,0"/>
-                                    <Button x:Name="BrowseButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Browse" Click="BrowseButton_Click" Margin="0"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
+                            <!-- Download Location Section -->
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="24" Margin="0,0,0,24" Effect="{StaticResource CardShadow}">
+                                <StackPanel>
+                                    <TextBlock Text="📁 Download Location" Style="{StaticResource ModernLabel}"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="DirectoryPathTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" IsReadOnly="True" Text="No directory selected" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,8,0"/>
+                                        <Button x:Name="BrowseButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Browse" Click="BrowseButton_Click" Margin="0"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
 
-                        <!-- Quality Selection Section (YouTube) -->
-                        <Border x:Name="QualitySection" Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="24" Margin="0,0,0,24" Effect="{StaticResource CardShadow}" Visibility="Collapsed">
-                            <StackPanel x:Name="YouTubeQualityPanel">
-                                <TextBlock x:Name="YouTubeQualityLabel" Text="🎬 Video Quality" Style="{StaticResource ModernLabel}"/>
-                                <TextBlock Text="Select your preferred video quality and format" Style="{StaticResource SecondaryLabel}" Margin="8,0,8,16"/>
-                                <ComboBox x:Name="YouTubeQualityComboBox" Style="{StaticResource ModernComboBox}" DisplayMemberPath="Label" SelectedValuePath="FormatCode" SelectionChanged="YouTubeQualityComboBox_SelectionChanged" PreviewMouseLeftButtonDown="YouTubeQualityComboBox_PreviewMouseLeftButtonDown" Margin="0"/>
-                            </StackPanel>
-                        </Border>
+                            <!-- Quality Selection Section (YouTube) -->
+                            <Border x:Name="QualitySection" Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="24" Margin="0,0,0,24" Effect="{StaticResource CardShadow}" Visibility="Collapsed">
+                                <StackPanel x:Name="YouTubeQualityPanel">
+                                    <TextBlock x:Name="YouTubeQualityLabel" Text="🎬 Video Quality" Style="{StaticResource ModernLabel}"/>
+                                    <TextBlock Text="Select your preferred video quality and format" Style="{StaticResource SecondaryLabel}" Margin="8,0,8,16"/>
+                                    <ComboBox x:Name="YouTubeQualityComboBox" Style="{StaticResource ModernComboBox}" DisplayMemberPath="Label" SelectedValuePath="FormatCode" SelectionChanged="YouTubeQualityComboBox_SelectionChanged" PreviewMouseLeftButtonDown="YouTubeQualityComboBox_PreviewMouseLeftButtonDown" Margin="0"/>
+                                </StackPanel>
+                            </Border>
 
-                        <!-- Download Button -->
-                        <Button x:Name="DownloadButton" Style="{StaticResource ModernButton}" Content="🚀 Start Download" Click="DownloadButton_Click" IsEnabled="False" HorizontalAlignment="Center" FontSize="16" Padding="32,16" Margin="0,0,0,32"/>
+                            <!-- Download Button -->
+                            <Button x:Name="DownloadButton" Style="{StaticResource ModernButton}" Content="🚀 Start Download" Click="DownloadButton_Click" IsEnabled="False" HorizontalAlignment="Center" FontSize="16" Padding="32,16" Margin="0,0,0,32"/>
 
                             <Button x:Name="CancelDownloadButton"
                                     Content="❌ Cancel Download"
@@ -515,23 +515,21 @@
                                     HorizontalAlignment="Center"
                                     Margin="0,10,0,10"/>
 
-                                <!-- Progress Section -->
-                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="24" Margin="0,0,0,0" Effect="{StaticResource CardShadow}">
+                            <!-- Progress Section -->
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="24" Margin="0,0,0,0" Effect="{StaticResource CardShadow}">
                                 <StackPanel>
                                     <TextBlock x:Name="FileNameTextBlock" 
-                                               Text="" FontWeight="SemiBold" 
+                                               Text="" 
+                                               FontWeight="SemiBold" 
                                                FontSize="16" 
                                                Foreground="{StaticResource PrimaryBrush}" 
                                                TextAlignment="Center" 
                                                TextWrapping="NoWrap" 
-                                               Margin="0,0,0,16"/>
+                                               TextTrimming="CharacterEllipsis"
+                                               Margin="0,0,0,16"
+                                               MinHeight="20"/>
 
                                     <ProgressBar x:Name="DownloadProgressBar" Style="{StaticResource ModernProgressBar}" Margin="0,0,0,8"/>
-                                    
-                                    <TextBlock x:Name="VideoTitleTextBlock" 
-                                               FontWeight="SemiBold" FontSize="16" Foreground="{StaticResource PrimaryBrush}"
-                                               TextAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" 
-                                               Margin="0,0,0,4"/>
 
                                     <TextBlock x:Name="StatusTextBlock" 
                                                Text="Ready to download..." Style="{StaticResource SecondaryLabel}"
@@ -539,7 +537,7 @@
                                 </StackPanel>
                             </Border>
 
-                        <!-- Info Footer -->
+                            <!-- Info Footer -->
                             <Border Background="{StaticResource HoverBrush}" CornerRadius="12" Padding="20" Margin="0,32,0,0">
                                 <StackPanel>
                                     <TextBlock Text="ℹ️ Supported Platforms" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" FontSize="14" Margin="0,0,0,8"/>

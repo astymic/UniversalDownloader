@@ -144,7 +144,7 @@ namespace UniversalDownloader
                 {
                     response.EnsureSuccessStatusCode();
                     string tempFileName = GetFileNameFromHeaders(response, url);
-                    FileNameTextBlock.Text = $"Expected File: {tempFileName}";
+                    FileNameTextBlock.Text = Utilities.SanitizeFileName(Path.GetFileNameWithoutExtension(tempFileName));
                     StatusTextBlock.Text = "Status: File info retrieved. Ready to download.";
                 }
             }
@@ -166,7 +166,7 @@ namespace UniversalDownloader
             string fileName = null;
             if (response.Content.Headers.ContentDisposition != null)
             {
-                fileName = response.Content.Headers.ContentDisposition.FileNameStar; 
+                fileName = response.Content.Headers.ContentDisposition.FileNameStar;
                 if (string.IsNullOrWhiteSpace(fileName)) { fileName = response.Content.Headers.ContentDisposition.FileName; }
             }
             if (string.IsNullOrWhiteSpace(fileName))
@@ -189,7 +189,7 @@ namespace UniversalDownloader
                                   : Path.GetFileNameWithoutExtension(fileName);
                 fileName = baseName + extension;
             }
-            return string.IsNullOrWhiteSpace(fileName) ? "unknown_file.dat" : Utilities.SanitizeFileName(fileName); 
+            return string.IsNullOrWhiteSpace(fileName) ? "unknown_file.dat" : Utilities.SanitizeFileName(fileName);
         }
 
         private async Task DownloadGoogleDriveFile(string url, string tempDownloadFolderPath, CancellationToken cancellationToken)
@@ -218,8 +218,16 @@ namespace UniversalDownloader
         private async Task DownloadDirectFile(string url, string tempDownloadFolderPath, CancellationToken cancellationToken, bool isGoogleDriveInitialAttempt = false)
         {
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null) { return; }
-            StatusTextBlock.Text = "Status: Starting direct download...";
-            FileNameTextBlock.Text = "Connecting for direct download...";
+
+            if (!isGoogleDriveInitialAttempt)
+            {
+                StatusTextBlock.Text = "Status: Starting direct download...";
+            }
+            else
+            {
+                FileNameTextBlock.Text = "Preparing download...";
+            }
+
             string tempFileName = "unknown_file.dat";
             string tempFilePath = null;
 
@@ -234,7 +242,7 @@ namespace UniversalDownloader
                     {
                         string htmlContent = await response.Content.ReadAsStringAsync();
                         var confirmLinkMatch = Regex.Match(htmlContent, @"<form[^>]*id=[""']downloadForm[""'][^>]*action=[""']([^""']+)[""']", RegexOptions.IgnoreCase);
-                        if (!confirmLinkMatch.Success) 
+                        if (!confirmLinkMatch.Success)
                         {
                             confirmLinkMatch = Regex.Match(htmlContent, @"href=[""'](https?://drive\.google\.com/uc\?export=download[^""']+)[""']", RegexOptions.IgnoreCase);
                         }
@@ -246,7 +254,7 @@ namespace UniversalDownloader
                             {
                                 newUrl = new Uri(response.RequestMessage.RequestUri, newUrl).ToString();
                             }
-                            StatusTextBlock.Text = "Status: Following Google Drive confirmation link..."; FileNameTextBlock.Text = "Google Drive: Confirming...";
+                            StatusTextBlock.Text = "Status: Following Google Drive confirmation link...";
                             await Task.Delay(200);
                             await DownloadDirectFile(newUrl, tempDownloadFolderPath, cancellationToken, false);
                             return;
@@ -267,7 +275,7 @@ namespace UniversalDownloader
                         string cleanDisplayTitle = Path.GetFileNameWithoutExtension(tempFileName);
                         FileNameTextBlock.Text = Utilities.SanitizeFileName(cleanDisplayTitle);
                     }
-                    StatusTextBlock.Text = $"Status: Downloading '{tempFileName}'...";
+                    StatusTextBlock.Text = $"Status: Downloading...";
 
                     long? totalBytes = response.Content.Headers.ContentLength;
                     int lastPercentage = -1;
@@ -275,7 +283,7 @@ namespace UniversalDownloader
                     if (DownloadProgressBar != null)
                     {
                         DownloadProgressBar.IsIndeterminate = !(totalBytes.HasValue && totalBytes.Value > 0);
-                        if (!DownloadProgressBar.IsIndeterminate) DownloadProgressBar.Maximum = 100; else DownloadProgressBar.Maximum = 0; 
+                        if (!DownloadProgressBar.IsIndeterminate) DownloadProgressBar.Maximum = 100; else DownloadProgressBar.Maximum = 0;
                         DownloadProgressBar.Value = 0;
                     }
 
@@ -296,14 +304,14 @@ namespace UniversalDownloader
                                 if ((int)percentage != lastPercentage)
                                 {
                                     if (DownloadProgressBar != null) DownloadProgressBar.Value = Math.Min(percentage, 100.0);
-                                    StatusTextBlock.Text = $"Downloading: {percentage:F1}% of {Utilities.FormatBytesOutput(totalBytes.Value)} | File: {tempFileName}";
+                                    StatusTextBlock.Text = $"Downloading: {percentage:F1}% of {Utilities.FormatBytesOutput(totalBytes.Value)}";
                                     lastPercentage = (int)percentage;
                                 }
                             }
                             else
                             {
                                 if (DownloadProgressBar != null && !DownloadProgressBar.IsIndeterminate) DownloadProgressBar.IsIndeterminate = true;
-                                StatusTextBlock.Text = $"Status: Downloading '{tempFileName}' ({Utilities.FormatBytesOutput(totalBytesRead)})...";
+                                StatusTextBlock.Text = $"Status: Downloading ({Utilities.FormatBytesOutput(totalBytesRead)})...";
                             }
                         }
                     }
@@ -314,31 +322,28 @@ namespace UniversalDownloader
                         if (totalBytes.HasValue && totalBytes.Value > 0) DownloadProgressBar.Value = 100;
                     }
 
-                    string finalTargetFileName = Path.GetFileName(tempFileName);
-                    string targetPath = Path.Combine(SelectedDirectory, finalTargetFileName);
-                    
                     if (!Directory.Exists(SelectedDirectory))
                     {
                         Debug.WriteLine($"Destination directory does not exist: {SelectedDirectory}");
                         StatusTextBlock.Text = $"Status: Error - Destination directory '{SelectedDirectory}' not found.";
                         FileNameTextBlock.Text = "Move Error";
-                        goto EndDirectDownloadLogic; 
+                        goto EndDirectDownloadLogic;
                     }
 
-                    int count = 1;
-                    string fileNameOnly = Path.GetFileNameWithoutExtension(targetPath);
-                    string extension = Path.GetExtension(targetPath);
-                    while (File.Exists(targetPath))
+                    string targetPath;
+                    try
                     {
-                        finalTargetFileName = $"{fileNameOnly} ({count++}){extension}"; 
-                        targetPath = Path.Combine(SelectedDirectory, finalTargetFileName);
-                        if (count > 100)
-                        { 
-                            StatusTextBlock.Text = "Status: Too many existing files with similar names. Could not move.";
-                            FileNameTextBlock.Text = "Move Error";
-                            goto EndDirectDownloadLogic;
-                        }
+                        targetPath = Utilities.GetUniqueFilePath(SelectedDirectory, tempFileName);
                     }
+                    catch (IOException ex)
+                    {
+                        StatusTextBlock.Text = "Status: Too many existing files with similar names. Could not move.";
+                        FileNameTextBlock.Text = "Move Error";
+                        Debug.WriteLine($"GetUniqueFilePath failed: {ex.Message}");
+                        goto EndDirectDownloadLogic;
+                    }
+
+
                     try
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -357,7 +362,7 @@ namespace UniversalDownloader
                         StatusTextBlock.Text = $"Status: Download complete to temp, but failed to move: {moveEx.Message.Split('\n')[0]}";
                         FileNameTextBlock.Text = "File Move Error";
                     }
-                    EndDirectDownloadLogic:;
+                EndDirectDownloadLogic:;
                 }
             }
             catch (OperationCanceledException) { throw; }
@@ -382,7 +387,7 @@ namespace UniversalDownloader
                     }
                     catch (Exception delEx) { Debug.WriteLine($"Error deleting temp file {tempFilePath} after failed move: {delEx.Message}"); }
                 }
-                CleanUpTempFolder(tempDownloadFolderPath); 
+                CleanUpTempFolder(tempDownloadFolderPath);
             }
         }
     }
