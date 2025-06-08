@@ -805,10 +805,11 @@ namespace UniversalDownloader
             string audioStreamUrl = null;
             string videoHeaders = null;
             string audioHeaders = null;
+            bool isAudioOnly = false;
 
             try
             {
-                // Get stream URLs more efficiently - get both video and audio streams at once
+                // First, get all available formats
                 var psiGetJson = new ProcessStartInfo
                 {
                     FileName = _ytDlpExecutablePath,
@@ -839,21 +840,39 @@ namespace UniversalDownloader
                         throw new Exception("No formats found in video metadata");
                     }
 
-                    // Parse the format selection to understand what we need
-                    bool isAudioOnly = formatSelection.Contains("bestaudio") && !formatSelection.Contains("bestvideo");
+                    // Determine if this is an audio-only request
+                    var selectedQuality = YouTubeQualityComboBox.SelectedItem as YouTubeQualityItem;
+                    isAudioOnly = selectedQuality?.IsAudioOnly == true ||
+                                 formatSelection.Contains("bestaudio") && !formatSelection.Contains("bestvideo");
 
                     if (isAudioOnly)
                     {
-                        // For audio-only, find the best audio stream
-                        var audioFormat = formats
+                        // For audio-only, find the best audio stream matching the format selection
+                        var audioFormats = formats
                             .Where(f => f["vcodec"]?.ToString() == "none" && f["acodec"]?.ToString() != "none")
-                            .OrderByDescending(f => f["abr"]?.ToObject<double?>() ?? 0)
-                            .FirstOrDefault();
+                            .ToList();
 
-                        if (audioFormat != null)
+                        JToken selectedAudioFormat = null;
+
+                        // If format selection is specific (not just "bestaudio"), try to match it
+                        if (formatSelection != "bestaudio/best" && formatSelection != "bestaudio")
                         {
-                            audioStreamUrl = audioFormat["url"]?.ToString();
-                            var headersObj = audioFormat["http_headers"] as JObject;
+                            // Try to find format by ID first
+                            selectedAudioFormat = audioFormats.FirstOrDefault(f => f["format_id"]?.ToString() == formatSelection);
+                        }
+
+                        // Fallback to best audio quality
+                        if (selectedAudioFormat == null)
+                        {
+                            selectedAudioFormat = audioFormats
+                                .OrderByDescending(f => f["abr"]?.ToObject<double?>() ?? 0)
+                                .FirstOrDefault();
+                        }
+
+                        if (selectedAudioFormat != null)
+                        {
+                            audioStreamUrl = selectedAudioFormat["url"]?.ToString();
+                            var headersObj = selectedAudioFormat["http_headers"] as JObject;
                             if (headersObj != null)
                             {
                                 audioHeaders = string.Join("\r\n", headersObj.Properties().Select(p => $"{p.Name}: {p.Value}"));
@@ -862,34 +881,96 @@ namespace UniversalDownloader
                     }
                     else
                     {
-                        // For video, we need both video and audio streams
-                        // Find best video stream
-                        var videoFormat = formats
-                            .Where(f => f["vcodec"]?.ToString() != "none" && f["vcodec"]?.ToString() != "unknown")
-                            .OrderByDescending(f => f["height"]?.ToObject<int?>() ?? 0)
-                            .ThenByDescending(f => f["tbr"]?.ToObject<double?>() ?? 0)
-                            .FirstOrDefault();
+                        // For video formats, we need to parse the format selection properly
+                        // Handle complex format selections like "bestvideo[height<=720]+bestaudio"
+                        string videoFormatFilter = "";
+                        string audioFormatFilter = "";
 
-                        // Find best audio stream
-                        var audioFormat = formats
-                            .Where(f => f["vcodec"]?.ToString() == "none" && f["acodec"]?.ToString() != "none")
-                            .OrderByDescending(f => f["abr"]?.ToObject<double?>() ?? 0)
-                            .FirstOrDefault();
-
-                        if (videoFormat != null)
+                        if (formatSelection.Contains("+"))
                         {
-                            videoStreamUrl = videoFormat["url"]?.ToString();
-                            var videoHeadersObj = videoFormat["http_headers"] as JObject;
+                            // Split combined format (video+audio)
+                            var parts = formatSelection.Split('+');
+                            videoFormatFilter = parts[0];
+                            if (parts.Length > 1)
+                                audioFormatFilter = parts[1];
+                        }
+                        else
+                        {
+                            // Single format selection
+                            videoFormatFilter = formatSelection;
+                        }
+
+                        // Parse video format requirements
+                        int? maxHeight = null;
+                        if (videoFormatFilter.Contains("height<="))
+                        {
+                            var heightMatch = Regex.Match(videoFormatFilter, @"height<=(\d+)");
+                            if (heightMatch.Success && int.TryParse(heightMatch.Groups[1].Value, out int h))
+                            {
+                                maxHeight = h;
+                            }
+                        }
+
+                        // Find best video stream matching criteria
+                        var videoFormats = formats
+                            .Where(f => f["vcodec"]?.ToString() != "none" && f["vcodec"]?.ToString() != "unknown")
+                            .ToList();
+
+                        JToken selectedVideoFormat = null;
+
+                        if (maxHeight.HasValue)
+                        {
+                            // Filter by height requirement
+                            selectedVideoFormat = videoFormats
+                                .Where(f => (f["height"]?.ToObject<int?>() ?? 0) <= maxHeight.Value)
+                                .OrderByDescending(f => f["height"]?.ToObject<int?>() ?? 0)
+                                .ThenByDescending(f => f["tbr"]?.ToObject<double?>() ?? 0)
+                                .FirstOrDefault();
+                        }
+                        else
+                        {
+                            // Get best available video format
+                            selectedVideoFormat = videoFormats
+                                .OrderByDescending(f => f["height"]?.ToObject<int?>() ?? 0)
+                                .ThenByDescending(f => f["tbr"]?.ToObject<double?>() ?? 0)
+                                .FirstOrDefault();
+                        }
+
+                        if (selectedVideoFormat != null)
+                        {
+                            videoStreamUrl = selectedVideoFormat["url"]?.ToString();
+                            var videoHeadersObj = selectedVideoFormat["http_headers"] as JObject;
                             if (videoHeadersObj != null)
                             {
                                 videoHeaders = string.Join("\r\n", videoHeadersObj.Properties().Select(p => $"{p.Name}: {p.Value}"));
                             }
                         }
 
-                        if (audioFormat != null)
+                        // Find best audio stream
+                        var audioFormats = formats
+                            .Where(f => f["vcodec"]?.ToString() == "none" && f["acodec"]?.ToString() != "none")
+                            .ToList();
+
+                        JToken selectedAudioFormat = null;
+
+                        if (!string.IsNullOrEmpty(audioFormatFilter) && audioFormatFilter != "bestaudio")
                         {
-                            audioStreamUrl = audioFormat["url"]?.ToString();
-                            var audioHeadersObj = audioFormat["http_headers"] as JObject;
+                            // Try to match specific audio format
+                            selectedAudioFormat = audioFormats.FirstOrDefault(f => f["format_id"]?.ToString() == audioFormatFilter);
+                        }
+
+                        // Fallback to best audio
+                        if (selectedAudioFormat == null)
+                        {
+                            selectedAudioFormat = audioFormats
+                                .OrderByDescending(f => f["abr"]?.ToObject<double?>() ?? 0)
+                                .FirstOrDefault();
+                        }
+
+                        if (selectedAudioFormat != null)
+                        {
+                            audioStreamUrl = selectedAudioFormat["url"]?.ToString();
+                            var audioHeadersObj = selectedAudioFormat["http_headers"] as JObject;
                             if (audioHeadersObj != null)
                             {
                                 audioHeaders = string.Join("\r\n", audioHeadersObj.Properties().Select(p => $"{p.Name}: {p.Value}"));
@@ -913,7 +994,9 @@ namespace UniversalDownloader
                 return;
             }
 
-            string tempFileName = $"{Utilities.SanitizeFileName(FileNameTextBlock.Text)}_trimmed.mp4";
+            // Determine output format and filename
+            string outputExtension = isAudioOnly ? ".m4a" : ".mp4";
+            string tempFileName = $"{Utilities.SanitizeFileName(FileNameTextBlock.Text)}_trimmed{outputExtension}";
             string tempFilePath = Path.Combine(tempDownloadFolderPath, tempFileName);
 
             StatusTextBlock.Text = "Status: Trimming video with FFmpeg...";
@@ -926,7 +1009,7 @@ namespace UniversalDownloader
             // Build FFmpeg command
             var ffmpegArgs = new List<string>();
 
-            // Add input streams
+            // Add input streams with seeking
             if (!string.IsNullOrEmpty(videoStreamUrl))
             {
                 if (!string.IsNullOrEmpty(videoHeaders))
@@ -950,29 +1033,41 @@ namespace UniversalDownloader
             // Set duration
             ffmpegArgs.Add($"-t {trimDuration.ToString("F3", CultureInfo.InvariantCulture)}");
 
-            // Encoding options for better compatibility and seeking accuracy
-            if (!string.IsNullOrEmpty(videoStreamUrl))
+            // Configure encoding based on format
+            if (isAudioOnly)
             {
-                // Re-encode video to ensure accurate seeking and keyframes
-                ffmpegArgs.Add("-c:v libx264");
-                ffmpegArgs.Add("-preset fast");
-                ffmpegArgs.Add("-crf 23");
+                // Audio-only output
+                ffmpegArgs.Add("-c:a aac");
+                ffmpegArgs.Add("-b:a 128k");
+                ffmpegArgs.Add("-vn"); // No video
+            }
+            else
+            {
+                // Video + Audio output
+                if (!string.IsNullOrEmpty(videoStreamUrl))
+                {
+                    // Video encoding - use fast preset for speed while maintaining quality
+                    ffmpegArgs.Add("-c:v libx264");
+                    ffmpegArgs.Add("-preset fast");
+                    ffmpegArgs.Add("-crf 23");
+                }
 
                 if (!string.IsNullOrEmpty(audioStreamUrl))
                 {
                     ffmpegArgs.Add("-c:a aac");
                     ffmpegArgs.Add("-b:a 128k");
                 }
-            }
-            else
-            {
-                // Audio only
-                ffmpegArgs.Add("-c:a aac");
-                ffmpegArgs.Add("-b:a 128k");
+                else
+                {
+                    // No separate audio stream, extract from video
+                    ffmpegArgs.Add("-c:a copy");
+                }
+
+                // Video container optimizations
+                ffmpegArgs.Add("-movflags +faststart");
             }
 
-            // Additional options
-            ffmpegArgs.Add("-movflags +faststart"); // Optimize for web playback
+            // Additional options for better compatibility
             ffmpegArgs.Add("-avoid_negative_ts make_zero");
             ffmpegArgs.Add("-y"); // Overwrite output file
             ffmpegArgs.Add($"\"{tempFilePath}\"");
@@ -1024,7 +1119,7 @@ namespace UniversalDownloader
                                     Dispatcher.Invoke(() =>
                                     {
                                         DownloadProgressBar.Value = progressPercent;
-                                        StatusTextBlock.Text = $"Status: Trimming video... {progressPercent:F0}%";
+                                        StatusTextBlock.Text = $"Status: Trimming {(isAudioOnly ? "audio" : "video")}... {progressPercent:F0}%";
                                     });
                                 }
                             }
@@ -1078,8 +1173,12 @@ namespace UniversalDownloader
                         ? string.Join("\n", errorLines)
                         : "Unknown FFmpeg error occurred";
 
-                    MessageBox.Show($"FFmpeg trimming failed.\n\nCommand: {arguments}\n\nError:\n{errorMessage}",
-                                  "Trimming Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    Debug.WriteLine($"Trimming Command: {arguments}");
+                    Debug.WriteLine($"Error Details: {errorMessage}");
+
+                    // Optional: Show MessageBox for debugging (remove in production)
+                     //MessageBox.Show($"FFmpeg trimming failed.\n\nCommand: {arguments}\n\nError:\n{errorMessage}",
+                     //              "Trimming Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
