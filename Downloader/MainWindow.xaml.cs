@@ -57,8 +57,6 @@ namespace UniversalDownloader
             _httpClient = new HttpClient();
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
             _httpClient.Timeout = TimeSpan.FromMinutes(10);
-
-            _ytDlpExecutablePath = Path.Combine(AppContext.BaseDirectory, YtDlpFileName);
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -80,6 +78,7 @@ namespace UniversalDownloader
             }
 
             await CheckAndEnsureYtDlpExistsAsync();
+            CheckFfmpegIsBundled(); // CHANGED: Call the new synchronous check
 
             _isInitializing = false;
             UpdateUiElementStates();
