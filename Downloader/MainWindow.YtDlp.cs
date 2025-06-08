@@ -717,23 +717,6 @@ namespace UniversalDownloader
             outputLine = outputLine.Trim();
             string currentOperationStatus = "";
 
-            Action<string> UpdateCleanTitle = (fullPathOrName) => {
-                if (FileNameTextBlock != null)
-                {
-                    if (string.IsNullOrEmpty(fullPathOrName))
-                    {
-                        // Don't update the title to "Processing..." to avoid flicker
-                        // Let it keep the last known good title.
-                        return;
-                    }
-                    string fileName = Path.GetFileNameWithoutExtension(fullPathOrName);
-                    fileName = Regex.Replace(fileName, @"\s*\[[^\]]+\]\s*$", "").Trim();
-                    fileName = Regex.Replace(fileName, @"\s*\(Audio\)\s*$", "").Trim();
-                    fileName = Utilities.SanitizeFileName(fileName);
-                    FileNameTextBlock.Text = string.IsNullOrWhiteSpace(fileName) ? "Untitled Video" : fileName;
-                }
-            };
-
             Match destMatch = YtDlpDestinationRegex.Match(outputLine);
             if (destMatch.Success)
             {
@@ -741,7 +724,6 @@ namespace UniversalDownloader
                 _currentDownloadingComponent = newComponentPath;
                 finalReportedFilePathInTemp = newComponentPath;
 
-                UpdateCleanTitle(_currentDownloadingComponent);
                 currentOperationStatus = $"Status: Starting download...";
 
                 _ytDlpCurrentComponentTotalBytes = -1;
@@ -761,7 +743,6 @@ namespace UniversalDownloader
                 _currentDownloadingComponent = alreadyDownloadedMatch.Groups["path"].Value.Trim('"', ' ');
                 finalReportedFilePathInTemp = _currentDownloadingComponent;
 
-                UpdateCleanTitle(finalReportedFilePathInTemp);
                 currentOperationStatus = $"Status: File already downloaded.";
 
                 DownloadProgressBar.IsIndeterminate = false;
@@ -781,7 +762,6 @@ namespace UniversalDownloader
                 _currentDownloadingComponent = processingPath;
                 finalReportedFilePathInTemp = processingPath;
 
-                UpdateCleanTitle(_currentDownloadingComponent);
                 currentOperationStatus = $"Status: {processingType}...";
 
                 DownloadProgressBar.IsIndeterminate = true; DownloadProgressBar.Value = 0;
