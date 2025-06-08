@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Newtonsoft.Json.Linq;
 using Ookii.Dialogs.Wpf;
 
@@ -40,8 +41,11 @@ namespace UniversalDownloader
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
             if (propertyName == nameof(TrimStartTimeInSeconds) || propertyName == nameof(TrimEndTimeInSeconds))
             {
-                // When the model values change, update the custom slider's visual state
-                Dispatcher.InvokeAsync(UpdateCustomSliderVisuals);
+                // When the data model values change, schedule a visual update.
+                // Using a priority like 'Input' ensures that the layout pass
+                // has completed before we attempt to read ActualWidth, which is crucial
+                // when the control has just become visible.
+                Dispatcher.InvokeAsync(UpdateCustomSliderVisuals, DispatcherPriority.Input);
             }
         }
 
@@ -504,81 +508,35 @@ namespace UniversalDownloader
 
         #region Custom Slider Logic
 
-        private bool isDraggingStart = false;
-        private bool isDraggingEnd = false;
-        private Point clickOffset;
-        private Thumb draggedThumb = null;
-
-        private void SliderCanvas_MouseDown(object sender, MouseButtonEventArgs e)
+        private void Thumb_DragDelta(object sender, DragDeltaEventArgs e)
         {
-            var thumb = e.Source as Thumb;
+            if (VideoDurationInSeconds <= 0 || SliderTrack.ActualWidth <= 0) return;
+
+            var thumb = sender as Thumb;
+            if (thumb == null) return;
+
+            // Calculate how many seconds each pixel of movement represents
+            double secondsPerPixel = VideoDurationInSeconds / SliderTrack.ActualWidth;
+            // Calculate the change in time based on the horizontal drag
+            double timeChange = e.HorizontalChange * secondsPerPixel;
+
             if (thumb == StartThumb)
             {
-                isDraggingStart = true;
-                draggedThumb = StartThumb;
+                // Calculate the new start time and clamp it to not go below 0 or past the end thumb
+                double newStartTime = TrimStartTimeInSeconds + timeChange;
+                TrimStartTimeInSeconds = Math.Max(0, Math.Min(newStartTime, TrimEndTimeInSeconds));
             }
             else if (thumb == EndThumb)
             {
-                isDraggingEnd = true;
-                draggedThumb = EndThumb;
+                // Calculate the new end time and clamp it to not go past the video duration or before the start thumb
+                double newEndTime = TrimEndTimeInSeconds + timeChange;
+                TrimEndTimeInSeconds = Math.Min(VideoDurationInSeconds, Math.Max(newEndTime, TrimStartTimeInSeconds));
             }
-
-            if (draggedThumb != null)
-            {
-                clickOffset = e.GetPosition(draggedThumb);
-                draggedThumb.CaptureMouse();
-            }
+            // The property setters for Trim...TimeInSeconds automatically trigger UpdateCustomSliderVisuals via OnPropertyChanged,
+            // which handles the visual update of the thumbs and the fill.
         }
 
-        private void SliderCanvas_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (draggedThumb == null || SliderTrack.ActualWidth <= 0) return;
-
-            Point currentPos = e.GetPosition(SliderCanvas);
-            double newLeft = currentPos.X - clickOffset.X;
-
-            // Calculate the thumb's center position from its new left edge position
-            double thumbCenter = newLeft + (draggedThumb.ActualWidth / 2);
-
-            if (isDraggingStart)
-            {
-                double endThumbCenter = Canvas.GetLeft(EndThumb) + (EndThumb.ActualWidth / 2);
-                // Constrain the center position
-                thumbCenter = Math.Max(0, Math.Min(thumbCenter, endThumbCenter));
-
-                double percent = thumbCenter / SliderTrack.ActualWidth;
-                // Check for NaN or infinity to be safe
-                if (double.IsFinite(percent))
-                {
-                    TrimStartTimeInSeconds = percent * VideoDurationInSeconds;
-                }
-            }
-            else if (isDraggingEnd)
-            {
-                double startThumbCenter = Canvas.GetLeft(StartThumb) + (StartThumb.ActualWidth / 2);
-                // Constrain the center position
-                thumbCenter = Math.Min(SliderTrack.ActualWidth, Math.Max(thumbCenter, startThumbCenter));
-
-                double percent = thumbCenter / SliderTrack.ActualWidth;
-                // Check for NaN or infinity to be safe
-                if (double.IsFinite(percent))
-                {
-                    TrimEndTimeInSeconds = percent * VideoDurationInSeconds;
-                }
-            }
-        }
-
-        private void SliderCanvas_MouseUp(object sender, MouseButtonEventArgs e)
-        {
-            isDraggingStart = false;
-            isDraggingEnd = false;
-            if (draggedThumb != null)
-            {
-                draggedThumb.ReleaseMouseCapture();
-                draggedThumb = null;
-            }
-        }
-
+        // This method syncs the visuals from the data model (e.g., on load, textbox change, or during drag)
         private void UpdateCustomSliderVisuals()
         {
             if (VideoDurationInSeconds <= 0) return;
@@ -586,22 +544,35 @@ namespace UniversalDownloader
             double trackWidth = SliderTrack.ActualWidth;
             if (trackWidth <= 0) return;
 
+            // Calculate position based on the center of the thumb
             double startPercent = TrimStartTimeInSeconds / VideoDurationInSeconds;
             double endPercent = TrimEndTimeInSeconds / VideoDurationInSeconds;
 
             double startX = startPercent * trackWidth;
             double endX = endPercent * trackWidth;
 
-            Canvas.SetLeft(StartThumb, startX - (StartThumb.ActualWidth / 2));
-            Canvas.SetLeft(EndThumb, endX - (EndThumb.ActualWidth / 2));
+            // Ensure ActualWidth is available before using it for offset calculation
+            if (StartThumb.ActualWidth > 0)
+            {
+                Canvas.SetLeft(StartThumb, startX - (StartThumb.ActualWidth / 2));
+            }
+            if (EndThumb.ActualWidth > 0)
+            {
+                Canvas.SetLeft(EndThumb, endX - (EndThumb.ActualWidth / 2));
+            }
 
             UpdateSliderFill();
         }
 
         private void UpdateSliderFill()
         {
-            double left = Canvas.GetLeft(StartThumb) + (StartThumb.ActualWidth / 2);
-            double right = Canvas.GetLeft(EndThumb) + (EndThumb.ActualWidth / 2);
+            // Check if thumbs have been positioned yet
+            double startLeft = Canvas.GetLeft(StartThumb);
+            double endLeft = Canvas.GetLeft(EndThumb);
+            if (double.IsNaN(startLeft) || double.IsNaN(endLeft)) return;
+
+            double left = startLeft + (StartThumb.ActualWidth / 2);
+            double right = endLeft + (EndThumb.ActualWidth / 2);
             Canvas.SetLeft(SliderFill, left);
             SliderFill.Width = Math.Max(0, right - left);
         }

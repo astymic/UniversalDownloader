@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -430,11 +430,15 @@ namespace UniversalDownloader
                         VideoDurationInSeconds = duration.Value;
                         TrimStartTimeInSeconds = 0;
                         TrimEndTimeInSeconds = duration.Value;
-                        // Explicitly set the start time text, as the property setter won't fire if the value is already 0.
-                        TrimStartTimeText = SecondsToTimeString(0);
+                        // Explicitly set the text properties to ensure the UI updates.
+                        TrimStartTimeText = SecondsToTimeString(TrimStartTimeInSeconds);
+                        TrimEndTimeText = SecondsToTimeString(TrimEndTimeInSeconds);
                         IsTrimmingEnabled = false; // Default to off
-                        if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Visible;
-                        UpdateCustomSliderVisuals(); // Set initial thumb positions
+                        if (TrimmingSection != null)
+                        {
+                            TrimmingSection.Visibility = Visibility.Visible;
+                            // The OnPropertyChanged event for TrimEndTimeInSeconds will now handle scheduling the visual update at the correct priority.
+                        }
                     }
                     else
                     {
