@@ -4,7 +4,6 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:UniversalDownloader"
-        xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
         mc:Ignorable="d"
         Title="Universal File Downloader" Height="850" Width="900"
         MinHeight="680" MinWidth="700"
@@ -49,7 +48,8 @@
         <DropShadowEffect x:Key="CardShadow" BlurRadius="20" ShadowDepth="4" Color="#000000" Opacity="0.08"/>
         <DropShadowEffect x:Key="ButtonShadow" BlurRadius="8" ShadowDepth="2" Color="#6366f1" Opacity="0.25"/>
         <DropShadowEffect x:Key="WindowShadow" BlurRadius="30" ShadowDepth="8" Color="#000000" Opacity="0.12"/>
-        <DropShadowEffect x:Key="SliderThumbShadow" BlurRadius="6" ShadowDepth="2" Color="#6366f1" Opacity="0.3"/>
+        <DropShadowEffect x:Key="SliderThumbShadow" BlurRadius="6" ShadowDepth="2" Color="#000000" Opacity="0.2"/>
+
 
         <!-- Gradient Resources -->
         <LinearGradientBrush x:Key="PrimaryGradient" StartPoint="0,0" EndPoint="1,1">
@@ -366,49 +366,20 @@
             </Setter>
         </Style>
 
-        <!-- =============== CUSTOM RANGESLIDER STYLES =============== -->
+        <!-- Style for the custom slider thumbs -->
         <Style x:Key="SliderThumbStyle" TargetType="Thumb">
-            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Effect" Value="{StaticResource SliderThumbShadow}"/>
-            <Setter Property="Height" Value="18"/>
-            <Setter Property="Width" Value="18"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
-                        <Grid>
-                            <Ellipse x:Name="thumbEllipse" Fill="{TemplateBinding Background}" Stroke="{TemplateBinding BorderBrush}" StrokeThickness="{TemplateBinding BorderThickness}" Effect="{TemplateBinding Effect}"/>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="RenderTransform">
-                                    <Setter.Value>
-                                        <ScaleTransform ScaleX="1.1" ScaleY="1.1"/>
-                                    </Setter.Value>
-                                </Setter>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
+                        <Ellipse Width="18" Height="18" 
+                                 Fill="White" 
+                                 Stroke="{StaticResource PrimaryBrush}" 
+                                 StrokeThickness="2" 
+                                 Effect="{StaticResource SliderThumbShadow}"/>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
-            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-            <Setter Property="RenderTransform">
-                <Setter.Value>
-                    <ScaleTransform/>
-                </Setter.Value>
-            </Setter>
         </Style>
-
-        <ControlTemplate x:Key="ModernRangeSliderTemplate" TargetType="{x:Type xctk:RangeSlider}">
-            <Grid Height="{TemplateBinding Height}" Width="{TemplateBinding Width}">
-                <Grid x:Name="PART_Container" VerticalAlignment="Center">
-                    <Border x:Name="PART_TrackBackground" Height="6" CornerRadius="3" Background="{StaticResource BorderBrush}"/>
-                    <Border x:Name="PART_SelectionRange" Height="6" CornerRadius="3" Background="{StaticResource PrimaryBrush}" HorizontalAlignment="Left"/>
-                    <Thumb x:Name="PART_LeftThumb" Style="{StaticResource SliderThumbStyle}"/>
-                    <Thumb x:Name="PART_RightThumb" Style="{StaticResource SliderThumbStyle}"/>
-                </Grid>
-            </Grid>
-        </ControlTemplate>
 
         <!-- =============== CUSTOM SCROLLBAR STYLES =============== -->
         <Style x:Key="ScrollBarThumbStyle" TargetType="{x:Type Thumb}">
@@ -613,12 +584,12 @@
                                               FontSize="14"
                                               Margin="8,0,8,16"/>
                                     <StackPanel IsEnabled="{Binding IsChecked, ElementName=EnableTrimmingCheckBox}">
-                                        <xctk:RangeSlider x:Name="TimeRangeSlider" 
-                                                          Template="{StaticResource ModernRangeSliderTemplate}"
-                                                          Minimum="0" Maximum="{Binding VideoDurationInSeconds}" 
-                                                          LowerValue="{Binding TrimStartTimeInSeconds, Mode=TwoWay}" 
-                                                          HigherValue="{Binding TrimEndTimeInSeconds, Mode=TwoWay}"
-                                                          Margin="8,0"/>
+                                        <Canvas x:Name="SliderCanvas" Height="30" Background="Transparent" Margin="8,0" MouseDown="SliderCanvas_MouseDown" MouseMove="SliderCanvas_MouseMove" MouseUp="SliderCanvas_MouseUp" SizeChanged="SliderCanvas_SizeChanged">
+                                            <Rectangle x:Name="SliderTrack" Height="6" Width="{Binding ActualWidth, ElementName=SliderCanvas}" Fill="{StaticResource BorderBrush}" RadiusX="3" RadiusY="3" Canvas.Left="0" Canvas.Top="12"/>
+                                            <Rectangle x:Name="SliderFill" Height="6" RadiusX="3" RadiusY="3" Canvas.Top="12" Fill="{StaticResource PrimaryBrush}"/>
+                                            <Thumb x:Name="StartThumb" Cursor="SizeWE" Style="{StaticResource SliderThumbStyle}" Canvas.Top="7" Background="Transparent"/>
+                                            <Thumb x:Name="EndThumb" Cursor="SizeWE" Style="{StaticResource SliderThumbStyle}" Canvas.Top="7" Background="Transparent"/>
+                                        </Canvas>
                                         <Grid Margin="8,8,8,0">
                                             <TextBox x:Name="StartTimeTextBox" 
                                                      Style="{StaticResource CompactTimeTextBoxStyle}"

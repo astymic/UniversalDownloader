@@ -423,25 +423,24 @@ namespace UniversalDownloader
                     FileNameTextBlock.Text = Utilities.SanitizeFileName(rawVideoTitle);
                     ytDlpReportedFormats = videoInfo["formats"] as JArray;
 
-                    // --- Trimming Logic Initialization Fix ---
+                    // --- Trimming Logic Initialization ---
                     double? duration = videoInfo["duration"]?.ToObject<double?>();
                     if (duration.HasValue && duration > 0)
                     {
                         VideoDurationInSeconds = duration.Value;
                         TrimStartTimeInSeconds = 0;
                         TrimEndTimeInSeconds = duration.Value;
-                        // Explicitly set text properties to trigger UI update on load
-                        TrimStartTimeText = SecondsToTimeString(TrimStartTimeInSeconds);
-                        TrimEndTimeText = SecondsToTimeString(TrimEndTimeInSeconds);
-
+                        // Explicitly set the start time text, as the property setter won't fire if the value is already 0.
+                        TrimStartTimeText = SecondsToTimeString(0);
                         IsTrimmingEnabled = false; // Default to off
                         if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Visible;
+                        UpdateCustomSliderVisuals(); // Set initial thumb positions
                     }
                     else
                     {
                         if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
                     }
-                    // --- End Trimming Logic Fix ---
+                    // --- End Trimming Logic ---
                 }
 
                 if (ytDlpReportedFormats == null || !ytDlpReportedFormats.HasValues)
@@ -877,7 +876,8 @@ namespace UniversalDownloader
 
                 DownloadProgressBar.IsIndeterminate = true; DownloadProgressBar.Value = 0;
                 _ytDlpCurrentComponentTotalBytes = -2;
-                lastKnownPercentageForComponent = 0; progressStartedForAnyComponent = true;
+                lastKnownPercentageForComponent = 0;
+                progressStartedForAnyComponent = true;
                 Debug.WriteLine($"YT-DLP PROCESSING ({processingType}): {finalReportedFilePathInTemp}");
                 if (StatusTextBlock != null) StatusTextBlock.Text = currentOperationStatus;
                 return;

@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using Newtonsoft.Json.Linq;
@@ -37,6 +38,11 @@ namespace UniversalDownloader
         protected virtual void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            if (propertyName == nameof(TrimStartTimeInSeconds) || propertyName == nameof(TrimEndTimeInSeconds))
+            {
+                // When the model values change, update the custom slider's visual state
+                Dispatcher.InvokeAsync(UpdateCustomSliderVisuals);
+            }
         }
 
         public MainWindow()
@@ -496,6 +502,118 @@ namespace UniversalDownloader
             catch (Exception ex) { Debug.WriteLine($"Error cleaning up temp folder {tempFolderPath}: {ex.Message}"); }
         }
 
+        #region Custom Slider Logic
+
+        private bool isDraggingStart = false;
+        private bool isDraggingEnd = false;
+        private Point clickOffset;
+        private Thumb draggedThumb = null;
+
+        private void SliderCanvas_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            var thumb = e.Source as Thumb;
+            if (thumb == StartThumb)
+            {
+                isDraggingStart = true;
+                draggedThumb = StartThumb;
+            }
+            else if (thumb == EndThumb)
+            {
+                isDraggingEnd = true;
+                draggedThumb = EndThumb;
+            }
+
+            if (draggedThumb != null)
+            {
+                clickOffset = e.GetPosition(draggedThumb);
+                draggedThumb.CaptureMouse();
+            }
+        }
+
+        private void SliderCanvas_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (draggedThumb == null || SliderTrack.ActualWidth <= 0) return;
+
+            Point currentPos = e.GetPosition(SliderCanvas);
+            double newLeft = currentPos.X - clickOffset.X;
+
+            // Calculate the thumb's center position from its new left edge position
+            double thumbCenter = newLeft + (draggedThumb.ActualWidth / 2);
+
+            if (isDraggingStart)
+            {
+                double endThumbCenter = Canvas.GetLeft(EndThumb) + (EndThumb.ActualWidth / 2);
+                // Constrain the center position
+                thumbCenter = Math.Max(0, Math.Min(thumbCenter, endThumbCenter));
+
+                double percent = thumbCenter / SliderTrack.ActualWidth;
+                // Check for NaN or infinity to be safe
+                if (double.IsFinite(percent))
+                {
+                    TrimStartTimeInSeconds = percent * VideoDurationInSeconds;
+                }
+            }
+            else if (isDraggingEnd)
+            {
+                double startThumbCenter = Canvas.GetLeft(StartThumb) + (StartThumb.ActualWidth / 2);
+                // Constrain the center position
+                thumbCenter = Math.Min(SliderTrack.ActualWidth, Math.Max(thumbCenter, startThumbCenter));
+
+                double percent = thumbCenter / SliderTrack.ActualWidth;
+                // Check for NaN or infinity to be safe
+                if (double.IsFinite(percent))
+                {
+                    TrimEndTimeInSeconds = percent * VideoDurationInSeconds;
+                }
+            }
+        }
+
+        private void SliderCanvas_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            isDraggingStart = false;
+            isDraggingEnd = false;
+            if (draggedThumb != null)
+            {
+                draggedThumb.ReleaseMouseCapture();
+                draggedThumb = null;
+            }
+        }
+
+        private void UpdateCustomSliderVisuals()
+        {
+            if (VideoDurationInSeconds <= 0) return;
+
+            double trackWidth = SliderTrack.ActualWidth;
+            if (trackWidth <= 0) return;
+
+            double startPercent = TrimStartTimeInSeconds / VideoDurationInSeconds;
+            double endPercent = TrimEndTimeInSeconds / VideoDurationInSeconds;
+
+            double startX = startPercent * trackWidth;
+            double endX = endPercent * trackWidth;
+
+            Canvas.SetLeft(StartThumb, startX - (StartThumb.ActualWidth / 2));
+            Canvas.SetLeft(EndThumb, endX - (EndThumb.ActualWidth / 2));
+
+            UpdateSliderFill();
+        }
+
+        private void UpdateSliderFill()
+        {
+            double left = Canvas.GetLeft(StartThumb) + (StartThumb.ActualWidth / 2);
+            double right = Canvas.GetLeft(EndThumb) + (EndThumb.ActualWidth / 2);
+            Canvas.SetLeft(SliderFill, left);
+            SliderFill.Width = Math.Max(0, right - left);
+        }
+
+        private void SliderCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            // Update visuals if the canvas is resized (e.g., window resize)
+            UpdateCustomSliderVisuals();
+        }
+
+        #endregion
+
         private void StartTimeTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
             var textBox = sender as TextBox;
@@ -503,6 +621,7 @@ namespace UniversalDownloader
 
             if (TimeStringToSeconds(textBox.Text, out double newStartTime))
             {
+                if (newStartTime < 0) newStartTime = 0;
                 if (newStartTime > TrimEndTimeInSeconds)
                 {
                     TrimStartTimeInSeconds = TrimEndTimeInSeconds;
@@ -512,11 +631,8 @@ namespace UniversalDownloader
                     TrimStartTimeInSeconds = newStartTime;
                 }
             }
-            else
-            {
-                // Revert to last valid value if parsing fails
-                textBox.Text = SecondsToTimeString(TrimStartTimeInSeconds);
-            }
+            // Always revert text to a valid format
+            textBox.Text = SecondsToTimeString(TrimStartTimeInSeconds);
         }
 
         private void EndTimeTextBox_LostFocus(object sender, RoutedEventArgs e)
@@ -539,11 +655,8 @@ namespace UniversalDownloader
                     TrimEndTimeInSeconds = newEndTime;
                 }
             }
-            else
-            {
-                // Revert to last valid value if parsing fails
-                textBox.Text = SecondsToTimeString(TrimEndTimeInSeconds);
-            }
+            // Always revert text to a valid format
+            textBox.Text = SecondsToTimeString(TrimEndTimeInSeconds);
         }
     }
 
