@@ -317,6 +317,7 @@ namespace UniversalDownloader
                 if (StatusTextBlock != null) StatusTextBlock.Text = "Status: Error processing URL.";
                 if (FileNameTextBlock != null) FileNameTextBlock.Text = "";
                 if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed;
+                if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
                 if (YouTubeQualityComboBox != null) YouTubeQualityComboBox.ItemsSource = null;
             }
             finally
@@ -493,6 +494,56 @@ namespace UniversalDownloader
                 Debug.WriteLine($"Cleaned up temp folder: {tempFolderPath}");
             }
             catch (Exception ex) { Debug.WriteLine($"Error cleaning up temp folder {tempFolderPath}: {ex.Message}"); }
+        }
+
+        private void StartTimeTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            if (textBox == null) return;
+
+            if (TimeStringToSeconds(textBox.Text, out double newStartTime))
+            {
+                if (newStartTime > TrimEndTimeInSeconds)
+                {
+                    TrimStartTimeInSeconds = TrimEndTimeInSeconds;
+                }
+                else
+                {
+                    TrimStartTimeInSeconds = newStartTime;
+                }
+            }
+            else
+            {
+                // Revert to last valid value if parsing fails
+                textBox.Text = SecondsToTimeString(TrimStartTimeInSeconds);
+            }
+        }
+
+        private void EndTimeTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            if (textBox == null) return;
+
+            if (TimeStringToSeconds(textBox.Text, out double newEndTime))
+            {
+                if (newEndTime < TrimStartTimeInSeconds)
+                {
+                    TrimEndTimeInSeconds = TrimStartTimeInSeconds;
+                }
+                else if (newEndTime > VideoDurationInSeconds)
+                {
+                    TrimEndTimeInSeconds = VideoDurationInSeconds;
+                }
+                else
+                {
+                    TrimEndTimeInSeconds = newEndTime;
+                }
+            }
+            else
+            {
+                // Revert to last valid value if parsing fails
+                textBox.Text = SecondsToTimeString(TrimEndTimeInSeconds);
+            }
         }
     }
 

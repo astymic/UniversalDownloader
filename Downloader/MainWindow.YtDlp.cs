@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -24,6 +24,97 @@ namespace UniversalDownloader
         private string _currentDownloadingComponent = null;
         private long _ytDlpCurrentComponentTotalBytes = -1;
 
+        #region Trimming Properties
+        private double _videoDurationInSeconds;
+        public double VideoDurationInSeconds
+        {
+            get => _videoDurationInSeconds;
+            set { _videoDurationInSeconds = value; OnPropertyChanged(nameof(VideoDurationInSeconds)); }
+        }
+
+        private bool _isTrimmingEnabled;
+        public bool IsTrimmingEnabled
+        {
+            get => _isTrimmingEnabled;
+            set { _isTrimmingEnabled = value; OnPropertyChanged(nameof(IsTrimmingEnabled)); }
+        }
+
+        private double _trimStartTimeInSeconds;
+        public double TrimStartTimeInSeconds
+        {
+            get => _trimStartTimeInSeconds;
+            set
+            {
+                if (_trimStartTimeInSeconds != value)
+                {
+                    _trimStartTimeInSeconds = value;
+                    OnPropertyChanged(nameof(TrimStartTimeInSeconds));
+                    TrimStartTimeText = SecondsToTimeString(value); // Update text when slider moves
+                }
+            }
+        }
+
+        private double _trimEndTimeInSeconds;
+        public double TrimEndTimeInSeconds
+        {
+            get => _trimEndTimeInSeconds;
+            set
+            {
+                if (_trimEndTimeInSeconds != value)
+                {
+                    _trimEndTimeInSeconds = value;
+                    OnPropertyChanged(nameof(TrimEndTimeInSeconds));
+                    TrimEndTimeText = SecondsToTimeString(value); // Update text when slider moves
+                }
+            }
+        }
+
+        private string _trimStartTimeText;
+        public string TrimStartTimeText
+        {
+            get => _trimStartTimeText;
+            set
+            {
+                if (_trimStartTimeText != value)
+                {
+                    _trimStartTimeText = value;
+                    OnPropertyChanged(nameof(TrimStartTimeText));
+                }
+            }
+        }
+
+        private string _trimEndTimeText;
+        public string TrimEndTimeText
+        {
+            get => _trimEndTimeText;
+            set
+            {
+                if (_trimEndTimeText != value)
+                {
+                    _trimEndTimeText = value;
+                    OnPropertyChanged(nameof(TrimEndTimeText));
+                }
+            }
+        }
+
+        private string SecondsToTimeString(double totalSeconds)
+        {
+            TimeSpan time = TimeSpan.FromSeconds(totalSeconds);
+            return time.ToString(@"hh\:mm\:ss");
+        }
+
+        private bool TimeStringToSeconds(string timeString, out double seconds)
+        {
+            if (TimeSpan.TryParseExact(timeString, @"hh\:mm\:ss", CultureInfo.InvariantCulture, out TimeSpan parsedTime))
+            {
+                seconds = parsedTime.TotalSeconds;
+                return true;
+            }
+            seconds = 0;
+            return false;
+        }
+
+        #endregion
 
         private async Task<string> GetLocalYtDlpVersionAsync()
         {
@@ -283,6 +374,7 @@ namespace UniversalDownloader
         private async Task LoadYouTubeQualitiesWithYtDlp(string videoUrl)
         {
             if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed;
+            if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
             if (YouTubeQualityComboBox == null || StatusTextBlock == null || FileNameTextBlock == null || DownloadButton == null) return;
             YouTubeQualityComboBox.ItemsSource = null;
 
@@ -330,6 +422,26 @@ namespace UniversalDownloader
                     string rawVideoTitle = videoInfo["title"]?.ToString() ?? "Unknown Video";
                     FileNameTextBlock.Text = Utilities.SanitizeFileName(rawVideoTitle);
                     ytDlpReportedFormats = videoInfo["formats"] as JArray;
+
+                    // --- Trimming Logic Initialization Fix ---
+                    double? duration = videoInfo["duration"]?.ToObject<double?>();
+                    if (duration.HasValue && duration > 0)
+                    {
+                        VideoDurationInSeconds = duration.Value;
+                        TrimStartTimeInSeconds = 0;
+                        TrimEndTimeInSeconds = duration.Value;
+                        // Explicitly set text properties to trigger UI update on load
+                        TrimStartTimeText = SecondsToTimeString(TrimStartTimeInSeconds);
+                        TrimEndTimeText = SecondsToTimeString(TrimEndTimeInSeconds);
+
+                        IsTrimmingEnabled = false; // Default to off
+                        if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
+                    }
+                    // --- End Trimming Logic Fix ---
                 }
 
                 if (ytDlpReportedFormats == null || !ytDlpReportedFormats.HasValues)
@@ -478,33 +590,29 @@ namespace UniversalDownloader
             try
             {
                 string arguments;
+                string baseArguments = $"--no-continue --progress --newline --no-warnings --ignore-config \"{itemUrl}\"";
+
+                string formatArgument;
                 if (extractAudio && (IsSpotifyLink(itemUrl) || IsSoundCloudLink(itemUrl)))
                 {
-                    arguments = $"-o \"{outputTemplateInTemp}\" " +
-                                $"--extract-audio " +
-                                $"--audio-format {audioFormat} " +
-                                $"--audio-quality 0 " +
-                                $"--no-continue --progress --newline --no-warnings --ignore-config " +
-                                $"\"{itemUrl}\"";
+                    formatArgument = $"--extract-audio --audio-format {audioFormat} --audio-quality 0";
                 }
                 else if (extractAudio)
                 {
-                    arguments = $"-o \"{outputTemplateInTemp}\" " +
-                                $"--extract-audio " +
-                                $"--audio-format {audioFormat} " +
-                                $"--audio-quality 0 " +
-                                $"-f \"{(string.IsNullOrWhiteSpace(formatSelection) ? "bestaudio/best" : formatSelection)}\" " +
-                                $"--no-continue --progress --newline --no-warnings --ignore-config " +
-                                $"\"{itemUrl}\"";
+                    formatArgument = $"--extract-audio --audio-format {audioFormat} --audio-quality 0 -f \"{(string.IsNullOrWhiteSpace(formatSelection) ? "bestaudio/best" : formatSelection)}\"";
                 }
                 else
                 {
-                    arguments = $"-o \"{outputTemplateInTemp}\" " +
-                                $"-f \"{formatSelection}\" " +
-                                $"--no-continue --progress --newline --no-warnings --ignore-config " +
-                                $"\"{itemUrl}\"";
+                    formatArgument = $"-f \"{formatSelection}\"";
                 }
 
+                string trimArgument = "";
+                if (IsTrimmingEnabled && TrimmingSection.Visibility == Visibility.Visible)
+                {
+                    trimArgument = $"--download-sections \"*{TrimStartTimeText}-{TrimEndTimeText}\"";
+                }
+
+                arguments = $"-o \"{outputTemplateInTemp}\" {formatArgument} {trimArgument} {baseArguments}";
 
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
@@ -724,6 +832,7 @@ namespace UniversalDownloader
                 _currentDownloadingComponent = newComponentPath;
                 finalReportedFilePathInTemp = newComponentPath;
 
+                // Do NOT update the FileNameTextBlock here. Let it keep the clean title.
                 currentOperationStatus = $"Status: Starting download...";
 
                 _ytDlpCurrentComponentTotalBytes = -1;
@@ -743,6 +852,7 @@ namespace UniversalDownloader
                 _currentDownloadingComponent = alreadyDownloadedMatch.Groups["path"].Value.Trim('"', ' ');
                 finalReportedFilePathInTemp = _currentDownloadingComponent;
 
+                // Do NOT update the FileNameTextBlock here.
                 currentOperationStatus = $"Status: File already downloaded.";
 
                 DownloadProgressBar.IsIndeterminate = false;
@@ -762,6 +872,7 @@ namespace UniversalDownloader
                 _currentDownloadingComponent = processingPath;
                 finalReportedFilePathInTemp = processingPath;
 
+                // Do NOT update the FileNameTextBlock here.
                 currentOperationStatus = $"Status: {processingType}...";
 
                 DownloadProgressBar.IsIndeterminate = true; DownloadProgressBar.Value = 0;
