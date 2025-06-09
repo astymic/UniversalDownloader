@@ -775,7 +775,15 @@ namespace UniversalDownloader
                         if (e.Data != null)
                             Dispatcher.Invoke(() => ParseYtDlpProgress(e.Data, ref actualFileNameFromYtDlpOutput, ref progressStartedForAnyComponent, ref lastReportedPercentageForComponent, ref finalReportedFilePathInTemp));
                     };
-                    process.ErrorDataReceived += (s, e) => { if (e.Data != null && !e.Data.ToLower().Contains("warning:") && !e.Data.ToLower().Contains("deprecated")) Dispatcher.Invoke(() => StatusTextBlock.Text = $"yt-dlp Info/Error: {e.Data.Split('\n')[0]}"); };
+                    //process.ErrorDataReceived += (s, e) => { if (e.Data != null && !e.Data.ToLower().Contains("warning:") && !e.Data.ToLower().Contains("deprecated")) Dispatcher.Invoke(() => StatusTextBlock.Text = $"yt-dlp Info/Error: {e.Data.Split('\n')[0]}"); };
+
+                    process.ErrorDataReceived += (s, e) =>
+                    {
+                        if (e.Data != null)
+                        {
+                            Debug.WriteLine($"yt-dlp stderr: {e.Data}");
+                        }
+                    };
 
                     process.Start();
                     process.BeginOutputReadLine();
@@ -789,7 +797,7 @@ namespace UniversalDownloader
                     catch (TaskCanceledException)
                     {
                         Debug.WriteLine("WaitForExitAsync was canceled.");
-                        if (!_currentYtDlpProcess.HasExited)
+                        if (_currentYtDlpProcess != null && !_currentYtDlpProcess.HasExited)
                         {
                             try { _currentYtDlpProcess.Kill(true); } catch { /* ignore */ }
                         }
@@ -802,10 +810,11 @@ namespace UniversalDownloader
 
                     if (cancellationToken.IsCancellationRequested)
                     {
-                        StatusTextBlock.Text = "Status: Download canceled during completion processing.";
-                        FileNameTextBlock.Text = "Download Canceled";
+                        //StatusTextBlock.Text = "Status: Download canceled during completion processing.";
+                        //FileNameTextBlock.Text = "Download Canceled";
                         throw new OperationCanceledException("yt-dlp download canceled.", cancellationToken);
                     }
+
 
                     if (process.ExitCode == 0)
                     {
@@ -872,11 +881,14 @@ namespace UniversalDownloader
                     else
                     {
                         DownloadProgressBar.Value = 0;
-                        if (!StatusTextBlock.Text.ToLower().Contains("error") && !StatusTextBlock.Text.ToLower().Contains("yt-dlp error"))
-                        {
-                            StatusTextBlock.Text = $"Status: yt-dlp download failed (code {process.ExitCode}).";
-                            FileNameTextBlock.Text = "YouTube Download Failed";
-                        }
+                        //if (!StatusTextBlock.Text.ToLower().Contains("error") && !StatusTextBlock.Text.ToLower().Contains("yt-dlp error"))
+                        //{
+                        //    StatusTextBlock.Text = $"Status: yt-dlp download failed (code {process.ExitCode}).";
+                        //    FileNameTextBlock.Text = "YouTube Download Failed";
+                        //}
+
+                        StatusTextBlock.Text = $"Status: yt-dlp download failed (code {process.ExitCode}).";
+                        FileNameTextBlock.Text = "YouTube Download Failed";
                     }
                 }
             }
