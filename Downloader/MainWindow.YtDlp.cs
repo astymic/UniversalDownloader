@@ -26,7 +26,7 @@ namespace UniversalDownloader
         private bool _isYtDlpReady = false;
 
         private const string FfmpegFileName = "ffmpeg.exe";
-        private const string FfmpegZipDownloadUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip";
+        private const string FfmpegZipDownloadUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
         private string _ffmpegExecutablePath;
         private bool _isFfmpegReady = false;
 

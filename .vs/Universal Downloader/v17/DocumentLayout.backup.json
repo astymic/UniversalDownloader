@@ -3,16 +3,20 @@
   "WorkspaceRootPath": "C:\\Users\\raikoben\\source\\repos\\Downloader\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\downloader\\downloader\\mainwindow.downloads.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.downloads.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\downloader\\downloader\\mainwindow.ytdlp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.ytdlp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\downloader\\downloader\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\downloader\\downloader\\mainwindow.ytdlp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.ytdlp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\downloader\\downloader\\mainwindow.downloads.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.downloads.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\downloader\\downloader\\universal downloader.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\universal downloader.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
     }
   ],
   "DocumentGroupContainers": [
@@ -22,7 +26,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 4,
           "Children": [
             {
               "$type": "Bookmark",
@@ -34,26 +38,39 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 3,
+              "Title": "Universal Downloader.csproj",
+              "DocumentMoniker": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\Universal Downloader.csproj",
+              "RelativeDocumentMoniker": "Downloader\\Universal Downloader.csproj",
+              "ToolTip": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\Universal Downloader.csproj",
+              "RelativeToolTip": "Downloader\\Universal Downloader.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAABNAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2025-06-09T06:12:38.141Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "MainWindow.Downloads.cs",
               "DocumentMoniker": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\MainWindow.Downloads.cs",
               "RelativeDocumentMoniker": "Downloader\\MainWindow.Downloads.cs",
               "ToolTip": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\MainWindow.Downloads.cs",
               "RelativeToolTip": "Downloader\\MainWindow.Downloads.cs",
-              "ViewState": "AgIAAGQBAAAAAAAAAAAswIgBAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAGQBAAAAAAAAAAAswHABAAANAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-05-28T11:32:36.345Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 0,
               "Title": "MainWindow.YtDlp.cs",
               "DocumentMoniker": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\MainWindow.YtDlp.cs",
               "RelativeDocumentMoniker": "Downloader\\MainWindow.YtDlp.cs",
               "ToolTip": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\MainWindow.YtDlp.cs",
               "RelativeToolTip": "Downloader\\MainWindow.YtDlp.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAOcAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAwAAAAAAAAAAAAAABEAAAAdAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-05-28T10:06:16.437Z",
               "EditorCaption": ""
@@ -66,7 +83,7 @@
               "RelativeDocumentMoniker": "Downloader\\MainWindow.xaml.cs",
               "ToolTip": "C:\\Users\\raikoben\\source\\repos\\Downloader\\Downloader\\MainWindow.xaml.cs",
               "RelativeToolTip": "Downloader\\MainWindow.xaml.cs",
-              "ViewState": "AgIAAGACAAAAAAAAAAAcwGgCAAAMAAAAAAAAAA==",
+              "ViewState": "AgIAAE8CAAAAAAAAAAAIwGgCAAAMAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-05-17T16:58:45.652Z",
               "EditorCaption": ""
