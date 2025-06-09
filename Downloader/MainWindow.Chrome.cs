@@ -9,15 +9,12 @@ namespace UniversalDownloader
 {
     public partial class MainWindow
     {
-        // For WndProc
-        private const int WM_NCLBUTTONDBLCLK = 0x00A3; // Non-client left button double-click
-        private const int HTCAPTION = 0x2;            // Hit test value for caption area
-
-        // For pseudo-maximize state
+        private const int WM_NCLBUTTONDBLCLK = 0x00A3; 
+        private const int HTCAPTION = 0x2;            
+        
         private bool _isManuallyPseudoMaximized = false;
         private Rect _normalWindowBoundsBeforePseudoMaximize;
-
-        // For dragging from maximized
+        
         private Point _startPointMaximizedDrag;
         private double _maximizedWindowWidthForDrag;
 
@@ -69,9 +66,6 @@ namespace UniversalDownloader
         {
             if (e.ClickCount == 2)
             {
-                // WndProc handles double-clicks on HTCAPTION.
-                // This is a fallback or for elements within title bar not part of HTCAPTION.
-                // If you have buttons on the title bar, their click events should be handled directly.
                 return;
             }
 
@@ -168,7 +162,7 @@ namespace UniversalDownloader
             Screen currentScreen = GetScreenFromWindow();
             if (currentScreen != null)
             {
-                // Use the WorkArea of the current screen
+                
                 this.Left = currentScreen.WorkingArea.Left;
                 this.Top = currentScreen.WorkingArea.Top;
                 this.Width = currentScreen.WorkingArea.Width;

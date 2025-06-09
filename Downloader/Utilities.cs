@@ -10,7 +10,6 @@ namespace UniversalDownloader
 {
     public static class Utilities
     {
-        // Helper method to find a visual child of a specific type
         public static T FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
         {
             if (parent == null) return null;
@@ -81,14 +80,6 @@ namespace UniversalDownloader
             };
             return mapping.TryGetValue(mimeType.Split(';')[0].Trim(), out var extension) ? extension : ".dat";
         }
-
-        /// <summary>
-        /// Finds a unique file path in a given directory by appending a number (e.g., " (1)") if the file already exists.
-        /// </summary>
-        /// <param name="directory">The target directory.</param>
-        /// <param name="desiredFileName">The desired name of the file.</param>
-        /// <returns>A unique file path.</returns>
-        /// <exception cref="IOException">Thrown if a unique name cannot be found after 100 attempts.</exception>
         public static string GetUniqueFilePath(string directory, string desiredFileName)
         {
             string targetPath = Path.Combine(directory, desiredFileName);
@@ -111,7 +102,6 @@ namespace UniversalDownloader
                 string newFileName = $"{fileNameOnly} ({count++}){extension}";
                 targetPath = Path.Combine(directory, newFileName);
             }
-
             return targetPath;
         }
     }

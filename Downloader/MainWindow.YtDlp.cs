@@ -1,9 +1,10 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -24,7 +25,8 @@ namespace UniversalDownloader
         private const string YtDlpVersionApiUrl = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest";
         private bool _isYtDlpReady = false;
 
-        private const string FfmpegFileName = "ffmpeg\\ffmpeg.exe";
+        private const string FfmpegFileName = "ffmpeg.exe";
+        private const string FfmpegZipDownloadUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip";
         private string _ffmpegExecutablePath;
         private bool _isFfmpegReady = false;
 
@@ -57,7 +59,7 @@ namespace UniversalDownloader
                 {
                     _trimStartTimeInSeconds = value;
                     OnPropertyChanged(nameof(TrimStartTimeInSeconds));
-                    TrimStartTimeText = SecondsToTimeString(value); // Update text when slider moves
+                    TrimStartTimeText = SecondsToTimeString(value); 
                 }
             }
         }
@@ -72,7 +74,7 @@ namespace UniversalDownloader
                 {
                     _trimEndTimeInSeconds = value;
                     OnPropertyChanged(nameof(TrimEndTimeInSeconds));
-                    TrimEndTimeText = SecondsToTimeString(value); // Update text when slider moves
+                    TrimEndTimeText = SecondsToTimeString(value);
                 }
             }
         }
@@ -108,7 +110,7 @@ namespace UniversalDownloader
         private string SecondsToTimeString(double totalSeconds)
         {
             TimeSpan time = TimeSpan.FromSeconds(totalSeconds);
-            // Use a format that FFmpeg understands well, including milliseconds for precision
+            
             return time.ToString(@"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture);
         }
 
@@ -125,24 +127,108 @@ namespace UniversalDownloader
 
         #endregion
 
-        private void CheckFfmpegIsBundled()
+        public async Task CheckAndEnsureFfmpegExistsAsync()
         {
             _ffmpegExecutablePath = Path.Combine(AppContext.BaseDirectory, FfmpegFileName);
             if (File.Exists(_ffmpegExecutablePath))
             {
                 _isFfmpegReady = true;
                 Debug.WriteLine($"FFmpeg found at: {_ffmpegExecutablePath}");
+                return;
             }
-            else
+
+            _isFfmpegReady = false;
+
+            _isManagingFfmpeg = true;
+            var ffmpegManageCts = new CancellationTokenSource();
+            UpdateUiElementStates("Downloading ffmpeg.exe");
+
+            try
             {
-                _isFfmpegReady = false;
-                Debug.WriteLine($"FATAL: FFmpeg not found at expected location: {_ffmpegExecutablePath}");
-                // We show this message only once on startup if it's missing.
-                MessageBox.Show($"Trimming functionality is disabled because '{FfmpegFileName}' was not found. Please ensure it is in the 'ffmpeg' subfolder next to the application executable.",
-                                "Dependency Missing", MessageBoxButton.OK, MessageBoxImage.Warning);
+                bool downloadedAndExtracted = await TryDownloadAndExtractFfmpegAsync(ffmpegManageCts.Token);
+                if (downloadedAndExtracted)
+                {
+                    _isFfmpegReady = true;
+                    if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: {FfmpegFileName} is ready. Trimming enabled.";
+                    if (FileNameTextBlock != null) FileNameTextBlock.Text = "";
+                }
+                else
+                {
+                    _isFfmpegReady = false;
+                    if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Failed to set up {FfmpegFileName}. Trimming is disabled.";
+                    if (FileNameTextBlock != null) FileNameTextBlock.Text = $"{FfmpegFileName} setup failed.";
+                }
+            }
+            finally
+            {
+                ffmpegManageCts.Dispose();
+                _isManagingFfmpeg = false;
+                UpdateUiElementStates();
             }
         }
 
+        private async Task<bool> TryDownloadAndExtractFfmpegAsync(CancellationToken cancellationToken)
+        {
+            string tempZipPath = Path.Combine(Path.GetTempPath(), "ffmpeg_download.zip");
+            string tempExtractPath = Path.Combine(Path.GetTempPath(), "ffmpeg_extract_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempExtractPath);
+
+            try
+            {
+                
+                bool downloaded = await DownloadFileAsync(FfmpegZipDownloadUrl, tempZipPath, $"{FfmpegFileName} archive", cancellationToken);
+                if (!downloaded)
+                {
+                    if (StatusTextBlock != null)
+                    {
+                        StatusTextBlock.Text = cancellationToken.IsCancellationRequested
+                            ? $"Status: Download of {FfmpegFileName} archive cancelled."
+                            : $"Status: Failed to download {FfmpegFileName} archive.";
+                    }
+                    return false;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                
+                if (StatusTextBlock != null) StatusTextBlock.Text = "Downloading ffmpeg.exe";
+                if (DownloadProgressBar != null) DownloadProgressBar.IsIndeterminate = true;
+
+                await Task.Run(() => ZipFile.ExtractToDirectory(tempZipPath, tempExtractPath), cancellationToken);
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                
+                string ffmpegSourcePath = Directory.EnumerateFiles(tempExtractPath, FfmpegFileName, SearchOption.AllDirectories).FirstOrDefault();
+                if (string.IsNullOrEmpty(ffmpegSourcePath))
+                {
+                    if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Could not find '{FfmpegFileName}' in the downloaded archive.";
+                    return false;
+                }
+
+                
+                File.Copy(ffmpegSourcePath, _ffmpegExecutablePath, true);
+                return File.Exists(_ffmpegExecutablePath);
+            }
+            catch (OperationCanceledException)
+            {
+                if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: {FfmpegFileName} setup cancelled.";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error during FFmpeg setup: {ex}");
+                if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Error setting up {FfmpegFileName}: {ex.Message.Split('\n')[0]}";
+                return false;
+            }
+            finally
+            {
+                
+                if (DownloadProgressBar != null) DownloadProgressBar.IsIndeterminate = false;
+                if (File.Exists(tempZipPath)) { try { File.Delete(tempZipPath); } catch (Exception ex) { Debug.WriteLine($"Failed to delete temp zip: {ex.Message}"); } }
+                if (Directory.Exists(tempExtractPath)) { try { Directory.Delete(tempExtractPath, true); } catch (Exception ex) { Debug.WriteLine($"Failed to delete temp extract dir: {ex.Message}"); } }
+            }
+        }
 
         private async Task<string> GetLocalYtDlpVersionAsync()
         {
@@ -326,7 +412,7 @@ namespace UniversalDownloader
             UpdateUiElementStates();
         }
 
-        private async Task<bool> TryDownloadYtDlpInternalAsync(CancellationToken cancellationToken)
+        private async Task<bool> DownloadFileAsync(string url, string destinationPath, string componentName, CancellationToken cancellationToken)
         {
             if (DownloadProgressBar != null)
             {
@@ -337,10 +423,20 @@ namespace UniversalDownloader
             {
                 using (var downloadClient = new HttpClient())
                 {
-                    downloadClient.Timeout = TimeSpan.FromMinutes(10);
-                    if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Downloading {YtDlpFileName} from {YtDlpDownloadUrl}...";
+                    downloadClient.Timeout = TimeSpan.FromMinutes(15);
+                    if (StatusTextBlock != null)
+                    {
+                        if (componentName.Contains("ffmpeg"))
+                        {
+                            StatusTextBlock.Text = "Downloading ffmpeg.exe";
+                        }
+                        else
+                        {
+                            StatusTextBlock.Text = $"Status: Downloading {componentName}...";
+                        }
+                    }
 
-                    var response = await downloadClient.GetAsync(YtDlpDownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                    var response = await downloadClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                     response.EnsureSuccessStatusCode();
                     long? totalDownloadSize = response.Content.Headers.ContentLength;
                     long totalBytesRead = 0;
@@ -353,7 +449,7 @@ namespace UniversalDownloader
                     }
 
                     using (var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken))
-                    using (var fileStream = new FileStream(_ytDlpExecutablePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+                    using (var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
                     {
                         byte[] buffer = new byte[81920];
                         int bytesRead;
@@ -369,14 +465,20 @@ namespace UniversalDownloader
                                 if ((int)percentage != lastPercentage)
                                 {
                                     if (DownloadProgressBar != null) DownloadProgressBar.Value = percentage;
-                                    if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Downloading {YtDlpFileName}... {percentage:F0}%";
+                                    if (!componentName.Contains("ffmpeg"))
+                                    {
+                                        if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Downloading {componentName}... {percentage:F0}%";
+                                    }
                                     lastPercentage = (int)percentage;
                                 }
                             }
                             else
                             {
                                 if (DownloadProgressBar != null && !DownloadProgressBar.IsIndeterminate) DownloadProgressBar.IsIndeterminate = true;
-                                if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Downloading {YtDlpFileName} ({Utilities.FormatBytesOutput(totalBytesRead)})...";
+                                if (!componentName.Contains("ffmpeg"))
+                                {
+                                    if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Downloading {componentName} ({Utilities.FormatBytesOutput(totalBytesRead)})...";
+                                }
                             }
                         }
                     }
@@ -386,18 +488,23 @@ namespace UniversalDownloader
             }
             catch (OperationCanceledException)
             {
-                Debug.WriteLine("yt-dlp.exe download was canceled.");
-                if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Download of {YtDlpFileName} canceled.";
-                if (File.Exists(_ytDlpExecutablePath)) { try { File.Delete(_ytDlpExecutablePath); } catch { /* best effort */ } }
+                Debug.WriteLine($"{componentName} download was canceled.");
+                if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Download of {componentName} canceled.";
+                if (File.Exists(destinationPath)) { try { File.Delete(destinationPath); } catch { /* best effort */ } }
                 return false;
             }
             catch (Exception ex)
             {
-                if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Error downloading {YtDlpFileName}: {ex.Message.Split('\n')[0]}";
-                if (File.Exists(_ytDlpExecutablePath)) { try { File.Delete(_ytDlpExecutablePath); } catch { /* best effort */ } }
+                if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Error downloading {componentName}: {ex.Message.Split('\n')[0]}";
+                if (File.Exists(destinationPath)) { try { File.Delete(destinationPath); } catch { /* best effort */ } }
                 return false;
             }
             finally { if (DownloadProgressBar != null) DownloadProgressBar.IsIndeterminate = false; }
+        }
+
+        private async Task<bool> TryDownloadYtDlpInternalAsync(CancellationToken cancellationToken)
+        {
+            return await DownloadFileAsync(YtDlpDownloadUrl, _ytDlpExecutablePath, YtDlpFileName, cancellationToken);
         }
 
         private async Task LoadYouTubeQualitiesWithYtDlp(string videoUrl)
@@ -452,28 +559,24 @@ namespace UniversalDownloader
                     FileNameTextBlock.Text = Utilities.SanitizeFileName(rawVideoTitle);
                     ytDlpReportedFormats = videoInfo["formats"] as JArray;
 
-                    // --- Trimming Logic Initialization ---
                     double? duration = videoInfo["duration"]?.ToObject<double?>();
-                    if (duration.HasValue && duration > 0)
+                    if (duration.HasValue && duration > 0 && _isFfmpegReady)
                     {
                         VideoDurationInSeconds = duration.Value;
                         TrimStartTimeInSeconds = 0;
                         TrimEndTimeInSeconds = duration.Value;
-                        // Explicitly set the text properties to ensure the UI updates.
                         TrimStartTimeText = SecondsToTimeString(TrimStartTimeInSeconds);
                         TrimEndTimeText = SecondsToTimeString(TrimEndTimeInSeconds);
-                        IsTrimmingEnabled = false; // Default to off
+                        IsTrimmingEnabled = false; 
                         if (TrimmingSection != null)
                         {
                             TrimmingSection.Visibility = Visibility.Visible;
-                            // The OnPropertyChanged event for TrimEndTimeInSeconds will now handle scheduling the visual update at the correct priority.
                         }
                     }
                     else
                     {
                         if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
                     }
-                    // --- End Trimming Logic ---
                 }
 
                 if (ytDlpReportedFormats == null || !ytDlpReportedFormats.HasValues)
@@ -587,15 +690,13 @@ namespace UniversalDownloader
         {
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null) return;
             if (!_isYtDlpReady) { StatusTextBlock.Text = $"Status: {YtDlpFileName} is not available."; return; }
-
-            // *** NEW: Fast trimming path using FFmpeg via API calls ***
+            
             if (IsTrimmingEnabled && TrimmingSection.Visibility == Visibility.Visible && IsYouTubeLink(itemUrl))
             {
                 await DownloadTrimmedWithFfmpegViaApi(itemUrl, formatSelection, tempDownloadFolderPath, cancellationToken);
                 return;
             }
-
-            // --- Original download path for non-trimmed or non-YouTube links ---
+            
             _ytDlpCurrentComponentTotalBytes = -1;
 
             string baseFileNameTemplate;
@@ -645,7 +746,6 @@ namespace UniversalDownloader
                 {
                     formatArgument = $"-f \"{formatSelection}\"";
                 }
-
 
                 arguments = $"-o \"{outputTemplateInTemp}\" {formatArgument} {baseArguments}";
 
@@ -809,7 +909,7 @@ namespace UniversalDownloader
 
             try
             {
-                // First, get all available formats
+                
                 var psiGetJson = new ProcessStartInfo
                 {
                     FileName = _ytDlpExecutablePath,
@@ -839,29 +939,25 @@ namespace UniversalDownloader
                     {
                         throw new Exception("No formats found in video metadata");
                     }
-
-                    // Determine if this is an audio-only request
+                    
                     var selectedQuality = YouTubeQualityComboBox.SelectedItem as YouTubeQualityItem;
                     isAudioOnly = selectedQuality?.IsAudioOnly == true ||
                                  formatSelection.Contains("bestaudio") && !formatSelection.Contains("bestvideo");
 
                     if (isAudioOnly)
                     {
-                        // For audio-only, find the best audio stream matching the format selection
                         var audioFormats = formats
                             .Where(f => f["vcodec"]?.ToString() == "none" && f["acodec"]?.ToString() != "none")
                             .ToList();
 
                         JToken selectedAudioFormat = null;
 
-                        // If format selection is specific (not just "bestaudio"), try to match it
                         if (formatSelection != "bestaudio/best" && formatSelection != "bestaudio")
                         {
-                            // Try to find format by ID first
+                            
                             selectedAudioFormat = audioFormats.FirstOrDefault(f => f["format_id"]?.ToString() == formatSelection);
                         }
-
-                        // Fallback to best audio quality
+                        
                         if (selectedAudioFormat == null)
                         {
                             selectedAudioFormat = audioFormats
@@ -881,14 +977,11 @@ namespace UniversalDownloader
                     }
                     else
                     {
-                        // For video formats, we need to parse the format selection properly
-                        // Handle complex format selections like "bestvideo[height<=720]+bestaudio"
                         string videoFormatFilter = "";
                         string audioFormatFilter = "";
 
                         if (formatSelection.Contains("+"))
                         {
-                            // Split combined format (video+audio)
                             var parts = formatSelection.Split('+');
                             videoFormatFilter = parts[0];
                             if (parts.Length > 1)
@@ -896,11 +989,10 @@ namespace UniversalDownloader
                         }
                         else
                         {
-                            // Single format selection
                             videoFormatFilter = formatSelection;
                         }
 
-                        // Parse video format requirements
+                        
                         int? maxHeight = null;
                         if (videoFormatFilter.Contains("height<="))
                         {
@@ -911,7 +1003,7 @@ namespace UniversalDownloader
                             }
                         }
 
-                        // Find best video stream matching criteria
+                        
                         var videoFormats = formats
                             .Where(f => f["vcodec"]?.ToString() != "none" && f["vcodec"]?.ToString() != "unknown")
                             .ToList();
@@ -920,7 +1012,7 @@ namespace UniversalDownloader
 
                         if (maxHeight.HasValue)
                         {
-                            // Filter by height requirement
+                            
                             selectedVideoFormat = videoFormats
                                 .Where(f => (f["height"]?.ToObject<int?>() ?? 0) <= maxHeight.Value)
                                 .OrderByDescending(f => f["height"]?.ToObject<int?>() ?? 0)
@@ -929,7 +1021,7 @@ namespace UniversalDownloader
                         }
                         else
                         {
-                            // Get best available video format
+                            
                             selectedVideoFormat = videoFormats
                                 .OrderByDescending(f => f["height"]?.ToObject<int?>() ?? 0)
                                 .ThenByDescending(f => f["tbr"]?.ToObject<double?>() ?? 0)
@@ -945,8 +1037,8 @@ namespace UniversalDownloader
                                 videoHeaders = string.Join("\r\n", videoHeadersObj.Properties().Select(p => $"{p.Name}: {p.Value}"));
                             }
                         }
+                        
 
-                        // Find best audio stream
                         var audioFormats = formats
                             .Where(f => f["vcodec"]?.ToString() == "none" && f["acodec"]?.ToString() != "none")
                             .ToList();
@@ -955,11 +1047,10 @@ namespace UniversalDownloader
 
                         if (!string.IsNullOrEmpty(audioFormatFilter) && audioFormatFilter != "bestaudio")
                         {
-                            // Try to match specific audio format
+                            
                             selectedAudioFormat = audioFormats.FirstOrDefault(f => f["format_id"]?.ToString() == audioFormatFilter);
                         }
-
-                        // Fallback to best audio
+                        
                         if (selectedAudioFormat == null)
                         {
                             selectedAudioFormat = audioFormats
@@ -986,7 +1077,7 @@ namespace UniversalDownloader
                 return;
             }
 
-            // Validate we have the necessary streams
+            
             if (string.IsNullOrEmpty(audioStreamUrl) && string.IsNullOrEmpty(videoStreamUrl))
             {
                 StatusTextBlock.Text = "Status: Could not find suitable streams for trimming.";
@@ -994,7 +1085,6 @@ namespace UniversalDownloader
                 return;
             }
 
-            // Determine output format and filename
             string outputExtension = isAudioOnly ? ".m4a" : ".mp4";
             string tempFileName = $"{Utilities.SanitizeFileName(FileNameTextBlock.Text)}_trimmed{outputExtension}";
             string tempFilePath = Path.Combine(tempDownloadFolderPath, tempFileName);
@@ -1002,14 +1092,12 @@ namespace UniversalDownloader
             StatusTextBlock.Text = "Status: Trimming video with FFmpeg...";
             DownloadProgressBar.IsIndeterminate = false;
             DownloadProgressBar.Value = 0;
+            
 
-            // Calculate duration for progress tracking
             double trimDuration = TrimEndTimeInSeconds - TrimStartTimeInSeconds;
-
-            // Build FFmpeg command
+            
             var ffmpegArgs = new List<string>();
-
-            // Add input streams with seeking
+            
             if (!string.IsNullOrEmpty(videoStreamUrl))
             {
                 if (!string.IsNullOrEmpty(videoHeaders))
@@ -1030,23 +1118,22 @@ namespace UniversalDownloader
                 ffmpegArgs.Add($"-i \"{audioStreamUrl}\"");
             }
 
-            // Set duration
+            
             ffmpegArgs.Add($"-t {trimDuration.ToString("F3", CultureInfo.InvariantCulture)}");
 
-            // Configure encoding based on format
+            
             if (isAudioOnly)
             {
-                // Audio-only output
+                
                 ffmpegArgs.Add("-c:a aac");
                 ffmpegArgs.Add("-b:a 128k");
-                ffmpegArgs.Add("-vn"); // No video
+                ffmpegArgs.Add("-vn"); 
             }
             else
             {
-                // Video + Audio output
+                
                 if (!string.IsNullOrEmpty(videoStreamUrl))
                 {
-                    // Video encoding - use fast preset for speed while maintaining quality
                     ffmpegArgs.Add("-c:v libx264");
                     ffmpegArgs.Add("-preset fast");
                     ffmpegArgs.Add("-crf 23");
@@ -1059,17 +1146,13 @@ namespace UniversalDownloader
                 }
                 else
                 {
-                    // No separate audio stream, extract from video
                     ffmpegArgs.Add("-c:a copy");
                 }
-
-                // Video container optimizations
                 ffmpegArgs.Add("-movflags +faststart");
             }
-
-            // Additional options for better compatibility
+            
             ffmpegArgs.Add("-avoid_negative_ts make_zero");
-            ffmpegArgs.Add("-y"); // Overwrite output file
+            ffmpegArgs.Add("-y"); 
             ffmpegArgs.Add($"\"{tempFilePath}\"");
 
             string arguments = string.Join(" ", ffmpegArgs);
@@ -1099,7 +1182,7 @@ namespace UniversalDownloader
                     {
                         ffmpegErrorOutput.AppendLine(e.Data);
 
-                        // Parse FFmpeg progress
+                        
                         if (e.Data.Contains("time="))
                         {
                             var timeMatch = Regex.Match(e.Data, @"time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})");
@@ -1113,7 +1196,7 @@ namespace UniversalDownloader
                                 double currentTime = hours * 3600 + minutes * 60 + seconds + centiseconds / 100.0;
                                 double progressPercent = Math.Min((currentTime / trimDuration) * 100, 100);
 
-                                if (Math.Abs(progressPercent - lastProgressPercent) > 1) // Update every 1%
+                                if (Math.Abs(progressPercent - lastProgressPercent) > 1) 
                                 {
                                     lastProgressPercent = progressPercent;
                                     Dispatcher.Invoke(() =>
@@ -1163,7 +1246,7 @@ namespace UniversalDownloader
                     StatusTextBlock.Text = "Status: FFmpeg trimming failed.";
                     FileNameTextBlock.Text = "Trimming Failed";
 
-                    // Show more specific error information
+                    
                     var errorLines = error.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                                           .Where(line => line.ToLower().Contains("error") || line.ToLower().Contains("failed"))
                                           .Take(3)
@@ -1175,14 +1258,9 @@ namespace UniversalDownloader
 
                     Debug.WriteLine($"Trimming Command: {arguments}");
                     Debug.WriteLine($"Error Details: {errorMessage}");
-
-                    // Optional: Show MessageBox for debugging (remove in production)
-                     //MessageBox.Show($"FFmpeg trimming failed.\n\nCommand: {arguments}\n\nError:\n{errorMessage}",
-                     //              "Trimming Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
-
 
         private async Task MoveFinalFile(string sourcePath, string destinationFolder)
         {
@@ -1195,8 +1273,8 @@ namespace UniversalDownloader
 
             string originalFileName = Path.GetFileName(sourcePath);
             string cleanFileNameOnly = Path.GetFileNameWithoutExtension(originalFileName);
-            cleanFileNameOnly = Regex.Replace(cleanFileNameOnly, @"\s*\[[^\]]+\]\s*$", "").Trim(); // removes [id]
-            cleanFileNameOnly = Regex.Replace(cleanFileNameOnly, @"\s*\(Audio\)\s*$", "").Trim(); // removes (Audio)
+            cleanFileNameOnly = Regex.Replace(cleanFileNameOnly, @"\s*\[[^\]]+\]\s*$", "").Trim(); 
+            cleanFileNameOnly = Regex.Replace(cleanFileNameOnly, @"\s*\(Audio\)\s*$", "").Trim(); 
             string extension = Path.GetExtension(originalFileName);
             string desiredFileName = Utilities.SanitizeFileName(cleanFileNameOnly + extension);
 
@@ -1266,7 +1344,7 @@ namespace UniversalDownloader
                 _currentDownloadingComponent = newComponentPath;
                 finalReportedFilePathInTemp = newComponentPath;
 
-                // Do NOT update the FileNameTextBlock here. Let it keep the clean title.
+                
                 currentOperationStatus = $"Status: Starting download...";
 
                 _ytDlpCurrentComponentTotalBytes = -1;
@@ -1286,7 +1364,7 @@ namespace UniversalDownloader
                 _currentDownloadingComponent = alreadyDownloadedMatch.Groups["path"].Value.Trim('"', ' ');
                 finalReportedFilePathInTemp = _currentDownloadingComponent;
 
-                // Do NOT update the FileNameTextBlock here.
+                
                 currentOperationStatus = $"Status: File already downloaded.";
 
                 DownloadProgressBar.IsIndeterminate = false;
@@ -1306,7 +1384,7 @@ namespace UniversalDownloader
                 _currentDownloadingComponent = processingPath;
                 finalReportedFilePathInTemp = processingPath;
 
-                // Do NOT update the FileNameTextBlock here.
+                
                 currentOperationStatus = $"Status: {processingType}...";
                 if (processingType.ToLower().Contains("ffmpeg"))
                 {

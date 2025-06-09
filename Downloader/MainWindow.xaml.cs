@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -18,14 +18,14 @@ namespace UniversalDownloader
 {
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
-        // Core properties
+        
         private string _selectedDirectory;
         private HttpClient _httpClient;
-
-        // Specific Busy Flags 
+        
         private bool _isInitializing = false;
         private bool _isProcessingUrl = false;
         private bool _isManagingYtDlp = false;
+        private bool _isManagingFfmpeg = false;
         private bool _isDownloadingFile = false;
 
         private const string SettingsKeyLastDownloadPath = "LastDownloadPath";
@@ -41,10 +41,6 @@ namespace UniversalDownloader
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
             if (propertyName == nameof(TrimStartTimeInSeconds) || propertyName == nameof(TrimEndTimeInSeconds))
             {
-                // When the data model values change, schedule a visual update.
-                // Using a priority like 'Input' ensures that the layout pass
-                // has completed before we attempt to read ActualWidth, which is crucial
-                // when the control has just become visible.
                 Dispatcher.InvokeAsync(UpdateCustomSliderVisuals, DispatcherPriority.Input);
             }
         }
@@ -78,7 +74,7 @@ namespace UniversalDownloader
             }
 
             await CheckAndEnsureYtDlpExistsAsync();
-            CheckFfmpegIsBundled(); // CHANGED: Call the new synchronous check
+            await CheckAndEnsureFfmpegExistsAsync(); 
 
             _isInitializing = false;
             UpdateUiElementStates();
@@ -205,23 +201,21 @@ namespace UniversalDownloader
             string lastRunDateKey = $"{settingKey}_LastCheckDate";
             SaveSetting(lastRunDateKey, DateTime.UtcNow.ToString("o"));
         }
-
-
-        // UI state updater
+        
         private void UpdateUiElementStates(string statusMessageUpdate = null)
         {
             Dispatcher.InvokeAsync(() =>
             {
                 bool canBrowse = !_isInitializing && !_isDownloadingFile;
-                bool canInputUrl = !_isInitializing && !_isProcessingUrl && !_isManagingYtDlp && !_isDownloadingFile;
-                bool canDownloadAction = CanInitiateDownload() && !_isInitializing && !_isProcessingUrl && !_isManagingYtDlp && !_isDownloadingFile;
+                bool canInputUrl = !_isInitializing && !_isProcessingUrl && !_isManagingYtDlp && !_isManagingFfmpeg && !_isDownloadingFile;
+                bool canDownloadAction = CanInitiateDownload() && !_isInitializing && !_isProcessingUrl && !_isManagingYtDlp && !_isManagingFfmpeg && !_isDownloadingFile;
 
                 if (UrlTextBox != null) UrlTextBox.IsEnabled = canInputUrl;
                 if (BrowseButton != null) BrowseButton.IsEnabled = canBrowse;
 
                 if (CancelDownloadButton != null)
                 {
-                    CancelDownloadButton.Visibility = (_isDownloadingFile || (_isManagingYtDlp && FileNameTextBlock.Text.Contains("Downloading:")))
+                    CancelDownloadButton.Visibility = (_isDownloadingFile || (_isManagingYtDlp && FileNameTextBlock.Text.Contains("Downloading:")) || _isManagingFfmpeg)
                                                       ? Visibility.Visible
                                                       : Visibility.Collapsed;
 
@@ -255,7 +249,7 @@ namespace UniversalDownloader
 
         private bool IsAnyOperationInProgress()
         {
-            return _isInitializing || _isProcessingUrl || _isManagingYtDlp || _isDownloadingFile;
+            return _isInitializing || _isProcessingUrl || _isManagingYtDlp || _isManagingFfmpeg || _isDownloadingFile;
         }
 
 
@@ -271,9 +265,7 @@ namespace UniversalDownloader
             }
             return true;
         }
-
-
-        // UI Event Handlers 
+        
         private void UrlTextBox_GotFocus(object sender, RoutedEventArgs e)
         {
             if (UrlTextBox.Text == "Paste URL here...")
@@ -478,6 +470,11 @@ namespace UniversalDownloader
                 StatusTextBlock.Text = "Status: Canceling yt-dlp download...";
                 Debug.WriteLine("Cancellation for yt-dlp executable download is not fully implemented via this button yet.");
             }
+            else if (_isManagingFfmpeg)
+            {
+                StatusTextBlock.Text = "Status: Canceling ffmpeg download...";
+                Debug.WriteLine("Cancellation for ffmpeg executable download is not fully implemented via this button yet.");
+            }
         }
 
         private string CreateTempDownloadFolder()
@@ -514,28 +511,23 @@ namespace UniversalDownloader
             var thumb = sender as Thumb;
             if (thumb == null) return;
 
-            // Calculate how many seconds each pixel of movement represents
             double secondsPerPixel = VideoDurationInSeconds / SliderTrack.ActualWidth;
-            // Calculate the change in time based on the horizontal drag
+            
             double timeChange = e.HorizontalChange * secondsPerPixel;
 
             if (thumb == StartThumb)
             {
-                // Calculate the new start time and clamp it to not go below 0 or past the end thumb
                 double newStartTime = TrimStartTimeInSeconds + timeChange;
                 TrimStartTimeInSeconds = Math.Max(0, Math.Min(newStartTime, TrimEndTimeInSeconds));
             }
             else if (thumb == EndThumb)
             {
-                // Calculate the new end time and clamp it to not go past the video duration or before the start thumb
                 double newEndTime = TrimEndTimeInSeconds + timeChange;
                 TrimEndTimeInSeconds = Math.Min(VideoDurationInSeconds, Math.Max(newEndTime, TrimStartTimeInSeconds));
             }
-            // The property setters for Trim...TimeInSeconds automatically trigger UpdateCustomSliderVisuals via OnPropertyChanged,
-            // which handles the visual update of the thumbs and the fill.
         }
 
-        // This method syncs the visuals from the data model (e.g., on load, textbox change, or during drag)
+        
         private void UpdateCustomSliderVisuals()
         {
             if (VideoDurationInSeconds <= 0) return;
@@ -543,14 +535,12 @@ namespace UniversalDownloader
             double trackWidth = SliderTrack.ActualWidth;
             if (trackWidth <= 0) return;
 
-            // Calculate position based on the center of the thumb
             double startPercent = TrimStartTimeInSeconds / VideoDurationInSeconds;
             double endPercent = TrimEndTimeInSeconds / VideoDurationInSeconds;
 
             double startX = startPercent * trackWidth;
             double endX = endPercent * trackWidth;
 
-            // Ensure ActualWidth is available before using it for offset calculation
             if (StartThumb.ActualWidth > 0)
             {
                 Canvas.SetLeft(StartThumb, startX - (StartThumb.ActualWidth / 2));
@@ -559,13 +549,13 @@ namespace UniversalDownloader
             {
                 Canvas.SetLeft(EndThumb, endX - (EndThumb.ActualWidth / 2));
             }
-
+            
             UpdateSliderFill();
         }
 
         private void UpdateSliderFill()
         {
-            // Check if thumbs have been positioned yet
+            
             double startLeft = Canvas.GetLeft(StartThumb);
             double endLeft = Canvas.GetLeft(EndThumb);
             if (double.IsNaN(startLeft) || double.IsNaN(endLeft)) return;
@@ -578,11 +568,11 @@ namespace UniversalDownloader
 
         private void SliderCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            // Update visuals if the canvas is resized (e.g., window resize)
             UpdateCustomSliderVisuals();
         }
 
         #endregion
+
 
         private void StartTimeTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
@@ -601,7 +591,6 @@ namespace UniversalDownloader
                     TrimStartTimeInSeconds = newStartTime;
                 }
             }
-            // Always revert text to a valid format
             textBox.Text = SecondsToTimeString(TrimStartTimeInSeconds);
         }
 
@@ -625,7 +614,6 @@ namespace UniversalDownloader
                     TrimEndTimeInSeconds = newEndTime;
                 }
             }
-            // Always revert text to a valid format
             textBox.Text = SecondsToTimeString(TrimEndTimeInSeconds);
         }
     }
