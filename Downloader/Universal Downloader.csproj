@@ -1,31 +1,25 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
 		<TargetFramework>net8.0-windows</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWPF>true</UseWPF>
+
+		<PublishSingleFile>true</PublishSingleFile>
+		<SelfContained>true</SelfContained>
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
 		<ApplicationIcon>akashi.ico</ApplicationIcon>
 	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-		<SelfContained>false</SelfContained>
-		<PublishSingleFile>true</PublishSingleFile>
-		<EnableUnsafeWpfPropertyFieldAccess>true</EnableUnsafeWpfPropertyFieldAccess>
-	</PropertyGroup>
-
-  <ItemGroup>
-    <None Remove="akashi.ico" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Resource Include="akashi.ico" />
-  </ItemGroup>
-
+	<ItemGroup>
+		<None Remove="akashi.ico" />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
+	</ItemGroup>
+	<ItemGroup>
+		<Resource Include="akashi.ico" />
+	</ItemGroup>
 </Project>
