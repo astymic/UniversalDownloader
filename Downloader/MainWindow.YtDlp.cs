@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -12,6 +12,8 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
 using Newtonsoft.Json.Linq;
 
@@ -59,7 +61,7 @@ namespace UniversalDownloader
                 {
                     _trimStartTimeInSeconds = value;
                     OnPropertyChanged(nameof(TrimStartTimeInSeconds));
-                    TrimStartTimeText = SecondsToTimeString(value); 
+                    TrimStartTimeText = SecondsToTimeString(value);
                 }
             }
         }
@@ -110,7 +112,7 @@ namespace UniversalDownloader
         private string SecondsToTimeString(double totalSeconds)
         {
             TimeSpan time = TimeSpan.FromSeconds(totalSeconds);
-            
+
             return time.ToString(@"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture);
         }
 
@@ -175,7 +177,7 @@ namespace UniversalDownloader
 
             try
             {
-                
+
                 bool downloaded = await DownloadFileAsync(FfmpegZipDownloadUrl, tempZipPath, $"{FfmpegFileName} archive", cancellationToken);
                 if (!downloaded)
                 {
@@ -190,7 +192,7 @@ namespace UniversalDownloader
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                
+
                 if (StatusTextBlock != null) StatusTextBlock.Text = "Downloading ffmpeg.exe";
                 if (DownloadProgressBar != null) DownloadProgressBar.IsIndeterminate = true;
 
@@ -198,7 +200,7 @@ namespace UniversalDownloader
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                
+
                 string ffmpegSourcePath = Directory.EnumerateFiles(tempExtractPath, FfmpegFileName, SearchOption.AllDirectories).FirstOrDefault();
                 if (string.IsNullOrEmpty(ffmpegSourcePath))
                 {
@@ -206,7 +208,7 @@ namespace UniversalDownloader
                     return false;
                 }
 
-                
+
                 File.Copy(ffmpegSourcePath, _ffmpegExecutablePath, true);
                 return File.Exists(_ffmpegExecutablePath);
             }
@@ -223,7 +225,7 @@ namespace UniversalDownloader
             }
             finally
             {
-                
+
                 if (DownloadProgressBar != null) DownloadProgressBar.IsIndeterminate = false;
                 if (File.Exists(tempZipPath)) { try { File.Delete(tempZipPath); } catch (Exception ex) { Debug.WriteLine($"Failed to delete temp zip: {ex.Message}"); } }
                 if (Directory.Exists(tempExtractPath)) { try { Directory.Delete(tempExtractPath, true); } catch (Exception ex) { Debug.WriteLine($"Failed to delete temp extract dir: {ex.Message}"); } }
@@ -567,7 +569,7 @@ namespace UniversalDownloader
                         TrimEndTimeInSeconds = duration.Value;
                         TrimStartTimeText = SecondsToTimeString(TrimStartTimeInSeconds);
                         TrimEndTimeText = SecondsToTimeString(TrimEndTimeInSeconds);
-                        IsTrimmingEnabled = false; 
+                        IsTrimmingEnabled = false;
                         if (TrimmingSection != null)
                         {
                             TrimmingSection.Visibility = Visibility.Visible;
@@ -690,13 +692,13 @@ namespace UniversalDownloader
         {
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null) return;
             if (!_isYtDlpReady) { StatusTextBlock.Text = $"Status: {YtDlpFileName} is not available."; return; }
-            
+
             if (IsTrimmingEnabled && TrimmingSection.Visibility == Visibility.Visible && IsYouTubeLink(itemUrl))
             {
                 await DownloadTrimmedWithFfmpegViaApi(itemUrl, formatSelection, tempDownloadFolderPath, cancellationToken);
                 return;
             }
-            
+
             _ytDlpCurrentComponentTotalBytes = -1;
 
             string baseFileNameTemplate;
@@ -921,7 +923,7 @@ namespace UniversalDownloader
 
             try
             {
-                
+
                 var psiGetJson = new ProcessStartInfo
                 {
                     FileName = _ytDlpExecutablePath,
@@ -951,7 +953,7 @@ namespace UniversalDownloader
                     {
                         throw new Exception("No formats found in video metadata");
                     }
-                    
+
                     var selectedQuality = YouTubeQualityComboBox.SelectedItem as YouTubeQualityItem;
                     isAudioOnly = selectedQuality?.IsAudioOnly == true ||
                                  formatSelection.Contains("bestaudio") && !formatSelection.Contains("bestvideo");
@@ -966,10 +968,10 @@ namespace UniversalDownloader
 
                         if (formatSelection != "bestaudio/best" && formatSelection != "bestaudio")
                         {
-                            
+
                             selectedAudioFormat = audioFormats.FirstOrDefault(f => f["format_id"]?.ToString() == formatSelection);
                         }
-                        
+
                         if (selectedAudioFormat == null)
                         {
                             selectedAudioFormat = audioFormats
@@ -1004,7 +1006,7 @@ namespace UniversalDownloader
                             videoFormatFilter = formatSelection;
                         }
 
-                        
+
                         int? maxHeight = null;
                         if (videoFormatFilter.Contains("height<="))
                         {
@@ -1015,7 +1017,7 @@ namespace UniversalDownloader
                             }
                         }
 
-                        
+
                         var videoFormats = formats
                             .Where(f => f["vcodec"]?.ToString() != "none" && f["vcodec"]?.ToString() != "unknown")
                             .ToList();
@@ -1024,7 +1026,7 @@ namespace UniversalDownloader
 
                         if (maxHeight.HasValue)
                         {
-                            
+
                             selectedVideoFormat = videoFormats
                                 .Where(f => (f["height"]?.ToObject<int?>() ?? 0) <= maxHeight.Value)
                                 .OrderByDescending(f => f["height"]?.ToObject<int?>() ?? 0)
@@ -1033,7 +1035,7 @@ namespace UniversalDownloader
                         }
                         else
                         {
-                            
+
                             selectedVideoFormat = videoFormats
                                 .OrderByDescending(f => f["height"]?.ToObject<int?>() ?? 0)
                                 .ThenByDescending(f => f["tbr"]?.ToObject<double?>() ?? 0)
@@ -1049,7 +1051,7 @@ namespace UniversalDownloader
                                 videoHeaders = string.Join("\r\n", videoHeadersObj.Properties().Select(p => $"{p.Name}: {p.Value}"));
                             }
                         }
-                        
+
 
                         var audioFormats = formats
                             .Where(f => f["vcodec"]?.ToString() == "none" && f["acodec"]?.ToString() != "none")
@@ -1059,10 +1061,10 @@ namespace UniversalDownloader
 
                         if (!string.IsNullOrEmpty(audioFormatFilter) && audioFormatFilter != "bestaudio")
                         {
-                            
+
                             selectedAudioFormat = audioFormats.FirstOrDefault(f => f["format_id"]?.ToString() == audioFormatFilter);
                         }
-                        
+
                         if (selectedAudioFormat == null)
                         {
                             selectedAudioFormat = audioFormats
@@ -1089,7 +1091,7 @@ namespace UniversalDownloader
                 return;
             }
 
-            
+
             if (string.IsNullOrEmpty(audioStreamUrl) && string.IsNullOrEmpty(videoStreamUrl))
             {
                 StatusTextBlock.Text = "Status: Could not find suitable streams for trimming.";
@@ -1104,12 +1106,12 @@ namespace UniversalDownloader
             StatusTextBlock.Text = "Status: Trimming video with FFmpeg...";
             DownloadProgressBar.IsIndeterminate = false;
             DownloadProgressBar.Value = 0;
-            
+
 
             double trimDuration = TrimEndTimeInSeconds - TrimStartTimeInSeconds;
-            
+
             var ffmpegArgs = new List<string>();
-            
+
             if (!string.IsNullOrEmpty(videoStreamUrl))
             {
                 if (!string.IsNullOrEmpty(videoHeaders))
@@ -1130,20 +1132,20 @@ namespace UniversalDownloader
                 ffmpegArgs.Add($"-i \"{audioStreamUrl}\"");
             }
 
-            
+
             ffmpegArgs.Add($"-t {trimDuration.ToString("F3", CultureInfo.InvariantCulture)}");
 
-            
+
             if (isAudioOnly)
             {
-                
+
                 ffmpegArgs.Add("-c:a aac");
                 ffmpegArgs.Add("-b:a 128k");
-                ffmpegArgs.Add("-vn"); 
+                ffmpegArgs.Add("-vn");
             }
             else
             {
-                
+
                 if (!string.IsNullOrEmpty(videoStreamUrl))
                 {
                     ffmpegArgs.Add("-c:v libx264");
@@ -1162,9 +1164,9 @@ namespace UniversalDownloader
                 }
                 ffmpegArgs.Add("-movflags +faststart");
             }
-            
+
             ffmpegArgs.Add("-avoid_negative_ts make_zero");
-            ffmpegArgs.Add("-y"); 
+            ffmpegArgs.Add("-y");
             ffmpegArgs.Add($"\"{tempFilePath}\"");
 
             string arguments = string.Join(" ", ffmpegArgs);
@@ -1194,7 +1196,7 @@ namespace UniversalDownloader
                     {
                         ffmpegErrorOutput.AppendLine(e.Data);
 
-                        
+
                         if (e.Data.Contains("time="))
                         {
                             var timeMatch = Regex.Match(e.Data, @"time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})");
@@ -1208,7 +1210,7 @@ namespace UniversalDownloader
                                 double currentTime = hours * 3600 + minutes * 60 + seconds + centiseconds / 100.0;
                                 double progressPercent = Math.Min((currentTime / trimDuration) * 100, 100);
 
-                                if (Math.Abs(progressPercent - lastProgressPercent) > 1) 
+                                if (Math.Abs(progressPercent - lastProgressPercent) > 1)
                                 {
                                     lastProgressPercent = progressPercent;
                                     Dispatcher.Invoke(() =>
@@ -1258,7 +1260,7 @@ namespace UniversalDownloader
                     StatusTextBlock.Text = "Status: FFmpeg trimming failed.";
                     FileNameTextBlock.Text = "Trimming Failed";
 
-                    
+
                     var errorLines = error.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                                           .Where(line => line.ToLower().Contains("error") || line.ToLower().Contains("failed"))
                                           .Take(3)
@@ -1285,8 +1287,8 @@ namespace UniversalDownloader
 
             string originalFileName = Path.GetFileName(sourcePath);
             string cleanFileNameOnly = Path.GetFileNameWithoutExtension(originalFileName);
-            cleanFileNameOnly = Regex.Replace(cleanFileNameOnly, @"\s*\[[^\]]+\]\s*$", "").Trim(); 
-            cleanFileNameOnly = Regex.Replace(cleanFileNameOnly, @"\s*\(Audio\)\s*$", "").Trim(); 
+            cleanFileNameOnly = Regex.Replace(cleanFileNameOnly, @"\s*\[[^\]]+\]\s*$", "").Trim();
+            cleanFileNameOnly = Regex.Replace(cleanFileNameOnly, @"\s*\(Audio\)\s*$", "").Trim();
             string extension = Path.GetExtension(originalFileName);
             string desiredFileName = Utilities.SanitizeFileName(cleanFileNameOnly + extension);
 
@@ -1322,7 +1324,6 @@ namespace UniversalDownloader
             }
         }
 
-
         private static readonly Regex YtDlpProgressRegex = new Regex(
            @"\[download\]\s+(?<percent>[\d\.]+?)%\s+of\s+(?:~?\s*)?(?<total_size_str>[\d\.]+[KMGTPEZiY]?i?B|unknown)(?:\s+at\s+(?<speed>[\d\.]+[KMGTPEZiY]?i?B/s|\S+))?(?:\s+ETA\s+(?<eta>[\d:SMPH]+|\S+))?(?:\s+in\s+[\d:SMPH]+)?",
            RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -1356,7 +1357,7 @@ namespace UniversalDownloader
                 _currentDownloadingComponent = newComponentPath;
                 finalReportedFilePathInTemp = newComponentPath;
 
-                
+
                 currentOperationStatus = $"Status: Starting download...";
 
                 _ytDlpCurrentComponentTotalBytes = -1;
@@ -1376,7 +1377,7 @@ namespace UniversalDownloader
                 _currentDownloadingComponent = alreadyDownloadedMatch.Groups["path"].Value.Trim('"', ' ');
                 finalReportedFilePathInTemp = _currentDownloadingComponent;
 
-                
+
                 currentOperationStatus = $"Status: File already downloaded.";
 
                 DownloadProgressBar.IsIndeterminate = false;
@@ -1396,7 +1397,7 @@ namespace UniversalDownloader
                 _currentDownloadingComponent = processingPath;
                 finalReportedFilePathInTemp = processingPath;
 
-                
+
                 currentOperationStatus = $"Status: {processingType}...";
                 if (processingType.ToLower().Contains("ffmpeg"))
                 {
@@ -1466,5 +1467,117 @@ namespace UniversalDownloader
                 if (StatusTextBlock != null) StatusTextBlock.Text = currentOperationStatus;
             }
         }
+
+        #region Custom Slider UI Logic
+
+        private void Thumb_DragDelta(object sender, DragDeltaEventArgs e)
+        {
+            if (VideoDurationInSeconds <= 0 || SliderTrack.ActualWidth <= 0) return;
+
+            var thumb = sender as Thumb;
+            if (thumb == null) return;
+
+            double secondsPerPixel = VideoDurationInSeconds / SliderTrack.ActualWidth;
+
+            double timeChange = e.HorizontalChange * secondsPerPixel;
+
+            if (thumb == StartThumb)
+            {
+                double newStartTime = TrimStartTimeInSeconds + timeChange;
+                TrimStartTimeInSeconds = Math.Max(0, Math.Min(newStartTime, TrimEndTimeInSeconds));
+            }
+            else if (thumb == EndThumb)
+            {
+                double newEndTime = TrimEndTimeInSeconds + timeChange;
+                TrimEndTimeInSeconds = Math.Min(VideoDurationInSeconds, Math.Max(newEndTime, TrimStartTimeInSeconds));
+            }
+        }
+
+        private void UpdateCustomSliderVisuals()
+        {
+            if (VideoDurationInSeconds <= 0) return;
+
+            double trackWidth = SliderTrack.ActualWidth;
+            if (trackWidth <= 0) return;
+
+            double startPercent = TrimStartTimeInSeconds / VideoDurationInSeconds;
+            double endPercent = TrimEndTimeInSeconds / VideoDurationInSeconds;
+
+            double startX = startPercent * trackWidth;
+            double endX = endPercent * trackWidth;
+
+            if (StartThumb.ActualWidth > 0)
+            {
+                Canvas.SetLeft(StartThumb, startX - (StartThumb.ActualWidth / 2));
+            }
+            if (EndThumb.ActualWidth > 0)
+            {
+                Canvas.SetLeft(EndThumb, endX - (EndThumb.ActualWidth / 2));
+            }
+
+            UpdateSliderFill();
+        }
+
+        private void UpdateSliderFill()
+        {
+            double startLeft = Canvas.GetLeft(StartThumb);
+            double endLeft = Canvas.GetLeft(EndThumb);
+            if (double.IsNaN(startLeft) || double.IsNaN(endLeft)) return;
+
+            double left = startLeft + (StartThumb.ActualWidth / 2);
+            double right = endLeft + (EndThumb.ActualWidth / 2);
+            Canvas.SetLeft(SliderFill, left);
+            SliderFill.Width = Math.Max(0, right - left);
+        }
+
+        private void SliderCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateCustomSliderVisuals();
+        }
+
+        private void StartTimeTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            if (textBox == null) return;
+
+            if (TimeStringToSeconds(textBox.Text, out double newStartTime))
+            {
+                if (newStartTime < 0) newStartTime = 0;
+                if (newStartTime > TrimEndTimeInSeconds)
+                {
+                    TrimStartTimeInSeconds = TrimEndTimeInSeconds;
+                }
+                else
+                {
+                    TrimStartTimeInSeconds = newStartTime;
+                }
+            }
+            textBox.Text = SecondsToTimeString(TrimStartTimeInSeconds);
+        }
+
+        private void EndTimeTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            if (textBox == null) return;
+
+            if (TimeStringToSeconds(textBox.Text, out double newEndTime))
+            {
+                if (newEndTime < TrimStartTimeInSeconds)
+                {
+                    TrimEndTimeInSeconds = TrimStartTimeInSeconds;
+                }
+                else if (newEndTime > VideoDurationInSeconds)
+                {
+                    TrimEndTimeInSeconds = VideoDurationInSeconds;
+                }
+                else
+                {
+                    TrimEndTimeInSeconds = newEndTime;
+                }
+            }
+            textBox.Text = SecondsToTimeString(TrimEndTimeInSeconds);
+        }
+
+        #endregion
     }
 }

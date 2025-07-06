@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -36,13 +37,13 @@ namespace UniversalDownloader
 
         private bool IsKnownAudioPlatformLink(string url)
         {
-            return IsSpotifyLink(url) || IsSoundCloudLink(url); 
+            return IsSpotifyLink(url) || IsSoundCloudLink(url);
         }
 
         private async Task ProcessUrlChange(string url, bool isInitialLoad = false)
         {
             if (YouTubeQualityComboBox != null) YouTubeQualityComboBox.ItemsSource = null;
-            if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed; 
+            if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed;
 
             if (string.IsNullOrWhiteSpace(url) || url == "Paste URL here...")
             {
@@ -56,11 +57,11 @@ namespace UniversalDownloader
                 {
                     if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: {YtDlpFileName} dependency check...";
                     await CheckAndEnsureYtDlpExistsAsync();
-                    if (!_isYtDlpReady) 
+                    if (!_isYtDlpReady)
                     {
                         if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: {YtDlpFileName} not available. Platform features disabled.";
                         if (FileNameTextBlock != null) FileNameTextBlock.Text = "Required tool missing.";
-                        return; 
+                        return;
                     }
                 }
             }
@@ -70,7 +71,7 @@ namespace UniversalDownloader
             {
                 if (FileNameTextBlock != null) FileNameTextBlock.Text = "Processing YouTube URL...";
                 if (StatusTextBlock != null) StatusTextBlock.Text = "Status: Fetching YouTube qualities...";
-                await LoadYouTubeQualitiesWithYtDlp(url); 
+                await LoadYouTubeQualitiesWithYtDlp(url);
             }
             else if (IsKnownAudioPlatformLink(url))
             {
@@ -84,7 +85,7 @@ namespace UniversalDownloader
                 if (FileNameTextBlock != null) FileNameTextBlock.Text = "Google Drive link detected.";
                 if (StatusTextBlock != null) StatusTextBlock.Text = "Status: Ready to download Google Drive link.";
             }
-            else 
+            else
             {
                 if (FileNameTextBlock != null) FileNameTextBlock.Text = "Fetching file info...";
                 await TrySetFileNameFromUrlHeaders(url);

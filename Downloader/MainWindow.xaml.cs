@@ -1,16 +1,14 @@
-﻿﻿using System;
+﻿using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-using Newtonsoft.Json.Linq;
 using Ookii.Dialogs.Wpf;
 
 
@@ -18,23 +16,19 @@ namespace UniversalDownloader
 {
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
-        
         private string _selectedDirectory;
         private HttpClient _httpClient;
-        
+
         private bool _isInitializing = false;
         private bool _isProcessingUrl = false;
         private bool _isManagingYtDlp = false;
         private bool _isManagingFfmpeg = false;
         private bool _isDownloadingFile = false;
 
-        private const string SettingsKeyLastDownloadPath = "LastDownloadPath";
-
         private CancellationTokenSource _cancellationTokenSource;
         private Process _currentYtDlpProcess;
 
         public event PropertyChangedEventHandler PropertyChanged;
-
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
@@ -74,7 +68,7 @@ namespace UniversalDownloader
             }
 
             await CheckAndEnsureYtDlpExistsAsync();
-            await CheckAndEnsureFfmpegExistsAsync(); 
+            await CheckAndEnsureFfmpegExistsAsync();
 
             _isInitializing = false;
             UpdateUiElementStates();
@@ -117,91 +111,6 @@ namespace UniversalDownloader
             }
         }
 
-        private string GetSettingsFilePath()
-        {
-            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string appFolder = Path.Combine(appDataPath, "UniversalDownloader");
-            Directory.CreateDirectory(appFolder);
-            return Path.Combine(appFolder, "settings.json");
-        }
-
-        private void LoadSettings()
-        {
-            string settingsFile = GetSettingsFilePath();
-            if (File.Exists(settingsFile))
-            {
-                try
-                {
-                    JObject settings = JObject.Parse(File.ReadAllText(settingsFile));
-                    if (settings.TryGetValue(SettingsKeyLastDownloadPath, out JToken pathToken))
-                    {
-                        string savedPath = pathToken.ToString();
-                        if (Directory.Exists(savedPath)) SelectedDirectory = savedPath;
-                        else SelectedDirectory = null;
-                    }
-                }
-                catch (Exception ex) { Debug.WriteLine($"Error loading settings: {ex.Message}"); SelectedDirectory = null; }
-            }
-        }
-
-        private async Task SaveSettingAsync(string key, string value)
-        {
-            try
-            {
-                string settingsFile = GetSettingsFilePath(); JObject settings;
-                if (File.Exists(settingsFile))
-                {
-                    try
-                    {
-                        string jsonContent = await Task.Run(() => File.ReadAllText(settingsFile));
-                        settings = JObject.Parse(jsonContent);
-                    }
-                    catch { settings = new JObject(); }
-                }
-                else { settings = new JObject(); }
-                settings[key] = value;
-                string outputJson = settings.ToString(Newtonsoft.Json.Formatting.Indented);
-                await Task.Run(() => File.WriteAllText(settingsFile, outputJson));
-                Debug.WriteLine($"Setting '{key}' saved asynchronously.");
-            }
-            catch (Exception ex) { Debug.WriteLine($"Failed to write setting '{key}' asynchronously: {ex.Message}"); }
-        }
-
-        private void SaveSetting(string key, string value)
-        {
-            string settingsFile = GetSettingsFilePath(); JObject settings;
-            if (File.Exists(settingsFile))
-            {
-                try { settings = JObject.Parse(File.ReadAllText(settingsFile)); } catch { settings = new JObject(); }
-            }
-            else { settings = new JObject(); }
-            settings[key] = value;
-            try { File.WriteAllText(settingsFile, settings.ToString(Newtonsoft.Json.Formatting.Indented)); }
-            catch (Exception ex) { Debug.WriteLine($"Failed to write setting '{key}': {ex.Message}"); }
-        }
-
-        private bool IsFirstRunToday(string settingKey)
-        {
-            string settingsFile = GetSettingsFilePath(); JObject settings;
-            if (File.Exists(settingsFile))
-            {
-                try { settings = JObject.Parse(File.ReadAllText(settingsFile)); } catch { settings = new JObject(); }
-            }
-            else { settings = new JObject(); }
-            string lastRunDateKey = $"{settingKey}_LastCheckDate";
-            if (settings.TryGetValue(lastRunDateKey, out JToken lastRunToken))
-            {
-                if (DateTime.TryParse(lastRunToken.ToString(), out DateTime lastRunDate)) { return lastRunDate.Date < DateTime.UtcNow.Date; }
-            }
-            return true;
-        }
-
-        private void SetLastRunTimestamp(string settingKey)
-        {
-            string lastRunDateKey = $"{settingKey}_LastCheckDate";
-            SaveSetting(lastRunDateKey, DateTime.UtcNow.ToString("o"));
-        }
-        
         private void UpdateUiElementStates(string statusMessageUpdate = null)
         {
             Dispatcher.InvokeAsync(() =>
@@ -252,7 +161,6 @@ namespace UniversalDownloader
             return _isInitializing || _isProcessingUrl || _isManagingYtDlp || _isManagingFfmpeg || _isDownloadingFile;
         }
 
-
         private bool CanInitiateDownload()
         {
             if (UrlTextBox == null || string.IsNullOrWhiteSpace(UrlTextBox.Text) || UrlTextBox.Text == "Paste URL here...")
@@ -265,7 +173,7 @@ namespace UniversalDownloader
             }
             return true;
         }
-        
+
         private void UrlTextBox_GotFocus(object sender, RoutedEventArgs e)
         {
             if (UrlTextBox.Text == "Paste URL here...")
@@ -328,7 +236,7 @@ namespace UniversalDownloader
             }
         }
 
-        private void YouTubeQualityComboBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void YouTubeQualityComboBox_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             ComboBox comboBox = sender as ComboBox;
             if (comboBox != null && comboBox.IsEnabled && !comboBox.IsDropDownOpen)
@@ -500,121 +408,6 @@ namespace UniversalDownloader
                 Debug.WriteLine($"Cleaned up temp folder: {tempFolderPath}");
             }
             catch (Exception ex) { Debug.WriteLine($"Error cleaning up temp folder {tempFolderPath}: {ex.Message}"); }
-        }
-
-        #region Custom Slider Logic
-
-        private void Thumb_DragDelta(object sender, DragDeltaEventArgs e)
-        {
-            if (VideoDurationInSeconds <= 0 || SliderTrack.ActualWidth <= 0) return;
-
-            var thumb = sender as Thumb;
-            if (thumb == null) return;
-
-            double secondsPerPixel = VideoDurationInSeconds / SliderTrack.ActualWidth;
-            
-            double timeChange = e.HorizontalChange * secondsPerPixel;
-
-            if (thumb == StartThumb)
-            {
-                double newStartTime = TrimStartTimeInSeconds + timeChange;
-                TrimStartTimeInSeconds = Math.Max(0, Math.Min(newStartTime, TrimEndTimeInSeconds));
-            }
-            else if (thumb == EndThumb)
-            {
-                double newEndTime = TrimEndTimeInSeconds + timeChange;
-                TrimEndTimeInSeconds = Math.Min(VideoDurationInSeconds, Math.Max(newEndTime, TrimStartTimeInSeconds));
-            }
-        }
-
-        
-        private void UpdateCustomSliderVisuals()
-        {
-            if (VideoDurationInSeconds <= 0) return;
-
-            double trackWidth = SliderTrack.ActualWidth;
-            if (trackWidth <= 0) return;
-
-            double startPercent = TrimStartTimeInSeconds / VideoDurationInSeconds;
-            double endPercent = TrimEndTimeInSeconds / VideoDurationInSeconds;
-
-            double startX = startPercent * trackWidth;
-            double endX = endPercent * trackWidth;
-
-            if (StartThumb.ActualWidth > 0)
-            {
-                Canvas.SetLeft(StartThumb, startX - (StartThumb.ActualWidth / 2));
-            }
-            if (EndThumb.ActualWidth > 0)
-            {
-                Canvas.SetLeft(EndThumb, endX - (EndThumb.ActualWidth / 2));
-            }
-            
-            UpdateSliderFill();
-        }
-
-        private void UpdateSliderFill()
-        {
-            
-            double startLeft = Canvas.GetLeft(StartThumb);
-            double endLeft = Canvas.GetLeft(EndThumb);
-            if (double.IsNaN(startLeft) || double.IsNaN(endLeft)) return;
-
-            double left = startLeft + (StartThumb.ActualWidth / 2);
-            double right = endLeft + (EndThumb.ActualWidth / 2);
-            Canvas.SetLeft(SliderFill, left);
-            SliderFill.Width = Math.Max(0, right - left);
-        }
-
-        private void SliderCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            UpdateCustomSliderVisuals();
-        }
-
-        #endregion
-
-
-        private void StartTimeTextBox_LostFocus(object sender, RoutedEventArgs e)
-        {
-            var textBox = sender as TextBox;
-            if (textBox == null) return;
-
-            if (TimeStringToSeconds(textBox.Text, out double newStartTime))
-            {
-                if (newStartTime < 0) newStartTime = 0;
-                if (newStartTime > TrimEndTimeInSeconds)
-                {
-                    TrimStartTimeInSeconds = TrimEndTimeInSeconds;
-                }
-                else
-                {
-                    TrimStartTimeInSeconds = newStartTime;
-                }
-            }
-            textBox.Text = SecondsToTimeString(TrimStartTimeInSeconds);
-        }
-
-        private void EndTimeTextBox_LostFocus(object sender, RoutedEventArgs e)
-        {
-            var textBox = sender as TextBox;
-            if (textBox == null) return;
-
-            if (TimeStringToSeconds(textBox.Text, out double newEndTime))
-            {
-                if (newEndTime < TrimStartTimeInSeconds)
-                {
-                    TrimEndTimeInSeconds = TrimStartTimeInSeconds;
-                }
-                else if (newEndTime > VideoDurationInSeconds)
-                {
-                    TrimEndTimeInSeconds = VideoDurationInSeconds;
-                }
-                else
-                {
-                    TrimEndTimeInSeconds = newEndTime;
-                }
-            }
-            textBox.Text = SecondsToTimeString(TrimEndTimeInSeconds);
         }
     }
 

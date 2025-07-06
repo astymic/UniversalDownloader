@@ -4,17 +4,18 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Forms;
+using System.Windows.Controls;
 
 namespace UniversalDownloader
 {
     public partial class MainWindow
     {
-        private const int WM_NCLBUTTONDBLCLK = 0x00A3; 
-        private const int HTCAPTION = 0x2;            
-        
+        private const int WM_NCLBUTTONDBLCLK = 0x00A3;
+        private const int HTCAPTION = 0x2;
+
         private bool _isManuallyPseudoMaximized = false;
         private Rect _normalWindowBoundsBeforePseudoMaximize;
-        
+
         private Point _startPointMaximizedDrag;
         private double _maximizedWindowWidthForDrag;
 
@@ -85,7 +86,7 @@ namespace UniversalDownloader
                         RestoreFromPseudoMaximize();
                     }
 
-                    Point currentScreenMousePosition = new Point(Control.MousePosition.X, Control.MousePosition.Y);
+                    Point currentScreenMousePosition = new Point(System.Windows.Forms.Control.MousePosition.X, System.Windows.Forms.Control.MousePosition.Y);
                     if (this.ActualWidth > 0 && _maximizedWindowWidthForDrag > 0)
                     {
                         this.Left = currentScreenMousePosition.X - (_startPointMaximizedDrag.X * (this.ActualWidth / _maximizedWindowWidthForDrag));
@@ -162,7 +163,7 @@ namespace UniversalDownloader
             Screen currentScreen = GetScreenFromWindow();
             if (currentScreen != null)
             {
-                
+
                 this.Left = currentScreen.WorkingArea.Left;
                 this.Top = currentScreen.WorkingArea.Top;
                 this.Width = currentScreen.WorkingArea.Width;
@@ -185,7 +186,6 @@ namespace UniversalDownloader
             }
             UpdateMaximizeRestoreButtonAndBorder(true);
         }
-
 
         private void MaximizeRestoreButton_Click(object sender, RoutedEventArgs e)
         {
