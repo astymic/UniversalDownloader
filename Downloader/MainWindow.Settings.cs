@@ -26,10 +26,10 @@ namespace UniversalDownloader
                 try
                 {
                     JObject settings = JObject.Parse(File.ReadAllText(settingsFile));
-                    if (settings.TryGetValue(SettingsKeyLastDownloadPath, out JToken pathToken))
+                    if (settings.TryGetValue(SettingsKeyLastDownloadPath, out JToken? pathToken))
                     {
-                        string savedPath = pathToken.ToString();
-                        if (Directory.Exists(savedPath)) SelectedDirectory = savedPath;
+                        string? savedPath = pathToken?.ToString();
+                        if (savedPath != null && Directory.Exists(savedPath)) SelectedDirectory = savedPath;
                         else SelectedDirectory = null;
                     }
                 }
@@ -82,9 +82,9 @@ namespace UniversalDownloader
             }
             else { settings = new JObject(); }
             string lastRunDateKey = $"{settingKey}_LastCheckDate";
-            if (settings.TryGetValue(lastRunDateKey, out JToken lastRunToken))
+            if (settings.TryGetValue(lastRunDateKey, out JToken? lastRunToken))
             {
-                if (DateTime.TryParse(lastRunToken.ToString(), out DateTime lastRunDate)) { return lastRunDate.Date < DateTime.UtcNow.Date; }
+                if (DateTime.TryParse(lastRunToken?.ToString(), out DateTime lastRunDate)) { return lastRunDate.Date < DateTime.UtcNow.Date; }
             }
             return true;
         }

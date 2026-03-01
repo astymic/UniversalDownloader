@@ -16,7 +16,7 @@ namespace UniversalDownloader
         private bool _isManuallyPseudoMaximized = false;
         private Rect _normalWindowBoundsBeforePseudoMaximize;
 
-        private Point _startPointMaximizedDrag;
+        private System.Windows.Point _startPointMaximizedDrag;
         private double _maximizedWindowWidthForDrag;
 
         private Screen GetScreenFromWindow()
@@ -27,7 +27,7 @@ namespace UniversalDownloader
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
-            HwndSource source = PresentationSource.FromVisual(this) as HwndSource;
+            HwndSource? source = PresentationSource.FromVisual(this) as HwndSource;
             if (source != null)
             {
                 source.AddHook(WndProc);
@@ -86,7 +86,7 @@ namespace UniversalDownloader
                         RestoreFromPseudoMaximize();
                     }
 
-                    Point currentScreenMousePosition = new Point(System.Windows.Forms.Control.MousePosition.X, System.Windows.Forms.Control.MousePosition.Y);
+                    System.Windows.Point currentScreenMousePosition = new System.Windows.Point(System.Windows.Forms.Control.MousePosition.X, System.Windows.Forms.Control.MousePosition.Y);
                     if (this.ActualWidth > 0 && _maximizedWindowWidthForDrag > 0)
                     {
                         this.Left = currentScreenMousePosition.X - (_startPointMaximizedDrag.X * (this.ActualWidth / _maximizedWindowWidthForDrag));
@@ -106,7 +106,7 @@ namespace UniversalDownloader
             }
         }
 
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        private void MinimizeButton_Click(object? sender, RoutedEventArgs e)
         {
             this.WindowState = WindowState.Minimized;
         }
@@ -187,7 +187,7 @@ namespace UniversalDownloader
             UpdateMaximizeRestoreButtonAndBorder(true);
         }
 
-        private void MaximizeRestoreButton_Click(object sender, RoutedEventArgs e)
+        private void MaximizeRestoreButton_Click(object? sender, RoutedEventArgs e)
         {
             if (this.WindowState == WindowState.Maximized)
             {
@@ -208,12 +208,12 @@ namespace UniversalDownloader
             }
         }
 
-        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        private void CloseButton_Click(object? sender, RoutedEventArgs e)
         {
             this.Close();
         }
 
-        private void MainWindow_StateChanged(object sender, EventArgs e)
+        private void MainWindow_StateChanged(object? sender, EventArgs e)
         {
             if (this.WindowState == WindowState.Maximized)
             {

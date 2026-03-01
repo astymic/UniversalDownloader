@@ -5,13 +5,20 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWPF>true</UseWPF>
-
+		<UseWindowsForms>true</UseWindowsForms>
 		<PublishSingleFile>true</PublishSingleFile>
 		<SelfContained>true</SelfContained>
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
 		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
 		<ApplicationIcon>akashi.ico</ApplicationIcon>
+		<CETCompat>false</CETCompat>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<Using Remove="System.Windows.Forms" />
+		<Using Remove="System.Drawing" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<None Remove="akashi.ico" />
 	</ItemGroup>

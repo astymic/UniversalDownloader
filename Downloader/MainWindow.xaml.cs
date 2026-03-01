@@ -2,7 +2,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -10,33 +9,38 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Ookii.Dialogs.Wpf;
-
+using UniversalDownloader.Services;
 
 namespace UniversalDownloader
 {
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
-        private string _selectedDirectory;
-        private HttpClient _httpClient;
+        private string? _selectedDirectory;
+        private readonly DependencyManager _dependencyManager;
+        private readonly DownloadService _downloadService;
 
         private bool _isInitializing = false;
         private bool _isProcessingUrl = false;
-        private bool _isManagingYtDlp = false;
-        private bool _isManagingFfmpeg = false;
         private bool _isDownloadingFile = false;
 
-        private CancellationTokenSource _cancellationTokenSource;
-        private Process _currentYtDlpProcess;
+        private double _videoDurationInSeconds;
+        private double _trimStartTimeInSeconds;
+        private double _trimEndTimeInSeconds;
+        private string _trimStartTimeText = "00:00:00";
+        private string _trimEndTimeText = "00:00:00";
+        private string _maxVideoTimeText = "00:00:00";
+        private bool _isTrimmingEnabled = false;
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        private bool _isDraggingStartThumb = false;
+        private bool _isDraggingEndThumb = false;
+
+        private CancellationTokenSource? _cancellationTokenSource;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            if (propertyName == nameof(TrimStartTimeInSeconds) || propertyName == nameof(TrimEndTimeInSeconds))
-            {
-                Dispatcher.InvokeAsync(UpdateCustomSliderVisuals, DispatcherPriority.Input);
-            }
         }
 
         public MainWindow()
@@ -44,15 +48,51 @@ namespace UniversalDownloader
             InitializeComponent();
             DataContext = this;
 
-            _httpClient = new HttpClient();
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
-            _httpClient.Timeout = TimeSpan.FromMinutes(10);
+            _dependencyManager = new DependencyManager();
+            _dependencyManager.ProgressUpdated += DependencyManager_ProgressUpdated;
+
+            _downloadService = new DownloadService(_dependencyManager);
+            _downloadService.ProgressChanged += DownloadService_ProgressChanged;
+        }
+
+        private void DependencyManager_ProgressUpdated(string status)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (StatusTextBlock != null) StatusTextBlock.Text = status;
+            });
+        }
+
+        private void DownloadService_ProgressChanged(object? sender, DownloadProgressArgs e)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (StatusTextBlock != null && e.StatusMessage != null)
+                {
+                    StatusTextBlock.Text = e.StatusMessage;
+                }
+                
+                if (FileNameTextBlock != null && e.Filename != null)
+                {
+                    FileNameTextBlock.Text = e.Filename;
+                }
+
+                if (DownloadProgressBar != null)
+                {
+                    DownloadProgressBar.IsIndeterminate = e.IsIndeterminate;
+                    if (!e.IsIndeterminate)
+                    {
+                        DownloadProgressBar.Maximum = 100;
+                        DownloadProgressBar.Value = e.Percentage;
+                    }
+                }
+            });
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             _isInitializing = true;
-            UpdateUiElementStates("Status: Initializing...");
+            UpdateUiElementStates("Status: Initializing dependencies silently...");
 
             LoadSettings();
 
@@ -67,19 +107,25 @@ namespace UniversalDownloader
                 UrlTextBox.Foreground = (Brush)FindResource("TextSecondaryBrush");
             }
 
-            await CheckAndEnsureYtDlpExistsAsync();
-            await CheckAndEnsureFfmpegExistsAsync();
+            try
+            {
+                await _dependencyManager.InitializeDependenciesAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to initialize dependencies: {ex.Message}");
+            }
 
             _isInitializing = false;
             UpdateUiElementStates();
 
             if (UrlTextBox != null && !string.IsNullOrWhiteSpace(UrlTextBox.Text) && UrlTextBox.Text != "Paste URL here...")
             {
-                await ProcessUrlChange(UrlTextBox.Text, true);
+                await ProcessUrlChange(UrlTextBox.Text);
             }
             else
             {
-                UpdateUiElementStates(_isYtDlpReady ? "Status: Ready. Paste a URL." : $"Status: {YtDlpFileName} not ready. YouTube features disabled.");
+                UpdateUiElementStates(_dependencyManager.IsYtDlpReady ? "Status: Ready. Paste a URL." : "Status: YouTube features disabled (tool missing).");
             }
         }
 
@@ -111,54 +157,144 @@ namespace UniversalDownloader
             }
         }
 
+        public double VideoDurationInSeconds
+        {
+            get => _videoDurationInSeconds;
+            set { if (_videoDurationInSeconds != value) { _videoDurationInSeconds = value; OnPropertyChanged(nameof(VideoDurationInSeconds)); } }
+        }
+
+        public double TrimStartTimeInSeconds
+        {
+            get => _trimStartTimeInSeconds;
+            set
+            {
+                if (_trimStartTimeInSeconds != value)
+                {
+                    _trimStartTimeInSeconds = value;
+                    OnPropertyChanged(nameof(TrimStartTimeInSeconds));
+                    TrimStartTimeText = SecondsToTimeString(value);
+                }
+            }
+        }
+
+        public double TrimEndTimeInSeconds
+        {
+            get => _trimEndTimeInSeconds;
+            set
+            {
+                if (_trimEndTimeInSeconds != value)
+                {
+                    _trimEndTimeInSeconds = value;
+                    OnPropertyChanged(nameof(TrimEndTimeInSeconds));
+                    TrimEndTimeText = SecondsToTimeString(value);
+                }
+            }
+        }
+
+        public string TrimStartTimeText
+        {
+            get => _trimStartTimeText;
+            set { if (_trimStartTimeText != value) { _trimStartTimeText = value; OnPropertyChanged(nameof(TrimStartTimeText)); if (StartTimeTextBox != null && !StartTimeTextBox.IsFocused) StartTimeTextBox.Text = value; } }
+        }
+
+        public string TrimEndTimeText
+        {
+            get => _trimEndTimeText;
+            set { if (_trimEndTimeText != value) { _trimEndTimeText = value; OnPropertyChanged(nameof(TrimEndTimeText)); if (EndTimeTextBox != null && !EndTimeTextBox.IsFocused) EndTimeTextBox.Text = value; } }
+        }
+
+        public string MaxVideoTimeText
+        {
+            get => _maxVideoTimeText;
+            set { if (_maxVideoTimeText != value) { _maxVideoTimeText = value; OnPropertyChanged(nameof(MaxVideoTimeText)); } }
+        }
+
+        public bool IsTrimmingEnabled
+        {
+            get => _isTrimmingEnabled;
+            set { if (_isTrimmingEnabled != value) { _isTrimmingEnabled = value; OnPropertyChanged(nameof(IsTrimmingEnabled)); } }
+        }
+
+        private string SecondsToTimeString(double totalSeconds)
+        {
+            TimeSpan time = TimeSpan.FromSeconds(Math.Floor(totalSeconds));
+            return time.ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private bool TimeStringToSeconds(string timeString, out double seconds)
+        {
+            if (string.IsNullOrWhiteSpace(timeString))
+            {
+                seconds = 0;
+                return false;
+            }
+
+            if (timeString.Contains(":"))
+            {
+                if (TimeSpan.TryParse(timeString, System.Globalization.CultureInfo.InvariantCulture, out TimeSpan parsedTime))
+                {
+                    seconds = parsedTime.TotalSeconds;
+                    return true;
+                }
+            }
+            else
+            {
+                if (double.TryParse(timeString, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double parsedSeconds))
+                {
+                    seconds = parsedSeconds;
+                    return true;
+                }
+            }
+
+            seconds = 0;
+            return false;
+        }
+
         private void UpdateUiElementStates(string statusMessageUpdate = null)
         {
             Dispatcher.InvokeAsync(() =>
             {
-                bool canBrowse = !_isInitializing && !_isDownloadingFile;
-                bool canInputUrl = !_isInitializing && !_isProcessingUrl && !_isManagingYtDlp && !_isManagingFfmpeg && !_isDownloadingFile;
-                bool canDownloadAction = CanInitiateDownload() && !_isInitializing && !_isProcessingUrl && !_isManagingYtDlp && !_isManagingFfmpeg && !_isDownloadingFile;
+                bool isBusy = _isInitializing || _isProcessingUrl || _isDownloadingFile;
+                bool canBrowse = !isBusy;
+                bool canInputUrl = !isBusy;
+                bool canDownloadAction = CanInitiateDownload() && !isBusy;
 
                 if (UrlTextBox != null) UrlTextBox.IsEnabled = canInputUrl;
                 if (BrowseButton != null) BrowseButton.IsEnabled = canBrowse;
 
                 if (CancelDownloadButton != null)
                 {
-                    CancelDownloadButton.Visibility = (_isDownloadingFile || (_isManagingYtDlp && FileNameTextBlock.Text.Contains("Downloading:")) || _isManagingFfmpeg)
-                                                      ? Visibility.Visible
-                                                      : Visibility.Collapsed;
+                    CancelDownloadButton.Visibility = _isDownloadingFile ? Visibility.Visible : Visibility.Collapsed;
+                }
 
-                    if (DownloadButton != null)
+                if (DownloadButton != null)
+                {
+                    bool youtubeSpecificConditionsMet = true;
+                    if (_downloadService.IsYouTubeLink(UrlTextBox?.Text ?? string.Empty))
                     {
-                        bool youtubeSpecificConditionsMet = true;
-                        if (IsYouTubeLink(UrlTextBox?.Text ?? string.Empty))
-                        {
-                            youtubeSpecificConditionsMet = _isYtDlpReady && (YouTubeQualityComboBox?.SelectedItem != null) && (QualitySection?.Visibility == Visibility.Visible);
-                        }
-                        DownloadButton.IsEnabled = canDownloadAction && youtubeSpecificConditionsMet;
+                        youtubeSpecificConditionsMet = _dependencyManager.IsYtDlpReady && (YouTubeQualityComboBox?.SelectedItem != null) && (QualitySection?.Visibility == Visibility.Visible);
                     }
+                    else if (TrimmingSection != null && TrimmingSection.Visibility == Visibility.Visible)
+                    {
+                        TrimmingSection.Visibility = Visibility.Collapsed;
+                    }
+                    DownloadButton.IsEnabled = canDownloadAction && youtubeSpecificConditionsMet;
                 }
 
                 if (YouTubeQualityComboBox != null)
                 {
-                    YouTubeQualityComboBox.IsEnabled = canInputUrl && _isYtDlpReady && IsYouTubeLink(UrlTextBox?.Text ?? string.Empty) && YouTubeQualityComboBox.HasItems;
+                    YouTubeQualityComboBox.IsEnabled = canInputUrl && _dependencyManager.IsYtDlpReady && _downloadService.IsYouTubeLink(UrlTextBox?.Text ?? string.Empty) && YouTubeQualityComboBox.HasItems;
                 }
 
                 if (statusMessageUpdate != null && StatusTextBlock != null)
                 {
                     StatusTextBlock.Text = statusMessageUpdate;
                 }
-                else if (StatusTextBlock != null && !IsAnyOperationInProgress())
+                else if (StatusTextBlock != null && !isBusy)
                 {
-                    StatusTextBlock.Text = _isYtDlpReady ? "Status: Ready. Paste a URL." : $"Status: {YtDlpFileName} not ready. YouTube features disabled.";
+                    StatusTextBlock.Text = _dependencyManager.IsYtDlpReady ? "Status: Ready. Paste a URL." : "Status: Youtube features disabled.";
                 }
-
             });
-        }
-
-        private bool IsAnyOperationInProgress()
-        {
-            return _isInitializing || _isProcessingUrl || _isManagingYtDlp || _isManagingFfmpeg || _isDownloadingFile;
         }
 
         private bool CanInitiateDownload()
@@ -210,7 +346,7 @@ namespace UniversalDownloader
         private async void UrlTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (YouTubeQualityComboBox == null || StatusTextBlock == null || FileNameTextBlock == null || QualitySection == null) return;
-            if (_isProcessingUrl || _isDownloadingFile || _isManagingYtDlp) return;
+            if (_isProcessingUrl || _isDownloadingFile) return;
 
             _isProcessingUrl = true;
             UpdateUiElementStates("Status: Processing URL...");
@@ -223,11 +359,11 @@ namespace UniversalDownloader
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error during ProcessUrlChange: {ex}");
-                if (StatusTextBlock != null) StatusTextBlock.Text = "Status: Error processing URL.";
-                if (FileNameTextBlock != null) FileNameTextBlock.Text = "";
-                if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed;
+                StatusTextBlock.Text = "Status: Error processing URL.";
+                FileNameTextBlock.Text = "";
+                QualitySection.Visibility = Visibility.Collapsed;
                 if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
-                if (YouTubeQualityComboBox != null) YouTubeQualityComboBox.ItemsSource = null;
+                YouTubeQualityComboBox.ItemsSource = null;
             }
             finally
             {
@@ -235,6 +371,231 @@ namespace UniversalDownloader
                 UpdateUiElementStates();
             }
         }
+
+        private async Task ProcessUrlChange(string url)
+        {
+            YouTubeQualityComboBox.ItemsSource = null;
+            QualitySection.Visibility = Visibility.Collapsed;
+
+            if (string.IsNullOrWhiteSpace(url) || url == "Paste URL here...")
+            {
+                FileNameTextBlock.Text = string.Empty;
+                return;
+            }
+
+            if (_downloadService.IsYouTubeLink(url))
+            {
+                FileNameTextBlock.Text = "Processing YouTube URL...";
+                StatusTextBlock.Text = "Status: Fetching YouTube qualities...";
+                
+                try
+                {
+                    var info = await _downloadService.GetYouTubeInfoAsync(url);
+                    if (info.FormatsJson != null)
+                    {
+                        var qualities = ExtractQualitiesFromYouTubeInfo(info.FormatsJson);
+                        if (qualities.Count > 0)
+                        {
+                            YouTubeQualityComboBox.ItemsSource = qualities;
+                            QualitySection.Visibility = Visibility.Visible;
+                            YouTubeQualityComboBox.SelectedIndex = 0;
+                            StatusTextBlock.Text = "Status: YouTube qualities listed. Select quality to download.";
+
+                            try 
+                            { 
+                                var videoInfo = Newtonsoft.Json.Linq.JObject.Parse(info.FormatsJson);
+                                double? duration = videoInfo["duration"]?.ToObject<double?>();
+                                if (duration.HasValue && duration > 0)
+                                {
+                                    VideoDurationInSeconds = duration.Value;
+                                    TrimStartTimeInSeconds = 0;
+                                    TrimEndTimeInSeconds = duration.Value;
+                                    MaxVideoTimeText = SecondsToTimeString(duration.Value);
+                                    IsTrimmingEnabled = false; 
+                                    if (EnableTrimmingCheckBox != null) EnableTrimmingCheckBox.IsChecked = false;
+                                    if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Visible;
+                                    if (StartTimeTextBox != null) StartTimeTextBox.Text = "00:00:00"; 
+                                    if (EndTimeTextBox != null) EndTimeTextBox.Text = MaxVideoTimeText; 
+                                }
+                            } catch { }
+                        }
+                        else
+                        {
+                            StatusTextBlock.Text = "Status: No downloadable formats could be determined.";
+                            FileNameTextBlock.Text = "No YouTube formats found.";
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    StatusTextBlock.Text = $"Status: {ex.Message}";
+                    FileNameTextBlock.Text = "YouTube Info Error";
+                }
+            }
+            else if (_downloadService.IsKnownAudioPlatformLink(url))
+            {
+                string title = await _downloadService.GetTitleWithYtDlpAsync(url);
+                FileNameTextBlock.Text = title ?? "Audio Platform Item";
+                StatusTextBlock.Text = "Status: Ready to download audio.";
+            }
+            else if (_downloadService.IsGoogleDriveLink(url))
+            {
+                FileNameTextBlock.Text = "Google Drive link detected.";
+                StatusTextBlock.Text = "Status: Ready to download Google Drive link.";
+            }
+            else
+            {
+                FileNameTextBlock.Text = "Direct Link";
+                StatusTextBlock.Text = "Status: Ready to download direct file.";
+            }
+        }
+
+        private System.Collections.Generic.List<YouTubeQualityItem> ExtractQualitiesFromYouTubeInfo(string jsonOutput)
+        {
+             var list = new System.Collections.Generic.List<YouTubeQualityItem>();
+             try
+             {
+                 var videoInfo = Newtonsoft.Json.Linq.JObject.Parse(jsonOutput);
+                 var title = videoInfo["title"]?.ToString() ?? "Unknown Video";
+                 FileNameTextBlock.Text = Utilities.SanitizeFileName(title);
+
+                 list.Add(new YouTubeQualityItem { Label = "Best Video + Best Audio", FormatCode = "bestvideo+bestaudio/best", IsAudioOnly = false, SortPriority = 100 });
+                 list.Add(new YouTubeQualityItem { Label = "Best Audio Only", FormatCode = "bestaudio/best", IsAudioOnly = true, SortPriority = 50 });
+
+                 var formats = videoInfo["formats"] as Newtonsoft.Json.Linq.JArray;
+                 if (formats != null)
+                 {
+                     var uniqueHeights = new System.Collections.Generic.HashSet<int>();
+                     foreach (var format in formats)
+                     {
+                         var vcodec = format["vcodec"]?.ToString();
+                         var acodec = format["acodec"]?.ToString();
+                         var ext = format["ext"]?.ToString();
+                         if (vcodec != "none" && ext == "mp4")
+                         {
+                             int height = format["height"]?.ToObject<int>() ?? 0;
+                             int width = format["width"]?.ToObject<int>() ?? 0;
+                             
+                             if (height >= 360 && uniqueHeights.Add(height))
+                             {
+                                 int maxDim = Math.Max(width, height);
+                                 string label = $"{height}p Quality";
+                                 
+                                 if (maxDim >= 3840) label = "4K Quality";
+                                 else if (maxDim >= 2560) label = "1440p Quality";
+                                 else if (maxDim >= 1920) label = "1080p Quality";
+                                 else if (maxDim >= 1280) label = "720p Quality";
+                                 else if (maxDim >= 854) label = "480p Quality";
+                                 else if (maxDim >= 640) label = "360p Quality";
+                                 
+                                 list.Add(new YouTubeQualityItem 
+                                 { 
+                                     Label = label, 
+                                     FormatCode = $"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}][ext=mp4]/best",
+                                     IsAudioOnly = false, 
+                                     SortPriority = height 
+                                 });
+                             }
+                         }
+                     }
+                 }
+                 list.Sort((x, y) => y.SortPriority.CompareTo(x.SortPriority));
+             } 
+             catch { }
+             return list;
+        }
+
+        private void EnableTrimmingCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
+        {
+            if (EnableTrimmingCheckBox != null)
+            {
+                IsTrimmingEnabled = EnableTrimmingCheckBox.IsChecked == true;
+                if (TrimControlsPanel != null)
+                {
+                    TrimControlsPanel.Visibility = IsTrimmingEnabled ? Visibility.Visible : Visibility.Collapsed;
+                    if (IsTrimmingEnabled) UpdateSliderUI();
+                }
+            }
+        }
+
+        private void SliderCanvas_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateSliderUI();
+
+        private void SliderCanvas_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (SliderCanvas == null || VideoDurationInSeconds <= 0) return;
+            Point clickPoint = e.GetPosition(SliderCanvas);
+            double clickedSeconds = (clickPoint.X / SliderCanvas.ActualWidth) * VideoDurationInSeconds;
+            
+            double distToStart = Math.Abs(clickedSeconds - TrimStartTimeInSeconds);
+            double distToEnd = Math.Abs(clickedSeconds - TrimEndTimeInSeconds);
+
+            if (distToStart < distToEnd) { TrimStartTimeInSeconds = Math.Max(0, Math.Min(clickedSeconds, TrimEndTimeInSeconds - 0.1)); }
+            else { TrimEndTimeInSeconds = Math.Max(TrimStartTimeInSeconds + 0.1, Math.Min(clickedSeconds, VideoDurationInSeconds)); }
+            
+            UpdateSliderUI();
+            e.Handled = true;
+        }
+
+        private void StartThumb_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+        {
+            if (SliderCanvas == null || VideoDurationInSeconds <= 0) return;
+            _isDraggingStartThumb = true;
+            double pixelsPerSecond = SliderCanvas.ActualWidth / VideoDurationInSeconds;
+            double newSeconds = TrimStartTimeInSeconds + (e.HorizontalChange / pixelsPerSecond);
+            TrimStartTimeInSeconds = Math.Max(0, Math.Min(newSeconds, TrimEndTimeInSeconds - 0.1));
+            UpdateSliderUI();
+            _isDraggingStartThumb = false;
+        }
+
+        private void EndThumb_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+        {
+            if (SliderCanvas == null || VideoDurationInSeconds <= 0) return;
+            _isDraggingEndThumb = true;
+            double pixelsPerSecond = SliderCanvas.ActualWidth / VideoDurationInSeconds;
+            double newSeconds = TrimEndTimeInSeconds + (e.HorizontalChange / pixelsPerSecond);
+            TrimEndTimeInSeconds = Math.Max(TrimStartTimeInSeconds + 0.1, Math.Min(newSeconds, VideoDurationInSeconds));
+            UpdateSliderUI();
+            _isDraggingEndThumb = false;
+        }
+
+        private void UpdateSliderUI()
+        {
+            if (SliderCanvas == null || StartThumb == null || EndThumb == null || SliderFill == null || SliderTrack == null) return;
+            if (VideoDurationInSeconds <= 0 || SliderCanvas.ActualWidth <= 0) return;
+
+            SliderTrack.Width = SliderCanvas.ActualWidth;
+            double pixelsPerSecond = SliderCanvas.ActualWidth / VideoDurationInSeconds;
+            
+            double startX = TrimStartTimeInSeconds * pixelsPerSecond;
+            double endX = TrimEndTimeInSeconds * pixelsPerSecond;
+            
+            Canvas.SetLeft(StartThumb, startX);
+            Canvas.SetLeft(EndThumb, endX);
+            
+            Canvas.SetLeft(SliderFill, startX);
+            SliderFill.Width = Math.Max(0, endX - startX);
+        }
+
+        private void TimeTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isDraggingStartThumb || _isDraggingEndThumb) return;
+            TextBox tb = sender as TextBox;
+            if (tb != null && TimeStringToSeconds(tb.Text, out double seconds))
+            {
+                if (tb == StartTimeTextBox && seconds < TrimEndTimeInSeconds) { _trimStartTimeInSeconds = seconds; OnPropertyChanged(nameof(TrimStartTimeInSeconds)); UpdateSliderUI(); }
+                else if (tb == EndTimeTextBox && seconds > TrimStartTimeInSeconds && seconds <= VideoDurationInSeconds) { _trimEndTimeInSeconds = seconds; OnPropertyChanged(nameof(TrimEndTimeInSeconds)); UpdateSliderUI(); }
+            }
+        }
+
+        private void TimeTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            TextBox tb = sender as TextBox;
+            if (tb == StartTimeTextBox) TrimStartTimeText = SecondsToTimeString(TrimStartTimeInSeconds);
+            else if (tb == EndTimeTextBox) TrimEndTimeText = SecondsToTimeString(TrimEndTimeInSeconds);
+        }
+
+        private void TimeTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e) { if (e.Key == System.Windows.Input.Key.Enter) { TimeTextBox_LostFocus(sender, null); e.Handled = true; } }
+
 
         private void YouTubeQualityComboBox_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
@@ -262,91 +623,65 @@ namespace UniversalDownloader
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null || UrlTextBox == null) return;
 
             string url = UrlTextBox.Text;
-            if (!CanInitiateDownload() || (IsYouTubeLink(url) && !IsKnownAudioPlatformLink(url) && YouTubeQualityComboBox.SelectedItem == null))
-            {
-                UpdateUiElementStates("Status: Please enter a valid URL, select directory, and quality (if applicable).");
-                return;
-            }
+            if (!CanInitiateDownload()) return;
 
             _isDownloadingFile = true;
             _cancellationTokenSource = new CancellationTokenSource();
             UpdateUiElementStates("Status: Preparing to download...");
 
-            if (DownloadProgressBar != null)
-            {
-                DownloadProgressBar.Value = 0;
-                DownloadProgressBar.IsIndeterminate = true;
-            }
-
-            string tempDownloadFolderPath = CreateTempDownloadFolder();
-            if (string.IsNullOrEmpty(tempDownloadFolderPath))
-            {
-                _isDownloadingFile = false;
-                UpdateUiElementStates("Status: Could not create temp folder.");
-                return;
-            }
+            DownloadProgressBar.Value = 0;
+            DownloadProgressBar.IsIndeterminate = true;
 
             try
             {
-                if (IsYouTubeLink(url))
+                if (_downloadService.IsYouTubeLink(url))
                 {
-                    if (!_isYtDlpReady)
-                    {
-                        _isDownloadingFile = false;
-                        UpdateUiElementStates($"Status: {YtDlpFileName} is not available. YouTube download aborted.");
-                        return;
-                    }
                     var selectedQuality = YouTubeQualityComboBox.SelectedItem as YouTubeQualityItem;
-                    await DownloadWithYtDlpAsync(url, selectedQuality.FormatCode, tempDownloadFolderPath, _cancellationTokenSource.Token, extractAudio: selectedQuality.IsAudioOnly);
+                    if (selectedQuality != null && selectedQuality.FormatCode != "audio_only")
+                    {
+                        await _downloadService.DownloadWithYtDlpAsync(url, selectedQuality.FormatCode, Downloader.App.AppTempDirectory, SelectedDirectory, selectedQuality.IsAudioOnly, "best", IsTrimmingEnabled, TrimStartTimeInSeconds, TrimEndTimeInSeconds, _cancellationTokenSource.Token);
+                    }
+                    else
+                    {
+                        await _downloadService.DownloadWithYtDlpAsync(url, "bestaudio/best", Downloader.App.AppTempDirectory, SelectedDirectory, true, "mp3", false, 0, 0, _cancellationTokenSource.Token);
+                    }
                 }
-                else if (IsKnownAudioPlatformLink(url))
+                else if (_downloadService.IsKnownAudioPlatformLink(url))
                 {
-                    if (!_isYtDlpReady) { _isDownloadingFile = false; UpdateUiElementStates($"Status: {YtDlpFileName} is not available."); return; }
-                    await DownloadWithYtDlpAsync(url, "bestaudio/best", tempDownloadFolderPath, _cancellationTokenSource.Token, extractAudio: true, audioFormat: "mp3");
+                    await _downloadService.DownloadWithYtDlpAsync(url, "bestaudio/best", Downloader.App.AppTempDirectory, SelectedDirectory, true, "mp3", false, 0, 0, _cancellationTokenSource.Token);
                 }
-                else if (IsGoogleDriveLink(url))
+                else if (_downloadService.IsGoogleDriveLink(url))
                 {
-                    await DownloadGoogleDriveFile(url, tempDownloadFolderPath, _cancellationTokenSource.Token);
+                    string fileId = null;
+                    var matchFileD = System.Text.RegularExpressions.Regex.Match(url, @"/file/d/([a-zA-Z0-9_-]+)");
+                    if (matchFileD.Success) fileId = matchFileD.Groups[1].Value;
+                    string directDownloadUrl = $"https://drive.google.com/uc?export=download&confirm=t&id={fileId}";
+                    await _downloadService.DownloadDirectFileAsync(directDownloadUrl, Downloader.App.AppTempDirectory, SelectedDirectory, _cancellationTokenSource.Token);
                 }
                 else
                 {
-                    await DownloadDirectFile(url, tempDownloadFolderPath, _cancellationTokenSource.Token);
+                    await _downloadService.DownloadDirectFileAsync(url, Downloader.App.AppTempDirectory, SelectedDirectory, _cancellationTokenSource.Token);
                 }
             }
             catch (OperationCanceledException)
             {
-                if (StatusTextBlock != null) StatusTextBlock.Text = "Status: Download canceled by user.";
-                if (FileNameTextBlock != null) FileNameTextBlock.Text = "Download Canceled";
-                Debug.WriteLine("Download operation was canceled.");
+                StatusTextBlock.Text = "Status: Download canceled by user.";
+                // We do NOT change the FileNameTextBlock to "Download Canceled"
+                // so that it doesn't get stuck if they click download again immediately.
             }
             catch (Exception ex)
             {
-                if (StatusTextBlock != null) StatusTextBlock.Text = $"Status: Critical Download Error - {ex.Message.Split('\n')[0]}.";
-                if (FileNameTextBlock != null) FileNameTextBlock.Text = "File: (Download Failed)";
-                Debug.WriteLine($"DownloadButton_Click Critical Error: {ex.ToString()}");
+                StatusTextBlock.Text = $"Status: Error - {ex.Message.Split('\n')[0]}.";
+                FileNameTextBlock.Text = "Download Failed";
             }
             finally
             {
                 _isDownloadingFile = false;
-                _currentYtDlpProcess = null;
                 _cancellationTokenSource?.Dispose();
                 _cancellationTokenSource = null;
 
-                if (DownloadProgressBar != null && DownloadProgressBar.IsIndeterminate) DownloadProgressBar.IsIndeterminate = false;
+                DownloadProgressBar.IsIndeterminate = false;
                 UpdateUiElementStates();
-
-                bool wasMoveError = StatusTextBlock.Text.Contains("File Move Error") || StatusTextBlock.Text.Contains("failed to move");
-                bool wasDownloadError = StatusTextBlock.Text.Contains("Download Failed") || StatusTextBlock.Text.Contains("download aborted") || StatusTextBlock.Text.Contains("download corrupted");
-
-                if (!wasMoveError || wasDownloadError)
-                {
-                    CleanUpTempFolder(tempDownloadFolderPath);
-                }
-                else
-                {
-                    Debug.WriteLine($"Skipping cleanup of {tempDownloadFolderPath} due to potential move error. File might be there.");
-                    if (StatusTextBlock != null) StatusTextBlock.Text += $" File may be in {tempDownloadFolderPath}.";
-                }
             }
         }
 
@@ -356,65 +691,15 @@ namespace UniversalDownloader
             {
                 StatusTextBlock.Text = "Status: Canceling download...";
                 FileNameTextBlock.Text = "Canceling...";
-
                 _cancellationTokenSource?.Cancel();
-
-                if (_currentYtDlpProcess != null && !_currentYtDlpProcess.HasExited)
-                {
-                    try
-                    {
-                        _currentYtDlpProcess.Kill(true);
-                        Debug.WriteLine("yt-dlp process killed for cancellation.");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"Error killing yt-dlp process: {ex.Message}");
-                    }
-                    _currentYtDlpProcess = null;
-                }
             }
-            else if (_isManagingYtDlp && FileNameTextBlock.Text.Contains("Downloading:"))
-            {
-                StatusTextBlock.Text = "Status: Canceling yt-dlp download...";
-                Debug.WriteLine("Cancellation for yt-dlp executable download is not fully implemented via this button yet.");
-            }
-            else if (_isManagingFfmpeg)
-            {
-                StatusTextBlock.Text = "Status: Canceling ffmpeg download...";
-                Debug.WriteLine("Cancellation for ffmpeg executable download is not fully implemented via this button yet.");
-            }
-        }
-
-        private string CreateTempDownloadFolder()
-        {
-            try
-            {
-                string baseTempPath = Path.GetTempPath();
-                string appTempFolder = Path.Combine(baseTempPath, "UniversalDownloader_TempDownloads");
-                Directory.CreateDirectory(appTempFolder);
-                string uniqueDownloadFolder = Path.Combine(appTempFolder, Guid.NewGuid().ToString("N"));
-                Directory.CreateDirectory(uniqueDownloadFolder);
-                return uniqueDownloadFolder;
-            }
-            catch (Exception ex) { Debug.WriteLine($"Error creating temp download folder: {ex.Message}"); return null; }
-        }
-
-        private void CleanUpTempFolder(string tempFolderPath)
-        {
-            if (string.IsNullOrEmpty(tempFolderPath) || !Directory.Exists(tempFolderPath)) return;
-            try
-            {
-                Directory.Delete(tempFolderPath, true);
-                Debug.WriteLine($"Cleaned up temp folder: {tempFolderPath}");
-            }
-            catch (Exception ex) { Debug.WriteLine($"Error cleaning up temp folder {tempFolderPath}: {ex.Message}"); }
         }
     }
 
     public class YouTubeQualityItem
     {
-        public string Label { get; set; }
-        public string FormatCode { get; set; }
+        public required string Label { get; set; }
+        public required string FormatCode { get; set; }
         public bool IsAudioOnly { get; set; }
         public int SortPriority { get; set; }
     }

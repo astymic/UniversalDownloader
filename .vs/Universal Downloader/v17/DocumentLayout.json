@@ -1,34 +1,34 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\",
+  "WorkspaceRootPath": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\universaldownloader\\downloader\\mainwindow.chrome.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.chrome.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\universaldownloader\\downloader\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
-      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\universaldownloader\\downloader\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\chapa\\desktop\\universaldownloader\\downloader\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\universaldownloader\\downloader\\mainwindow.downloads.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.downloads.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\chapa\\desktop\\universaldownloader\\downloader\\utilities.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\utilities.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\universaldownloader\\downloader\\mainwindow.settings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.settings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\universaldownloader\\downloader\\mainwindow.ytdlp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\chapa\\desktop\\universaldownloader\\downloader\\mainwindow.ytdlp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.ytdlp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\raikoben\\source\\repos\\universaldownloader\\downloader\\utilities.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\utilities.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\chapa\\desktop\\universaldownloader\\downloader\\mainwindow.downloads.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.downloads.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\chapa\\desktop\\universaldownloader\\downloader\\mainwindow.settings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.settings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\chapa\\desktop\\universaldownloader\\downloader\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|c:\\users\\chapa\\desktop\\universaldownloader\\downloader\\mainwindow.chrome.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7C4516BD-73FF-4453-B97D-70263B3A4DC3}|Downloader\\Universal Downloader.csproj|solutionrelative:downloader\\mainwindow.chrome.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -38,21 +38,8 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 6,
+          "SelectedChildIndex": 7,
           "Children": [
-            {
-              "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "Utilities.cs",
-              "DocumentMoniker": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\Utilities.cs",
-              "RelativeDocumentMoniker": "Downloader\\Utilities.cs",
-              "ToolTip": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\Utilities.cs",
-              "RelativeToolTip": "Downloader\\Utilities.cs",
-              "ViewState": "AgIAAD8AAAAAAAAAAAAkwGsAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-07-06T09:07:41.373Z",
-              "EditorCaption": ""
-            },
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
@@ -63,80 +50,87 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "MainWindow.YtDlp.cs",
-              "DocumentMoniker": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\MainWindow.YtDlp.cs",
-              "RelativeDocumentMoniker": "Downloader\\MainWindow.YtDlp.cs",
-              "ToolTip": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\MainWindow.YtDlp.cs",
-              "RelativeToolTip": "Downloader\\MainWindow.YtDlp.cs",
-              "ViewState": "AgIAAA4GAAAAAAAAAAAkwCoGAAAJAAAAAAAAAA==",
+              "DocumentIndex": 1,
+              "Title": "Utilities.cs",
+              "DocumentMoniker": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\Utilities.cs",
+              "RelativeDocumentMoniker": "Downloader\\Utilities.cs",
+              "ToolTip": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\Utilities.cs",
+              "RelativeToolTip": "Downloader\\Utilities.cs",
+              "ViewState": "AgIAAFwAAAAAAAAAAAAAABsAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-07-06T09:07:42.142Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-07-06T09:07:41.373Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "MainWindow.YtDlp.cs",
+              "DocumentMoniker": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\MainWindow.YtDlp.cs",
+              "RelativeDocumentMoniker": "Downloader\\MainWindow.YtDlp.cs",
+              "ToolTip": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\MainWindow.YtDlp.cs",
+              "RelativeToolTip": "Downloader\\MainWindow.YtDlp.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAIwAEAAABcAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-06T09:07:42.142Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 4,
               "Title": "MainWindow.Settings.cs",
-              "DocumentMoniker": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\MainWindow.Settings.cs",
+              "DocumentMoniker": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\MainWindow.Settings.cs",
               "RelativeDocumentMoniker": "Downloader\\MainWindow.Settings.cs",
-              "ToolTip": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\MainWindow.Settings.cs",
+              "ToolTip": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\MainWindow.Settings.cs",
               "RelativeToolTip": "Downloader\\MainWindow.Settings.cs",
-              "ViewState": "AgIAAEEAAAAAAAAAAAAIwFEAAAANAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAFEAAAANAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-07-06T09:07:04.168Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-07-06T09:07:04.168Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 3,
               "Title": "MainWindow.Downloads.cs",
-              "DocumentMoniker": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\MainWindow.Downloads.cs",
+              "DocumentMoniker": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\MainWindow.Downloads.cs",
               "RelativeDocumentMoniker": "Downloader\\MainWindow.Downloads.cs",
-              "ToolTip": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\MainWindow.Downloads.cs",
+              "ToolTip": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\MainWindow.Downloads.cs",
               "RelativeToolTip": "Downloader\\MainWindow.Downloads.cs",
-              "ViewState": "AgIAAGEBAAAAAAAAAAAkwIkBAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAkwAEAAAA6AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-07-06T09:06:38.77Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-07-06T09:06:38.77Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "MainWindow.Chrome.cs",
+              "DocumentMoniker": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\MainWindow.Chrome.cs",
+              "RelativeDocumentMoniker": "Downloader\\MainWindow.Chrome.cs",
+              "ToolTip": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\MainWindow.Chrome.cs",
+              "RelativeToolTip": "Downloader\\MainWindow.Chrome.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAGUAAAAUAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-06T09:06:19.381Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "MainWindow.Chrome.cs",
-              "DocumentMoniker": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\MainWindow.Chrome.cs",
-              "RelativeDocumentMoniker": "Downloader\\MainWindow.Chrome.cs",
-              "ToolTip": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\MainWindow.Chrome.cs",
-              "RelativeToolTip": "Downloader\\MainWindow.Chrome.cs",
-              "ViewState": "AgIAAFIAAAAAAAAAAAAAAGUAAAAUAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-07-06T09:06:19.381Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
               "Title": "MainWindow.xaml.cs",
-              "DocumentMoniker": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\MainWindow.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\MainWindow.xaml.cs",
               "RelativeDocumentMoniker": "Downloader\\MainWindow.xaml.cs",
-              "ToolTip": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\MainWindow.xaml.cs",
+              "ToolTip": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\MainWindow.xaml.cs",
               "RelativeToolTip": "Downloader\\MainWindow.xaml.cs",
-              "ViewState": "AgIAAHwBAAAAAAAAAAAkwKQBAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABoAAAAvAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-07-06T09:06:01.302Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 5,
               "Title": "MainWindow.xaml",
-              "DocumentMoniker": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\MainWindow.xaml",
+              "DocumentMoniker": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\MainWindow.xaml",
               "RelativeDocumentMoniker": "Downloader\\MainWindow.xaml",
-              "ToolTip": "C:\\Users\\raikoben\\source\\repos\\UniversalDownloader\\Downloader\\MainWindow.xaml",
+              "ToolTip": "C:\\Users\\chapa\\Desktop\\UniversalDownloader\\Downloader\\MainWindow.xaml",
               "RelativeToolTip": "Downloader\\MainWindow.xaml",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
-              "WhenOpened": "2025-07-06T09:05:56.404Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-07-06T09:05:56.404Z"
             }
           ]
         }
