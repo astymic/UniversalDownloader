@@ -168,7 +168,7 @@ namespace UniversalDownloader.Services
                     tempFileName = GetFileNameFromHeaders(response, url);
                     tempFilePath = Path.Combine(tempDownloadFolder, tempFileName);
                     
-                    ReportProgress("Status: Downloading...", tempFileName, 0, true);
+                    ReportProgress("Downloading...", tempFileName, 0, true);
 
                     long? totalBytes = response.Content.Headers.ContentLength;
                     int lastPercentage = -1;
@@ -195,13 +195,13 @@ namespace UniversalDownloader.Services
                             }
                             else
                             {
-                                ReportProgress($"Status: Downloading ({Utilities.FormatBytesOutput(totalBytesRead)})...", tempFileName, 0, true);
+                                ReportProgress($"Downloading ({Utilities.FormatBytesOutput(totalBytesRead)})...", tempFileName, 0, true);
                             }
                         }
                     }
 
                     CopyToFinalDestinationAndClean(tempDownloadFolder, finalDestinationFolder);
-                    ReportProgress($"Status: Download complete! Saved as '{tempFileName}'", tempFileName, 100, false);
+                    ReportProgress($"Download complete — saved as '{tempFileName}'", tempFileName, 100, false);
                 }
             }
             catch (OperationCanceledException)
@@ -272,7 +272,9 @@ namespace UniversalDownloader.Services
 
             string formatArgument = extractAudio 
                 ? $"--extract-audio --audio-format {audioFormat} --audio-quality 0 -f \"{(string.IsNullOrWhiteSpace(formatSelection) ? "bestaudio/best" : formatSelection)}\""
-                : $"-f \"{formatSelection}\"";
+                // --merge-output-format mp4 ensures the final container is always MP4,
+                // even when yt-dlp picks WebM/VP9 streams (common on Shorts)
+                : $"-f \"{formatSelection}\" --merge-output-format mp4";
 
             string trimArgument = "";
 
@@ -397,7 +399,7 @@ namespace UniversalDownloader.Services
                     string fileName = Path.GetFileName(sourceFile);
                     string destFile = Path.Combine(finalDestinationFolder, fileName);
                     
-                    ReportProgress("Status: Copying file to final destination...", fileName, 100, true);
+                    ReportProgress("Copying to destination...", fileName, 100, true);
                     File.Copy(sourceFile, destFile, true);
                     
                     try { File.Delete(sourceFile); } catch { }
@@ -456,11 +458,11 @@ namespace UniversalDownloader.Services
                 string dlContent = line.Substring(dlLabel.Length).Trim();
                 if (dlContent.StartsWith("Destination:"))
                 {
-                    ReportProgress("Status: Downloading...", null, 0, true);
+                    ReportProgress("Downloading...", null, 0, true);
                 }
                 else if (dlContent.Contains("has already been downloaded"))
                 {
-                    ReportProgress("Status: File already downloaded.", null, 100, false);
+                    ReportProgress("File already downloaded.", null, 100, false);
                 }
                 else
                 {
@@ -483,11 +485,11 @@ namespace UniversalDownloader.Services
             }
             else if (line.StartsWith("[ExtractAudio]"))
             {
-                ReportProgress("Status: Extracting audio...", null, 100, true);
+                ReportProgress("Extracting audio...", null, 100, true);
             }
             else if (line.StartsWith("[Merger]"))
             {
-                ReportProgress("Status: Merging formats...", null, 100, true);
+                ReportProgress("Merging streams...", null, 100, true);
             }
         }
     }

@@ -1,3 +1,24 @@
 *.exe
 bin/
 obj/
+
+# Visual Studio
+.vs/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]uild/
+
+# NuGet
+*.nupkg
+project.lock.json
+packages/

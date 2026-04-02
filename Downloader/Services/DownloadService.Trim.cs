@@ -20,7 +20,7 @@ namespace UniversalDownloader.Services
                 throw new Exception("FFmpeg is required for trimming but is not available.");
             }
 
-            ReportProgress("Status: Trimming video locally...", null, 0, true);
+            ReportProgress("Trimming video...", null, 0, true);
 
             string videoTitle = Path.GetFileNameWithoutExtension(inputFilePath);
             string tempDownloadFolder = Path.GetDirectoryName(inputFilePath) ?? "";
@@ -100,7 +100,7 @@ namespace UniversalDownloader.Services
             var ffmpegErrorOutput = new System.Text.StringBuilder();
             double lastPercentage = 0;
             
-            ReportProgress("Status: Extracting trimmed segment...", tempFileName, 0, false);
+            ReportProgress("Trimming video segment...", tempFileName, 0, false);
             
             using (var process = new Process { StartInfo = psiFfmpeg, EnableRaisingEvents = true })
             {
@@ -157,7 +157,7 @@ namespace UniversalDownloader.Services
             try { File.Move(tempFilePath, finalFilePath, true); } catch (Exception ex) { Debug.WriteLine($"Failed to rename trimmed file: {ex.Message}"); }
 
             CopyToFinalDestinationAndClean(tempDownloadFolder, finalDestinationFolder);
-            ReportProgress($"Status: Trimming complete! Saved as '{finalFileName}'", finalFileName, 100, false);
+            ReportProgress($"Trim complete — saved as '{finalFileName}'", finalFileName, 100, false);
             return true;
         }
     }

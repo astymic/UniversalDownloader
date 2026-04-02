@@ -35,6 +35,7 @@ namespace UniversalDownloader
         private bool _isDraggingEndThumb = false;
 
         private CancellationTokenSource? _cancellationTokenSource;
+        private string _currentItemTitle = "";
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -75,6 +76,7 @@ namespace UniversalDownloader
                 if (FileNameTextBlock != null && e.Filename != null)
                 {
                     FileNameTextBlock.Text = e.Filename;
+                    FileNameTextBlock.Visibility = string.IsNullOrEmpty(e.Filename) ? Visibility.Collapsed : Visibility.Visible;
                 }
 
                 if (DownloadProgressBar != null)
@@ -125,7 +127,7 @@ namespace UniversalDownloader
             }
             else
             {
-                UpdateUiElementStates(_dependencyManager.IsYtDlpReady ? "Status: Ready. Paste a URL." : "Status: YouTube features disabled (tool missing).");
+                UpdateUiElementStates(_dependencyManager.IsYtDlpReady ? "Ready. Paste a URL to get started." : "YouTube features unavailable — yt-dlp missing.");
             }
         }
 
@@ -292,7 +294,7 @@ namespace UniversalDownloader
                 }
                 else if (StatusTextBlock != null && !isBusy)
                 {
-                    StatusTextBlock.Text = _dependencyManager.IsYtDlpReady ? "Status: Ready. Paste a URL." : "Status: Youtube features disabled.";
+                    StatusTextBlock.Text = _dependencyManager.IsYtDlpReady ? "Ready. Paste a URL to get started." : "YouTube features unavailable.";
                 }
             });
         }
@@ -359,8 +361,9 @@ namespace UniversalDownloader
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error during ProcessUrlChange: {ex}");
-                StatusTextBlock.Text = "Status: Error processing URL.";
+                StatusTextBlock.Text = "Error processing URL.";
                 FileNameTextBlock.Text = "";
+                FileNameTextBlock.Visibility = Visibility.Collapsed;
                 QualitySection.Visibility = Visibility.Collapsed;
                 if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
                 YouTubeQualityComboBox.ItemsSource = null;
@@ -379,7 +382,9 @@ namespace UniversalDownloader
 
             if (string.IsNullOrWhiteSpace(url) || url == "Paste URL here...")
             {
-                FileNameTextBlock.Text = string.Empty;
+                if (FileNameTextBlock != null) { FileNameTextBlock.Text = ""; FileNameTextBlock.Visibility = Visibility.Collapsed; }
+                if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
+                if (VideoDurationLabel != null) VideoDurationLabel.Text = "";
                 return;
             }
 
@@ -399,7 +404,7 @@ namespace UniversalDownloader
                             YouTubeQualityComboBox.ItemsSource = qualities;
                             QualitySection.Visibility = Visibility.Visible;
                             YouTubeQualityComboBox.SelectedIndex = 0;
-                            StatusTextBlock.Text = "Status: YouTube qualities listed. Select quality to download.";
+                            StatusTextBlock.Text = "Select a quality and click Start Download.";
 
                             try 
                             { 
@@ -415,38 +420,49 @@ namespace UniversalDownloader
                                     if (EnableTrimmingCheckBox != null) EnableTrimmingCheckBox.IsChecked = false;
                                     if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Visible;
                                     if (StartTimeTextBox != null) StartTimeTextBox.Text = "00:00:00"; 
-                                    if (EndTimeTextBox != null) EndTimeTextBox.Text = MaxVideoTimeText; 
+                                    if (EndTimeTextBox != null) EndTimeTextBox.Text = MaxVideoTimeText;
+                                    // Update duration labels in both sections
+                                    if (VideoDurationLabel != null) VideoDurationLabel.Text = MaxVideoTimeText;
                                 }
                             } catch { }
                         }
                         else
                         {
-                            StatusTextBlock.Text = "Status: No downloadable formats could be determined.";
-                            FileNameTextBlock.Text = "No YouTube formats found.";
+                            StatusTextBlock.Text = "No downloadable formats found.";
+                            FileNameTextBlock.Text = "No formats available";
+                            FileNameTextBlock.Visibility = Visibility.Visible;
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    StatusTextBlock.Text = $"Status: {ex.Message}";
-                    FileNameTextBlock.Text = "YouTube Info Error";
+                    StatusTextBlock.Text = ex.Message;
+                    FileNameTextBlock.Text = "Failed to load video info";
+                    FileNameTextBlock.Visibility = Visibility.Visible;
                 }
             }
             else if (_downloadService.IsKnownAudioPlatformLink(url))
             {
                 string title = await _downloadService.GetTitleWithYtDlpAsync(url);
-                FileNameTextBlock.Text = title ?? "Audio Platform Item";
-                StatusTextBlock.Text = "Status: Ready to download audio.";
+                string audioTitle = title ?? "Audio Platform Item";
+                _currentItemTitle = audioTitle;
+                FileNameTextBlock.Text = audioTitle;
+                FileNameTextBlock.Visibility = Visibility.Visible;
+                StatusTextBlock.Text = "Ready to download audio.";
             }
             else if (_downloadService.IsGoogleDriveLink(url))
             {
-                FileNameTextBlock.Text = "Google Drive link detected.";
-                StatusTextBlock.Text = "Status: Ready to download Google Drive link.";
+                _currentItemTitle = "Google Drive file";
+                FileNameTextBlock.Text = "Google Drive file";
+                FileNameTextBlock.Visibility = Visibility.Visible;
+                StatusTextBlock.Text = "Ready to download from Google Drive.";
             }
             else
             {
-                FileNameTextBlock.Text = "Direct Link";
-                StatusTextBlock.Text = "Status: Ready to download direct file.";
+                _currentItemTitle = "Direct link detected";
+                FileNameTextBlock.Text = "Direct link detected";
+                FileNameTextBlock.Visibility = Visibility.Visible;
+                StatusTextBlock.Text = "Ready to download.";
             }
         }
 
@@ -457,10 +473,25 @@ namespace UniversalDownloader
              {
                  var videoInfo = Newtonsoft.Json.Linq.JObject.Parse(jsonOutput);
                  var title = videoInfo["title"]?.ToString() ?? "Unknown Video";
-                 FileNameTextBlock.Text = Utilities.SanitizeFileName(title);
+                 string sanitizedTitle = Utilities.SanitizeFileName(title);
+                 // Store for restore after cancel
+                 _currentItemTitle = sanitizedTitle;
+                 // Show title in the filename block
+                 FileNameTextBlock.Text = sanitizedTitle;
+                 FileNameTextBlock.Visibility = Visibility.Visible;
+                 // Show shortened title in the quality section header
+                 if (VideoTitleInfoBlock != null)
+                 {
+                     string shortTitle = title.Length > 30 ? title.Substring(0, 27) + "..." : title;
+                     VideoTitleInfoBlock.Text = shortTitle;
+                 }
 
-                 list.Add(new YouTubeQualityItem { Label = "Best Video + Best Audio", FormatCode = "bestvideo+bestaudio/best", IsAudioOnly = false, SortPriority = 100 });
-                 list.Add(new YouTubeQualityItem { Label = "Best Audio Only", FormatCode = "bestaudio/best", IsAudioOnly = true, SortPriority = 50 });
+                 // SortPriority 9999 = always first (above any resolution value)
+                 // Prefer mp4+m4a streams to avoid WebM/VP9 (common on Shorts); --merge-output-format mp4 in DownloadService is the final safety net
+                 list.Add(new YouTubeQualityItem { Label = "Best Video + Best Audio", FormatCode = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 9999 });
+                 // Audio-only options at the bottom
+                 list.Add(new YouTubeQualityItem { Label = "Best Audio Only",   FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "best", SortPriority = 49 });
+                 list.Add(new YouTubeQualityItem { Label = "Download as MP3",    FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "mp3",  SortPriority = 48 });
 
                  var formats = videoInfo["formats"] as Newtonsoft.Json.Linq.JArray;
                  if (formats != null)
@@ -627,7 +658,14 @@ namespace UniversalDownloader
 
             _isDownloadingFile = true;
             _cancellationTokenSource = new CancellationTokenSource();
-            UpdateUiElementStates("Status: Preparing to download...");
+            UpdateUiElementStates("Preparing to download...");
+
+            // Restore the video title in case it was overwritten by a previous cancel
+            if (!string.IsNullOrEmpty(_currentItemTitle))
+            {
+                FileNameTextBlock.Text = _currentItemTitle;
+                FileNameTextBlock.Visibility = Visibility.Visible;
+            }
 
             DownloadProgressBar.Value = 0;
             DownloadProgressBar.IsIndeterminate = true;
@@ -637,9 +675,10 @@ namespace UniversalDownloader
                 if (_downloadService.IsYouTubeLink(url))
                 {
                     var selectedQuality = YouTubeQualityComboBox.SelectedItem as YouTubeQualityItem;
-                    if (selectedQuality != null && selectedQuality.FormatCode != "audio_only")
+                    if (selectedQuality != null)
                     {
-                        await _downloadService.DownloadWithYtDlpAsync(url, selectedQuality.FormatCode, Downloader.App.AppTempDirectory, SelectedDirectory, selectedQuality.IsAudioOnly, "best", IsTrimmingEnabled, TrimStartTimeInSeconds, TrimEndTimeInSeconds, _cancellationTokenSource.Token);
+                        // Each quality item carries its own AudioFormat ("best" = original, "mp3" = convert)
+                        await _downloadService.DownloadWithYtDlpAsync(url, selectedQuality.FormatCode, Downloader.App.AppTempDirectory, SelectedDirectory, selectedQuality.IsAudioOnly, selectedQuality.AudioFormat, IsTrimmingEnabled, TrimStartTimeInSeconds, TrimEndTimeInSeconds, _cancellationTokenSource.Token);
                     }
                     else
                     {
@@ -665,14 +704,13 @@ namespace UniversalDownloader
             }
             catch (OperationCanceledException)
             {
-                StatusTextBlock.Text = "Status: Download canceled by user.";
-                // We do NOT change the FileNameTextBlock to "Download Canceled"
-                // so that it doesn't get stuck if they click download again immediately.
+                StatusTextBlock.Text = "Download canceled.";
             }
             catch (Exception ex)
             {
-                StatusTextBlock.Text = $"Status: Error - {ex.Message.Split('\n')[0]}.";
-                FileNameTextBlock.Text = "Download Failed";
+                StatusTextBlock.Text = $"Error: {ex.Message.Split('\n')[0]}";
+                FileNameTextBlock.Text = "Download failed";
+                FileNameTextBlock.Visibility = Visibility.Visible;
             }
             finally
             {
@@ -689,8 +727,9 @@ namespace UniversalDownloader
         {
             if (_isDownloadingFile)
             {
-                StatusTextBlock.Text = "Status: Canceling download...";
-                FileNameTextBlock.Text = "Canceling...";
+                StatusTextBlock.Text = "Canceling...";
+                FileNameTextBlock.Text = "Canceling download...";
+                FileNameTextBlock.Visibility = Visibility.Visible;
                 _cancellationTokenSource?.Cancel();
             }
         }
@@ -701,6 +740,8 @@ namespace UniversalDownloader
         public required string Label { get; set; }
         public required string FormatCode { get; set; }
         public bool IsAudioOnly { get; set; }
+        /// <summary>yt-dlp --audio-format value: "best" keeps original, "mp3" converts to MP3.</summary>
+        public string AudioFormat { get; set; } = "best";
         public int SortPriority { get; set; }
     }
 }

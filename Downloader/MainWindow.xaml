@@ -32,6 +32,7 @@
         <SolidColorBrush x:Key="PrimaryBrush" Color="#8B5CF6"/> <!-- Vibrant Purple -->
         <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#A78BFA"/>
         <SolidColorBrush x:Key="AccentBrush" Color="#EC4899"/> <!-- Vibrant Pink -->
+        <SolidColorBrush x:Key="SuccessBrush" Color="#22C55E"/> <!-- Green for completed state -->
         
         <!-- Surface and Backgrounds -->
         <SolidColorBrush x:Key="BackgroundBrush" Color="#09090B"/> <!-- Very Dark Gray -->
@@ -381,6 +382,33 @@
             </Setter>
         </Style>
 
+        <!-- ComboBox Item Style with proper hover and selected states -->
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="16,10"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" CornerRadius="8" Margin="4,2">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SurfaceHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#1A8B5CF6"/>
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryHoverBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="ProgressBar" x:Key="ModernProgressBar">
             <Setter Property="Height" Value="6"/>
             <Setter Property="Background" Value="{StaticResource BorderBrush}"/>
@@ -531,7 +559,14 @@
                         <!-- Quality Selection -->
                         <Border x:Name="QualitySection" Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
                             <StackPanel>
-                                <TextBlock Text="VIDEO QUALITY" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="VIDEO QUALITY" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="VideoTitleInfoBlock" Grid.Column="1" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="200" HorizontalAlignment="Right"/>
+                                </Grid>
                                 <ComboBox x:Name="YouTubeQualityComboBox" Style="{StaticResource ModernComboBox}" DisplayMemberPath="Label" SelectedValuePath="FormatCode" SelectionChanged="YouTubeQualityComboBox_SelectionChanged" PreviewMouseLeftButtonDown="YouTubeQualityComboBox_PreviewMouseLeftButtonDown"/>
                             </StackPanel>
                         </Border>
@@ -539,32 +574,51 @@
                         <!-- Trimming Section -->
                         <Border x:Name="TrimmingSection" Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
                             <StackPanel>
-                                <TextBlock Text="TRIMMING" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="TRIMMING" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="VideoDurationLabel" Grid.Column="1" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+                                </Grid>
                                 
-                                <CheckBox x:Name="EnableTrimmingCheckBox" Content="Trim Video" Style="{StaticResource ModernCheckBox}" Margin="0,0,0,24" IsChecked="False" Checked="EnableTrimmingCheckBox_CheckedChanged" Unchecked="EnableTrimmingCheckBox_CheckedChanged"/>
+                                <CheckBox x:Name="EnableTrimmingCheckBox" Content="Enable trim" Style="{StaticResource ModernCheckBox}" Margin="0,0,0,20" IsChecked="False" Checked="EnableTrimmingCheckBox_CheckedChanged" Unchecked="EnableTrimmingCheckBox_CheckedChanged"/>
                                 
                                 <StackPanel x:Name="TrimControlsPanel" Visibility="Collapsed">
-                                    <Canvas x:Name="SliderCanvas" Height="30" Margin="16,0,16,24" SizeChanged="SliderCanvas_SizeChanged" MouseLeftButtonDown="SliderCanvas_MouseLeftButtonDown">
+                                    <!-- Slider with padding -->
+                                    <Canvas x:Name="SliderCanvas" Height="30" Margin="8,0,8,16" SizeChanged="SliderCanvas_SizeChanged" MouseLeftButtonDown="SliderCanvas_MouseLeftButtonDown">
                                         <!-- Track Background -->
                                         <Rectangle x:Name="SliderTrack" Height="6" Fill="{StaticResource BorderBrush}" Canvas.Top="12" RadiusX="3" RadiusY="3" IsHitTestVisible="False"/>
                                         
                                         <!-- Active Range Fill -->
                                         <Rectangle x:Name="SliderFill" Height="6" Fill="{StaticResource PrimaryGradient}" Canvas.Top="12" RadiusX="3" RadiusY="3" IsHitTestVisible="False"/>
                                         
-                                        <!-- Start Thumb (styled as simple circle for now; usually define a style overriding Template) -->
-                                        <Thumb x:Name="StartThumb" Width="16" Height="16" Canvas.Top="7" Style="{StaticResource ModernThumbStyle}" DragDelta="StartThumb_DragDelta" Margin="-8,0,0,0"/>
+                                        <!-- Start Thumb -->
+                                        <Thumb x:Name="StartThumb" Width="18" Height="18" Canvas.Top="6" Style="{StaticResource ModernThumbStyle}" DragDelta="StartThumb_DragDelta" Margin="-9,0,0,0"/>
 
                                         <!-- End Thumb -->
-                                        <Thumb x:Name="EndThumb" Width="16" Height="16" Canvas.Top="7" Style="{StaticResource ModernThumbStyle}" DragDelta="EndThumb_DragDelta" Margin="-8,0,0,0"/>
+                                        <Thumb x:Name="EndThumb" Width="18" Height="18" Canvas.Top="6" Style="{StaticResource ModernThumbStyle}" DragDelta="EndThumb_DragDelta" Margin="-9,0,0,0"/>
                                     </Canvas>
                                     
+                                    <!-- Time inputs with labels -->
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="StartTimeTextBox" Grid.Column="0" Style="{StaticResource TrimTimeTextBox}" HorizontalAlignment="Left" Width="100" Height="70" TextChanged="TimeTextBox_TextChanged" LostFocus="TimeTextBox_LostFocus" KeyDown="TimeTextBox_KeyDown"/>
-                                        <TextBox x:Name="EndTimeTextBox" Grid.Column="1" Style="{StaticResource TrimTimeTextBox}" HorizontalAlignment="Right" Width="100" Height="70" TextChanged="TimeTextBox_TextChanged" LostFocus="TimeTextBox_LostFocus" KeyDown="TimeTextBox_KeyDown"/>
+                                        
+                                        <!-- Start time -->
+                                        <StackPanel Grid.Column="0" HorizontalAlignment="Left">
+                                            <TextBlock Text="START" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,6" HorizontalAlignment="Center"/>
+                                            <TextBox x:Name="StartTimeTextBox" Style="{StaticResource TrimTimeTextBox}" Width="110" Height="44" TextChanged="TimeTextBox_TextChanged" LostFocus="TimeTextBox_LostFocus" KeyDown="TimeTextBox_KeyDown"/>
+                                        </StackPanel>
+                                        
+                                        <!-- End time -->
+                                        <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                            <TextBlock Text="END" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,6" HorizontalAlignment="Center"/>
+                                            <TextBox x:Name="EndTimeTextBox" Style="{StaticResource TrimTimeTextBox}" Width="110" Height="44" TextChanged="TimeTextBox_TextChanged" LostFocus="TimeTextBox_LostFocus" KeyDown="TimeTextBox_KeyDown"/>
+                                        </StackPanel>
                                     </Grid>
                                 </StackPanel>
                                 
@@ -573,32 +627,43 @@
                     </StackPanel>
 
                     <!-- Download Trigger -->
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,40">
-                        <Button x:Name="DownloadButton" Style="{StaticResource ModernButton}" Content="Start Download" Click="DownloadButton_Click" IsEnabled="False" Width="200"/>
-                        <Button x:Name="CancelDownloadButton" Style="{StaticResource MinimalistCancelButton}" Click="CancelDownloadButton_Click" Visibility="Collapsed" Margin="16,0,0,0"/>
-                    </StackPanel>
+                    <Grid HorizontalAlignment="Center" Margin="0,0,0,40">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="DownloadButton" Grid.Column="0" Style="{StaticResource ModernButton}" Content="Start Download" Click="DownloadButton_Click" IsEnabled="False" Width="200" Height="46"/>
+                        <Button x:Name="CancelDownloadButton" Grid.Column="1" Style="{StaticResource MinimalistCancelButton}" Click="CancelDownloadButton_Click" Visibility="Collapsed" Margin="12,0,0,0" Height="46" Width="46"/>
+                    </Grid>
 
                     <!-- Status Display -->
-                    <Border Background="{StaticResource GlassGradient}" 
+                    <Border x:Name="StatusPanel"
+                            Background="{StaticResource GlassGradient}" 
                             CornerRadius="16" 
-                            Padding="24"
+                            Padding="28,24"
                             BorderThickness="1"
                             BorderBrush="{StaticResource BorderBrush}">
                         <StackPanel>
+                            <!-- File name / title -->
                             <TextBlock x:Name="FileNameTextBlock" 
-                                       Text="Awaiting input..." 
-                                       FontWeight="Medium" 
-                                       FontSize="16" 
+                                       Text="" 
+                                       FontWeight="SemiBold" 
+                                       FontSize="15" 
                                        Foreground="{StaticResource TextPrimaryBrush}" 
-                                       TextAlignment="Center" 
-                                       Margin="0,0,0,16"/>
+                                       TextAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       Margin="0,0,0,14"
+                                       Visibility="Collapsed"/>
                                        
-                            <ProgressBar x:Name="DownloadProgressBar" Style="{StaticResource ModernProgressBar}" Margin="0,0,0,16"/>
+                            <!-- Progress bar -->
+                            <ProgressBar x:Name="DownloadProgressBar" Style="{StaticResource ModernProgressBar}" Margin="0,0,0,12"/>
 
+                            <!-- Status message -->
                             <TextBlock x:Name="StatusTextBlock" 
-                                       Text="Ready." 
+                                       Text="Ready to download. Paste a URL above." 
                                        Foreground="{StaticResource TextSecondaryBrush}" 
                                        TextAlignment="Center" 
+                                       TextWrapping="Wrap"
                                        FontSize="13"/>
                         </StackPanel>
                     </Border>
