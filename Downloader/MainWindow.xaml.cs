@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -36,6 +38,8 @@ namespace UniversalDownloader
 
         private CancellationTokenSource? _cancellationTokenSource;
         private string _currentItemTitle = "";
+        private ObservableCollection<PlaylistVideoItem> _playlistItems = new ObservableCollection<PlaylistVideoItem>();
+        private bool _isPlaylistMode = false;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -379,6 +383,10 @@ namespace UniversalDownloader
         {
             YouTubeQualityComboBox.ItemsSource = null;
             QualitySection.Visibility = Visibility.Collapsed;
+            // Reset playlist section
+            _isPlaylistMode = false;
+            _playlistItems.Clear();
+            if (FindName("PlaylistSection") is Border playlistBorder) playlistBorder.Visibility = Visibility.Collapsed;
 
             if (string.IsNullOrWhiteSpace(url) || url == "Paste URL here...")
             {
@@ -386,6 +394,89 @@ namespace UniversalDownloader
                 if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
                 if (VideoDurationLabel != null) VideoDurationLabel.Text = "";
                 return;
+            }
+
+            // ── Playlist check FIRST (before single video) ──
+            if (_downloadService.IsYouTubePlaylistLink(url))
+            {
+                FileNameTextBlock.Text = "Loading playlist...";
+                FileNameTextBlock.Visibility = Visibility.Visible;
+                StatusTextBlock.Text = "Fetching playlist info...";
+
+                try
+                {
+                    string? playlistJson = await _downloadService.GetPlaylistInfoAsync(url);
+                    if (playlistJson != null)
+                    {
+                        var playlistInfo = Newtonsoft.Json.Linq.JObject.Parse(playlistJson);
+                        string playlistTitle = playlistInfo["title"]?.ToString() ?? "Unknown Playlist";
+                        var entries = playlistInfo["entries"] as Newtonsoft.Json.Linq.JArray;
+
+                        if (entries != null && entries.Count > 0)
+                        {
+                            _currentItemTitle = playlistTitle;
+                            FileNameTextBlock.Text = playlistTitle;
+                            FileNameTextBlock.Visibility = Visibility.Visible;
+
+                            // Build default quality list for playlist items
+                            var defaultQualities = GetDefaultQualities();
+
+                            _playlistItems.Clear();
+                            int index = 0;
+                            foreach (var entry in entries)
+                            {
+                                index++;
+                                string videoId = entry["id"]?.ToString() ?? "";
+                                string videoTitle = entry["title"]?.ToString() ?? $"Video {index}";
+                                double? duration = entry["duration"]?.ToObject<double?>();
+                                string durationText = duration.HasValue ? SecondsToTimeString(duration.Value) : "";
+
+                                var item = new PlaylistVideoItem
+                                {
+                                    IsSelected = true,
+                                    Title = videoTitle,
+                                    VideoUrl = $"https://www.youtube.com/watch?v={videoId}",
+                                    DurationText = durationText,
+                                    AvailableQualities = new List<YouTubeQualityItem>(defaultQualities),
+                                    SelectedQualityIndex = 0
+                                };
+                                _playlistItems.Add(item);
+                            }
+
+                            // Show playlist section, hide single-video sections
+                            _isPlaylistMode = true;
+                            QualitySection.Visibility = Visibility.Collapsed;
+                            if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
+
+                            if (FindName("PlaylistSection") is Border plBorder)
+                            {
+                                plBorder.Visibility = Visibility.Visible;
+                            }
+                            if (FindName("PlaylistTitleLabel") is TextBlock plTitle)
+                            {
+                                string shortPl = playlistTitle.Length > 35 ? playlistTitle.Substring(0, 32) + "..." : playlistTitle;
+                                plTitle.Text = shortPl;
+                            }
+                            if (FindName("PlaylistCountLabel") is TextBlock plCount)
+                            {
+                                plCount.Text = $"{_playlistItems.Count} videos";
+                            }
+                            if (FindName("PlaylistItemsControl") is ItemsControl plItems)
+                            {
+                                plItems.ItemsSource = _playlistItems;
+                            }
+
+                            StatusTextBlock.Text = $"Playlist loaded — {_playlistItems.Count} videos. Select items and click Start Download.";
+                            return;
+                        }
+                    }
+                    // Fallback: not a real playlist, treat as single video
+                    StatusTextBlock.Text = "Could not parse playlist. Trying as single video...";
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Playlist parse error: {ex.Message}");
+                }
             }
 
             if (_downloadService.IsYouTubeLink(url))
@@ -487,8 +578,8 @@ namespace UniversalDownloader
                  }
 
                  // SortPriority 9999 = always first (above any resolution value)
-                 // Prefer mp4+m4a streams to avoid WebM/VP9 (common on Shorts); --merge-output-format mp4 in DownloadService is the final safety net
-                 list.Add(new YouTubeQualityItem { Label = "Best Video + Best Audio", FormatCode = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 9999 });
+                 // No [ext=] filter — let yt-dlp pick the absolute best quality stream; --merge-output-format mp4 handles the container
+                 list.Add(new YouTubeQualityItem { Label = "Best Video + Best Audio", FormatCode = "bestvideo+bestaudio/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 9999 });
                  // Audio-only options at the bottom
                  list.Add(new YouTubeQualityItem { Label = "Best Audio Only",   FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "best", SortPriority = 49 });
                  list.Add(new YouTubeQualityItem { Label = "Download as MP3",    FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "mp3",  SortPriority = 48 });
@@ -500,9 +591,8 @@ namespace UniversalDownloader
                      foreach (var format in formats)
                      {
                          var vcodec = format["vcodec"]?.ToString();
-                         var acodec = format["acodec"]?.ToString();
-                         var ext = format["ext"]?.ToString();
-                         if (vcodec != "none" && ext == "mp4")
+                         // Accept ANY video stream regardless of container — --merge-output-format mp4 handles remux
+                         if (vcodec != null && vcodec != "none")
                          {
                              int height = format["height"]?.ToObject<int>() ?? 0;
                              int width = format["width"]?.ToObject<int>() ?? 0;
@@ -519,10 +609,11 @@ namespace UniversalDownloader
                                  else if (maxDim >= 854) label = "480p Quality";
                                  else if (maxDim >= 640) label = "360p Quality";
                                  
+                                 // No [ext=] filter — let yt-dlp pick the best codec; --merge-output-format mp4 ensures the final output is MP4
                                  list.Add(new YouTubeQualityItem 
                                  { 
                                      Label = label, 
-                                     FormatCode = $"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}][ext=mp4]/best",
+                                     FormatCode = $"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best",
                                      IsAudioOnly = false, 
                                      SortPriority = height 
                                  });
@@ -672,7 +763,47 @@ namespace UniversalDownloader
 
             try
             {
-                if (_downloadService.IsYouTubeLink(url))
+                // ── Playlist download mode ──
+                if (_isPlaylistMode && _playlistItems.Count > 0)
+                {
+                    var selectedItems = new List<PlaylistVideoItem>();
+                    foreach (var item in _playlistItems)
+                    {
+                        if (item.IsSelected) selectedItems.Add(item);
+                    }
+
+                    if (selectedItems.Count == 0)
+                    {
+                        StatusTextBlock.Text = "No videos selected. Check at least one item.";
+                        return;
+                    }
+
+                    for (int i = 0; i < selectedItems.Count; i++)
+                    {
+                        _cancellationTokenSource.Token.ThrowIfCancellationRequested();
+
+                        var plItem = selectedItems[i];
+                        var quality = plItem.AvailableQualities[plItem.SelectedQualityIndex];
+
+                        _currentItemTitle = plItem.Title;
+                        FileNameTextBlock.Text = $"[{i + 1}/{selectedItems.Count}] {plItem.Title}";
+                        FileNameTextBlock.Visibility = Visibility.Visible;
+                        StatusTextBlock.Text = $"Downloading {i + 1} of {selectedItems.Count}...";
+                        DownloadProgressBar.Value = 0;
+                        DownloadProgressBar.IsIndeterminate = true;
+
+                        await _downloadService.DownloadWithYtDlpAsync(
+                            plItem.VideoUrl, quality.FormatCode,
+                            Downloader.App.AppTempDirectory, SelectedDirectory,
+                            quality.IsAudioOnly, quality.AudioFormat,
+                            false, 0, 0, _cancellationTokenSource.Token);
+                    }
+
+                    StatusTextBlock.Text = $"Playlist complete — {selectedItems.Count} videos downloaded.";
+                    FileNameTextBlock.Text = _currentItemTitle;
+                }
+                // ── Single video download mode ──
+                else if (_downloadService.IsYouTubeLink(url))
                 {
                     var selectedQuality = YouTubeQualityComboBox.SelectedItem as YouTubeQualityItem;
                     if (selectedQuality != null)
@@ -733,6 +864,31 @@ namespace UniversalDownloader
                 _cancellationTokenSource?.Cancel();
             }
         }
+        private void PlaylistSelectAll_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var item in _playlistItems) item.IsSelected = true;
+        }
+
+        private void PlaylistDeselectAll_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var item in _playlistItems) item.IsSelected = false;
+        }
+
+        /// <summary>Returns the default quality preset list used for each playlist item.</summary>
+        private List<YouTubeQualityItem> GetDefaultQualities()
+        {
+            return new List<YouTubeQualityItem>
+            {
+                new YouTubeQualityItem { Label = "Best Video + Audio", FormatCode = "bestvideo+bestaudio/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 9999 },
+                new YouTubeQualityItem { Label = "4K", FormatCode = "bestvideo[height<=2160]+bestaudio/best[height<=2160]/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 2160 },
+                new YouTubeQualityItem { Label = "1440p", FormatCode = "bestvideo[height<=1440]+bestaudio/best[height<=1440]/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 1440 },
+                new YouTubeQualityItem { Label = "1080p", FormatCode = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 1080 },
+                new YouTubeQualityItem { Label = "720p", FormatCode = "bestvideo[height<=720]+bestaudio/best[height<=720]/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 720 },
+                new YouTubeQualityItem { Label = "480p", FormatCode = "bestvideo[height<=480]+bestaudio/best[height<=480]/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 480 },
+                new YouTubeQualityItem { Label = "Best Audio", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "best", SortPriority = 49 },
+                new YouTubeQualityItem { Label = "MP3", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "mp3", SortPriority = 48 },
+            };
+        }
     }
 
     public class YouTubeQualityItem
@@ -743,5 +899,31 @@ namespace UniversalDownloader
         /// <summary>yt-dlp --audio-format value: "best" keeps original, "mp3" converts to MP3.</summary>
         public string AudioFormat { get; set; } = "best";
         public int SortPriority { get; set; }
+    }
+
+    public class PlaylistVideoItem : INotifyPropertyChanged
+    {
+        private bool _isSelected = true;
+        private int _selectedQualityIndex = 0;
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { _isSelected = value; OnPropertyChanged(nameof(IsSelected)); }
+        }
+
+        public string Title { get; set; } = "";
+        public string VideoUrl { get; set; } = "";
+        public string DurationText { get; set; } = "";
+        public List<YouTubeQualityItem> AvailableQualities { get; set; } = new();
+
+        public int SelectedQualityIndex
+        {
+            get => _selectedQualityIndex;
+            set { _selectedQualityIndex = value; OnPropertyChanged(nameof(SelectedQualityIndex)); }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 }

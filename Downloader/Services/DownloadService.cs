@@ -49,6 +49,13 @@ namespace UniversalDownloader.Services
             return Regex.IsMatch(url, @"(youtube\.com\/(watch\?v=|embed\/|shorts\/)|youtu\.be\/)", RegexOptions.IgnoreCase);
         }
 
+        public bool IsYouTubePlaylistLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            // Only match pure playlist pages, NOT single videos that happen to have ?list= context
+            return Regex.IsMatch(url, @"youtube\.com\/playlist\?list=", RegexOptions.IgnoreCase);
+        }
+
         public bool IsGoogleDriveLink(string url)
         {
             if (string.IsNullOrWhiteSpace(url)) return false;
@@ -115,7 +122,7 @@ namespace UniversalDownloader.Services
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
                     FileName = _dependencyManager.YtDlpExecutablePath,
-                    Arguments = $"-J --no-warnings --ignore-config --flat-playlist \"{url}\"",
+                    Arguments = $"-J --no-warnings --ignore-config --no-playlist \"{url}\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -147,6 +154,48 @@ namespace UniversalDownloader.Services
             catch (Exception ex)
             {
                 throw new Exception($"Error getting YouTube info: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Fetches playlist metadata using yt-dlp --flat-playlist -J.
+        /// Returns the raw JSON string containing playlist title and entries.
+        /// </summary>
+        public async Task<string?> GetPlaylistInfoAsync(string url)
+        {
+            if (!_dependencyManager.IsYtDlpReady) return null;
+
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = _dependencyManager.YtDlpExecutablePath,
+                    Arguments = $"--flat-playlist -J --no-warnings --ignore-config \"{url}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = System.Text.Encoding.UTF8,
+                    StandardErrorEncoding = System.Text.Encoding.UTF8
+                };
+                psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+
+                using (Process process = Process.Start(psi))
+                {
+                    string jsonOutput = await process.StandardOutput.ReadToEndAsync();
+                    await process.WaitForExitAsync();
+
+                    if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(jsonOutput))
+                    {
+                        return null;
+                    }
+                    return jsonOutput;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error fetching playlist info: {ex.Message}");
+                return null;
             }
         }
 
@@ -278,7 +327,7 @@ namespace UniversalDownloader.Services
 
             string trimArgument = "";
 
-            string arguments = $"-o \"{outputTemplate}\" {formatArgument} {trimArgument} --no-continue --progress --newline --no-warnings --ignore-config \"{url}\"";
+            string arguments = $"-o \"{outputTemplate}\" {formatArgument} {trimArgument} --no-playlist --no-continue --progress --newline --no-warnings --ignore-config \"{url}\"";
 
             ProcessStartInfo psi = new ProcessStartInfo
             {

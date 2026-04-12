@@ -571,6 +571,72 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Playlist Section (only visible for playlist URLs) -->
+                        <Border x:Name="PlaylistSection" Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
+                            <StackPanel>
+                                <!-- Header row -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="PLAYLIST" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="PlaylistTitleLabel" Grid.Column="1" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="12,0,12,0" HorizontalAlignment="Left"/>
+                                    <TextBlock x:Name="PlaylistCountLabel" Grid.Column="2" Foreground="{StaticResource PrimaryBrush}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <!-- Quick buttons -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                    <Button Content="Select All" Style="{StaticResource SecondaryButton}" Click="PlaylistSelectAll_Click" Padding="14,6" FontSize="12" Margin="0,0,8,0"/>
+                                    <Button Content="Deselect All" Style="{StaticResource SecondaryButton}" Click="PlaylistDeselectAll_Click" Padding="14,6" FontSize="12"/>
+                                </StackPanel>
+
+                                <!-- Scrollable item list -->
+                                <ScrollViewer MaxHeight="350" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsControl x:Name="PlaylistItemsControl">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#0DFFFFFF" CornerRadius="8" Padding="12,10" Margin="0,0,0,6" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <!-- Checkbox -->
+                                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" VerticalAlignment="Center" Margin="0,0,10,0" Padding="0"/>
+
+                                                        <!-- Title -->
+                                                        <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0"/>
+
+                                                        <!-- Duration -->
+                                                        <TextBlock Grid.Column="2" Text="{Binding DurationText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="50" TextAlignment="Right"/>
+
+                                                        <!-- Quality selector -->
+                                                        <ComboBox Grid.Column="3" 
+                                                                  ItemsSource="{Binding AvailableQualities}" 
+                                                                  SelectedIndex="{Binding SelectedQualityIndex, Mode=TwoWay}" 
+                                                                  DisplayMemberPath="Label"
+                                                                  Style="{StaticResource ModernComboBox}" 
+                                                                  Width="150" 
+                                                                  Padding="8,6"
+                                                                  FontSize="12"
+                                                                  MaxDropDownHeight="200"
+                                                                  VerticalAlignment="Center"
+                                                                  PreviewMouseLeftButtonDown="YouTubeQualityComboBox_PreviewMouseLeftButtonDown"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </StackPanel>
+                        </Border>
+
+
                         <!-- Trimming Section -->
                         <Border x:Name="TrimmingSection" Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
                             <StackPanel>
