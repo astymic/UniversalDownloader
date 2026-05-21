@@ -397,7 +397,85 @@ namespace UniversalDownloader
             }
 
             // ── Playlist check FIRST (before single video) ──
-            if (_downloadService.IsYouTubePlaylistLink(url))
+            if (_downloadService.IsSpotifyPlaylistOrAlbumLink(url))
+            {
+                FileNameTextBlock.Text = "Loading Spotify playlist...";
+                FileNameTextBlock.Visibility = Visibility.Visible;
+                StatusTextBlock.Text = "Fetching Spotify track list...";
+
+                try
+                {
+                    var plMetadata = await _downloadService.GetSpotifyPlaylistMetadataAsync(url, _spotifyUserToken, _spotifyClientId, _spotifyClientSecret);
+                    if (plMetadata != null && plMetadata.Tracks.Count > 0)
+                    {
+                        _currentItemTitle = plMetadata.Name;
+                        FileNameTextBlock.Text = plMetadata.Name;
+                        FileNameTextBlock.Visibility = Visibility.Visible;
+
+                        var defaultQualities = GetDefaultQualities();
+
+                        _playlistItems.Clear();
+                        foreach (var track in plMetadata.Tracks)
+                        {
+                            var item = new PlaylistVideoItem
+                            {
+                                IsSelected = true,
+                                Title = $"{track.Artist} - {track.Title}",
+                                VideoUrl = track.Uri, // e.g., "spotify:track:..."
+                                DurationText = "",
+                                AvailableQualities = new List<YouTubeQualityItem>(defaultQualities),
+                                SelectedQualityIndex = 7 // Default to MP3
+                            };
+                            _playlistItems.Add(item);
+                        }
+
+                        // Show playlist section, hide single-video sections
+                        _isPlaylistMode = true;
+                        QualitySection.Visibility = Visibility.Collapsed;
+                        if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
+
+                        if (FindName("PlaylistSection") is Border plBorder)
+                        {
+                            plBorder.Visibility = Visibility.Visible;
+                        }
+                        if (FindName("PlaylistTitleLabel") is TextBlock plTitle)
+                        {
+                            string shortPl = plMetadata.Name.Length > 35 ? plMetadata.Name.Substring(0, 32) + "..." : plMetadata.Name;
+                            plTitle.Text = shortPl;
+                        }
+                        if (FindName("PlaylistCountLabel") is TextBlock plCount)
+                        {
+                            plCount.Text = $"{_playlistItems.Count} tracks";
+                        }
+                        if (FindName("PlaylistItemsControl") is ItemsControl plItems)
+                        {
+                            plItems.ItemsSource = _playlistItems;
+                        }
+
+                        if (_playlistItems.Count == 100 && string.IsNullOrEmpty(_spotifyUserToken) && (string.IsNullOrEmpty(_spotifyClientId) || string.IsNullOrEmpty(_spotifyClientSecret)))
+                        {
+                            StatusTextBlock.Text = "Playlist loaded (limit 100). Connect Spotify in Settings to bypass the limit!";
+                        }
+                        else
+                        {
+                            StatusTextBlock.Text = $"Spotify playlist loaded — {_playlistItems.Count} tracks. Select items and click Start Download.";
+                        }
+                        return;
+                    }
+                    else
+                    {
+                        StatusTextBlock.Text = "Could not load Spotify playlist or album tracks.";
+                        FileNameTextBlock.Text = "Failed to load Spotify items";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Spotify playlist parse error: {ex.Message}");
+                    StatusTextBlock.Text = $"Error parsing Spotify playlist: {ex.Message}";
+                }
+                return;
+            }
+            else if (_downloadService.IsYouTubePlaylistLink(url))
             {
                 FileNameTextBlock.Text = "Loading playlist...";
                 FileNameTextBlock.Visibility = Visibility.Visible;
@@ -828,11 +906,28 @@ namespace UniversalDownloader
                         DownloadProgressBar.Value = 0;
                         DownloadProgressBar.IsIndeterminate = true;
 
-                        await _downloadService.DownloadWithYtDlpAsync(
-                            plItem.VideoUrl, quality.FormatCode,
-                            Downloader.App.AppTempDirectory, SelectedDirectory,
-                            quality.IsAudioOnly, quality.AudioFormat,
-                            false, 0, 0, _cancellationTokenSource.Token);
+                        string downloadUrl = plItem.VideoUrl;
+                        string? overrideName = null;
+                        if (downloadUrl.StartsWith("spotify:", StringComparison.OrdinalIgnoreCase) || downloadUrl.Contains("open.spotify.com"))
+                        {
+                            string cleanTitle = plItem.Title.Replace("\"", "").Replace("'", "");
+                            downloadUrl = $"ytsearch1:{cleanTitle}";
+                            overrideName = plItem.Title;
+                        }
+
+                        _downloadService.ProgressPrefix = $"[{i + 1}/{selectedItems.Count}]";
+                        try
+                        {
+                            await _downloadService.DownloadWithYtDlpAsync(
+                                downloadUrl, quality.FormatCode,
+                                Downloader.App.AppTempDirectory, SelectedDirectory,
+                                quality.IsAudioOnly, quality.AudioFormat,
+                                false, 0, 0, _cancellationTokenSource.Token, overrideName);
+                        }
+                        finally
+                        {
+                            _downloadService.ProgressPrefix = null;
+                        }
                     }
 
                     StatusTextBlock.Text = $"Playlist complete — {selectedItems.Count} videos downloaded.";

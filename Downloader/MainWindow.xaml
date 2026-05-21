@@ -1,4 +1,4 @@
-﻿<Window x:Class="UniversalDownloader.MainWindow"
+<Window x:Class="UniversalDownloader.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -500,48 +500,259 @@
                         <TextBlock Text="Universal Downloader" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button x:Name="SettingsButton" Content="&#xE713;" Style="{StaticResource WindowControlButton}" Click="SettingsButton_Click" ToolTip="Settings"/>
                         <Button x:Name="MinimizeButton" Content="&#xE921;" Style="{StaticResource WindowControlButton}" Click="MinimizeButton_Click" ToolTip="Minimize"/>
                         <Button x:Name="MaximizeRestoreButton" Content="&#xE922;" Style="{StaticResource WindowControlButton}" Click="MaximizeRestoreButton_Click" ToolTip="Maximize"/>
                         <Button x:Name="CloseButton" Content="&#xE8BB;" Style="{StaticResource WindowCloseButton}" Click="CloseButton_Click" ToolTip="Close"/>
                     </StackPanel>
                 </Grid>
             </Border>
-
             <!-- Main Content Area -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Margin="40,20,40,40" MaxWidth="680">
-                    
-                    <!-- Header -->
-                    <TextBlock Text="Download Everything." 
-                               FontSize="42" 
-                               FontWeight="Bold" 
-                               Foreground="{StaticResource TextPrimaryBrush}" 
-                               TextAlignment="Center" 
-                               Margin="0,0,0,8"/>
-                    <TextBlock Text="Paste a URL from YouTube, Drive, Spotify, or any direct file." 
-                               Foreground="{StaticResource TextSecondaryBrush}" 
-                               FontSize="16" 
-                               TextAlignment="Center" 
-                               Margin="0,0,0,50"/>
+            <Grid Grid.Row="1">
+                <!-- Main Downloader View -->
+                <ScrollViewer x:Name="MainScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Visible">
+                    <StackPanel Margin="40,20,40,40" MaxWidth="680">
+                        
+                        <!-- Header -->
+                        <TextBlock Text="Download Everything." 
+                                   FontSize="42" 
+                                   FontWeight="Bold" 
+                                   Foreground="{StaticResource TextPrimaryBrush}" 
+                                   TextAlignment="Center" 
+                                   Margin="0,0,0,8"/>
+                        <TextBlock Text="Paste a URL from YouTube, Drive, Spotify, or any direct file." 
+                                   Foreground="{StaticResource TextSecondaryBrush}" 
+                                   FontSize="16" 
+                                   TextAlignment="Center" 
+                                   Margin="0,0,0,50"/>
 
-                    <!-- URL Input Container -->
-                    <Border Background="{StaticResource SurfaceBrush}" 
-                            CornerRadius="12" 
-                            Padding="24" 
-                            Margin="0,0,0,32" 
-                            BorderThickness="1"
-                            BorderBrush="{StaticResource BorderBrush}"
-                            Effect="{StaticResource CardShadow}">
-                        <StackPanel>
-                            <TextBlock Text="LINK TO DOWNLOAD" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
-                            <TextBox x:Name="UrlTextBox" Style="{StaticResource ModernTextBox}" Text="Paste URL here..." TextChanged="UrlTextBox_TextChanged" GotFocus="UrlTextBox_GotFocus" LostFocus="UrlTextBox_LostFocus"/>
+                        <!-- URL Input Container -->
+                        <Border Background="{StaticResource SurfaceBrush}" 
+                                CornerRadius="12" 
+                                Padding="24" 
+                                Margin="0,0,0,32" 
+                                BorderThickness="1"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                Effect="{StaticResource CardShadow}">
+                            <StackPanel>
+                                <TextBlock Text="LINK TO DOWNLOAD" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
+                                <TextBox x:Name="UrlTextBox" Style="{StaticResource ModernTextBox}" Text="Paste URL here..." TextChanged="UrlTextBox_TextChanged" GotFocus="UrlTextBox_GotFocus" LostFocus="UrlTextBox_LostFocus"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Settings Container -->
+                        <StackPanel Margin="0,0,0,32" VerticalAlignment="Stretch">
+
+                            <!-- Download Location -->
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                                <StackPanel>
+                                    <TextBlock Text="SAVE LOCATION" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="DirectoryPathTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" IsReadOnly="True" Text="Select folder..." Margin="0,0,16,0"/>
+                                        <Button x:Name="BrowseButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Browse" Click="BrowseButton_Click" Padding="24,12"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Quality Selection -->
+                            <Border x:Name="QualitySection" Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="VIDEO QUALITY" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="VideoTitleInfoBlock" Grid.Column="1" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="200" HorizontalAlignment="Right"/>
+                                    </Grid>
+                                    <ComboBox x:Name="YouTubeQualityComboBox" Style="{StaticResource ModernComboBox}" DisplayMemberPath="Label" SelectedValuePath="FormatCode" SelectionChanged="YouTubeQualityComboBox_SelectionChanged" PreviewMouseLeftButtonDown="YouTubeQualityComboBox_PreviewMouseLeftButtonDown"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Playlist Section (only visible for playlist URLs) -->
+                            <Border x:Name="PlaylistSection" Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
+                                <StackPanel>
+                                    <!-- Header row -->
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="PLAYLIST" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="PlaylistTitleLabel" Grid.Column="1" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="12,0,12,0" HorizontalAlignment="Left"/>
+                                        <TextBlock x:Name="PlaylistCountLabel" Grid.Column="2" Foreground="{StaticResource PrimaryBrush}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    </Grid>
+
+                                    <!-- Quick buttons -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                        <Button Content="Select All" Style="{StaticResource SecondaryButton}" Click="PlaylistSelectAll_Click" Padding="14,6" FontSize="12" Margin="0,0,8,0"/>
+                                        <Button Content="Deselect All" Style="{StaticResource SecondaryButton}" Click="PlaylistDeselectAll_Click" Padding="14,6" FontSize="12"/>
+                                    </StackPanel>
+
+                                    <!-- Scrollable item list -->
+                                    <ScrollViewer MaxHeight="350" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsControl x:Name="PlaylistItemsControl">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="#0DFFFFFF" CornerRadius="8" Padding="12,10" Margin="0,0,0,6" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <!-- Checkbox -->
+                                                            <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" VerticalAlignment="Center" Margin="0,0,10,0" Padding="0"/>
+
+                                                            <!-- Title -->
+                                                            <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0"/>
+
+                                                            <!-- Duration -->
+                                                            <TextBlock Grid.Column="2" Text="{Binding DurationText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="50" TextAlignment="Right"/>
+
+                                                            <!-- Quality selector -->
+                                                            <ComboBox Grid.Column="3" 
+                                                                      ItemsSource="{Binding AvailableQualities}" 
+                                                                      SelectedIndex="{Binding SelectedQualityIndex, Mode=TwoWay}" 
+                                                                      DisplayMemberPath="Label"
+                                                                      Style="{StaticResource ModernComboBox}" 
+                                                                      Width="150" 
+                                                                      Padding="8,6"
+                                                                      FontSize="12"
+                                                                      MaxDropDownHeight="200"
+                                                                      VerticalAlignment="Center"
+                                                                      PreviewMouseLeftButtonDown="YouTubeQualityComboBox_PreviewMouseLeftButtonDown"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Trimming Section -->
+                            <Border x:Name="TrimmingSection" Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="TRIMMING" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="VideoDurationLabel" Grid.Column="1" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+                                    </Grid>
+                                    
+                                    <CheckBox x:Name="EnableTrimmingCheckBox" Content="Enable trim" Style="{StaticResource ModernCheckBox}" Margin="0,0,0,20" IsChecked="False" Checked="EnableTrimmingCheckBox_CheckedChanged" Unchecked="EnableTrimmingCheckBox_CheckedChanged"/>
+                                    
+                                    <StackPanel x:Name="TrimControlsPanel" Visibility="Collapsed">
+                                        <!-- Slider with padding -->
+                                        <Canvas x:Name="SliderCanvas" Height="30" Margin="8,0,8,16" SizeChanged="SliderCanvas_SizeChanged" MouseLeftButtonDown="SliderCanvas_MouseLeftButtonDown">
+                                            <!-- Track Background -->
+                                            <Rectangle x:Name="SliderTrack" Height="6" Fill="{StaticResource BorderBrush}" Canvas.Top="12" RadiusX="3" RadiusY="3" IsHitTestVisible="False"/>
+                                            
+                                            <!-- Active Range Fill -->
+                                            <Rectangle x:Name="SliderFill" Height="6" Fill="{StaticResource PrimaryGradient}" Canvas.Top="12" RadiusX="3" RadiusY="3" IsHitTestVisible="False"/>
+                                            
+                                            <!-- Start Thumb -->
+                                            <Thumb x:Name="StartThumb" Width="18" Height="18" Canvas.Top="6" Style="{StaticResource ModernThumbStyle}" DragDelta="StartThumb_DragDelta" Margin="-9,0,0,0"/>
+
+                                            <!-- End Thumb -->
+                                            <Thumb x:Name="EndThumb" Width="18" Height="18" Canvas.Top="6" Style="{StaticResource ModernThumbStyle}" DragDelta="EndThumb_DragDelta" Margin="-9,0,0,0"/>
+                                        </Canvas>
+                                        
+                                        <!-- Time inputs with labels -->
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <!-- Start time -->
+                                            <StackPanel Grid.Column="0" HorizontalAlignment="Left">
+                                                <TextBlock Text="START" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,6" HorizontalAlignment="Center"/>
+                                                <TextBox x:Name="StartTimeTextBox" Style="{StaticResource TrimTimeTextBox}" Width="110" Height="44" TextChanged="TimeTextBox_TextChanged" LostFocus="TimeTextBox_LostFocus" KeyDown="TimeTextBox_KeyDown"/>
+                                            </StackPanel>
+                                            
+                                            <!-- End time -->
+                                            <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                                <TextBlock Text="END" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,6" HorizontalAlignment="Center"/>
+                                                <TextBox x:Name="EndTimeTextBox" Style="{StaticResource TrimTimeTextBox}" Width="110" Height="44" TextChanged="TimeTextBox_TextChanged" LostFocus="TimeTextBox_LostFocus" KeyDown="TimeTextBox_KeyDown"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                    
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </Border>
 
-                    <!-- Settings Container -->
-                    <StackPanel Margin="0,0,0,32" VerticalAlignment="Stretch">
+                        <!-- Download Trigger -->
+                        <Grid HorizontalAlignment="Center" Margin="0,0,0,40">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="DownloadButton" Grid.Column="0" Style="{StaticResource ModernButton}" Content="Start Download" Click="DownloadButton_Click" IsEnabled="False" Width="200" Height="46"/>
+                            <Button x:Name="CancelDownloadButton" Grid.Column="1" Style="{StaticResource MinimalistCancelButton}" Click="CancelDownloadButton_Click" Visibility="Collapsed" Margin="12,0,0,0" Height="46" Width="46"/>
+                        </Grid>
 
-                        <!-- Download Location -->
+                        <!-- Status Display -->
+                        <Border x:Name="StatusPanel"
+                                Background="{StaticResource GlassGradient}" 
+                                CornerRadius="16" 
+                                Padding="28,24"
+                                BorderThickness="1"
+                                BorderBrush="{StaticResource BorderBrush}">
+                            <StackPanel>
+                                <!-- File name / title -->
+                                <TextBlock x:Name="FileNameTextBlock" 
+                                           Text="" 
+                                           FontWeight="SemiBold" 
+                                           FontSize="15" 
+                                           Foreground="{StaticResource TextPrimaryBrush}" 
+                                           TextAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           Margin="0,0,0,14"
+                                           Visibility="Collapsed"/>
+                                           
+                                <!-- Progress bar -->
+                                <ProgressBar x:Name="DownloadProgressBar" Style="{StaticResource ModernProgressBar}" Margin="0,0,0,12"/>
+
+                                <!-- Status message -->
+                                <TextBlock x:Name="StatusTextBlock" 
+                                           Text="Ready to download. Paste a URL above." 
+                                           Foreground="{StaticResource TextSecondaryBrush}" 
+                                           TextAlignment="Center" 
+                                           TextWrapping="Wrap"
+                                           FontSize="13"/>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Settings View -->
+                <ScrollViewer x:Name="SettingsScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed">
+                    <StackPanel Margin="40,20,40,40" MaxWidth="680">
+                        
+                        <!-- Back Button -->
+                        <Button Content="&#x2190; Back to Downloader" Style="{StaticResource SecondaryButton}" Click="BackToDownloader_Click" Margin="0,0,0,24" HorizontalAlignment="Left" Padding="14,8"/>
+
+                        <!-- Header -->
+                        <TextBlock Text="Settings" 
+                                   FontSize="36" 
+                                   FontWeight="Bold" 
+                                   Foreground="{StaticResource TextPrimaryBrush}" 
+                                   Margin="0,0,0,32"/>
+
+                        <!-- Download Location Settings -->
                         <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
                             <StackPanel>
                                 <TextBlock Text="SAVE LOCATION" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
@@ -550,192 +761,89 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="DirectoryPathTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" IsReadOnly="True" Text="Select folder..." Margin="0,0,16,0"/>
-                                    <Button x:Name="BrowseButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Browse" Click="BrowseButton_Click" Padding="24,12"/>
+                                    <TextBox x:Name="SettingsDirectoryPathTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" IsReadOnly="True" Text="Select folder..." Margin="0,0,16,0"/>
+                                    <Button x:Name="SettingsBrowseButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Browse" Click="BrowseButton_Click" Padding="24,12"/>
                                 </Grid>
                             </StackPanel>
                         </Border>
 
-                        <!-- Quality Selection -->
-                        <Border x:Name="QualitySection" Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
+                        <!-- Spotify Settings -->
+                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
                             <StackPanel>
+                                <TextBlock Text="SPOTIFY INTEGRATION" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" FontWeight="Bold" Margin="0,0,0,8"/>
+                                <TextBlock Text="Required to fetch all tracks in playlists/albums exceeding the 100-track limit." Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,20" TextWrapping="Wrap"/>
+
+                                <!-- Option A: User Account (Browser Token) -->
+                                <TextBlock Text="METHOD A: CONNECT SPOTIFY ACCOUNT (RECOMMENDED)" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,8"/>
+                                <TextBlock Text="No developer account required. Log in via your web browser to authorize." Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,12" TextWrapping="Wrap"/>
+                                
                                 <Grid Margin="0,0,0,16">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="VIDEO QUALITY" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="VideoTitleInfoBlock" Grid.Column="1" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="200" HorizontalAlignment="Right"/>
+                                    <TextBlock x:Name="SpotifyAccountStatusTextBlock" Grid.Column="0" Text="Status: Not Connected" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Button x:Name="ConnectAccountBrowserButton" Style="{StaticResource SecondaryButton}" Content="Connect Account" Click="ConnectAccountBrowserButton_Click" Padding="14,8" Margin="0,0,8,0"/>
+                                        <Button x:Name="DisconnectAccountButton" Style="{StaticResource SecondaryButton}" Content="Log Out" Click="DisconnectAccountButton_Click" Padding="14,8" Visibility="Collapsed"/>
+                                    </StackPanel>
                                 </Grid>
-                                <ComboBox x:Name="YouTubeQualityComboBox" Style="{StaticResource ModernComboBox}" DisplayMemberPath="Label" SelectedValuePath="FormatCode" SelectionChanged="YouTubeQualityComboBox_SelectionChanged" PreviewMouseLeftButtonDown="YouTubeQualityComboBox_PreviewMouseLeftButtonDown"/>
-                            </StackPanel>
-                        </Border>
 
-                        <!-- Playlist Section (only visible for playlist URLs) -->
-                        <Border x:Name="PlaylistSection" Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
-                            <StackPanel>
-                                <!-- Header row -->
+                                <!-- Token Paste Panel -->
+                                <Border x:Name="SpotifyTokenPastePanel" Background="#0DFFFFFF" CornerRadius="8" Padding="16" Margin="0,0,0,20" Visibility="Collapsed" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
+                                    <StackPanel>
+                                        <TextBlock Text="1. Log in to Spotify in the browser window that just opened." Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                                        <TextBlock Text="2. After authorizing, copy the entire URL from the browser address bar (it starts with open.spotify.com/#access_token=...)." Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" Margin="0,0,0,12" TextWrapping="Wrap"/>
+                                        <TextBlock Text="PASTE THE REDIRECTED URL HERE:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,6"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="SpotifyRedirectUrlTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Padding="10,8"/>
+                                            <Button x:Name="ConfirmTokenButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Confirm" Click="ConfirmTokenButton_Click" Padding="16,8"/>
+                                        </Grid>
+                                        <TextBlock x:Name="SpotifyTokenErrorTextBlock" Foreground="#EF4444" FontSize="11" Margin="0,8,0,0" Visibility="Collapsed" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Separator Height="1" Background="{StaticResource BorderBrush}" Margin="0,8,0,20"/>
+
+                                <!-- Option B: Developer Credentials -->
+                                <TextBlock Text="METHOD B: SPOTIFY API DEVELOPER CREDENTIALS" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,8"/>
+                                <TextBlock Text="Use your own Spotify Developer App credentials for permanent offline access." Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,16" TextWrapping="Wrap"/>
+                                
                                 <Grid Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="100"/>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="PLAYLIST" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="PlaylistTitleLabel" Grid.Column="1" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="12,0,12,0" HorizontalAlignment="Left"/>
-                                    <TextBlock x:Name="PlaylistCountLabel" Grid.Column="2" Foreground="{StaticResource PrimaryBrush}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Client ID:" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" FontSize="12"/>
+                                    <TextBox x:Name="SpotifyClientIdTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" TextChanged="SpotifyCredentials_TextChanged" Padding="10,8"/>
+                                </Grid>
+                                
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Client Secret:" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" FontSize="12"/>
+                                    <TextBox x:Name="SpotifyClientSecretTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" TextChanged="SpotifyCredentials_TextChanged" Padding="10,8"/>
                                 </Grid>
 
-                                <!-- Quick buttons -->
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                                    <Button Content="Select All" Style="{StaticResource SecondaryButton}" Click="PlaylistSelectAll_Click" Padding="14,6" FontSize="12" Margin="0,0,8,0"/>
-                                    <Button Content="Deselect All" Style="{StaticResource SecondaryButton}" Click="PlaylistDeselectAll_Click" Padding="14,6" FontSize="12"/>
-                                </StackPanel>
-
-                                <!-- Scrollable item list -->
-                                <ScrollViewer MaxHeight="350" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <ItemsControl x:Name="PlaylistItemsControl">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="#0DFFFFFF" CornerRadius="8" Padding="12,10" Margin="0,0,0,6" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-
-                                                        <!-- Checkbox -->
-                                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" VerticalAlignment="Center" Margin="0,0,10,0" Padding="0"/>
-
-                                                        <!-- Title -->
-                                                        <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0"/>
-
-                                                        <!-- Duration -->
-                                                        <TextBlock Grid.Column="2" Text="{Binding DurationText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="50" TextAlignment="Right"/>
-
-                                                        <!-- Quality selector -->
-                                                        <ComboBox Grid.Column="3" 
-                                                                  ItemsSource="{Binding AvailableQualities}" 
-                                                                  SelectedIndex="{Binding SelectedQualityIndex, Mode=TwoWay}" 
-                                                                  DisplayMemberPath="Label"
-                                                                  Style="{StaticResource ModernComboBox}" 
-                                                                  Width="150" 
-                                                                  Padding="8,6"
-                                                                  FontSize="12"
-                                                                  MaxDropDownHeight="200"
-                                                                  VerticalAlignment="Center"
-                                                                  PreviewMouseLeftButtonDown="YouTubeQualityComboBox_PreviewMouseLeftButtonDown"/>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
-                            </StackPanel>
-                        </Border>
-
-
-                        <!-- Trimming Section -->
-                        <Border x:Name="TrimmingSection" Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,16">
+                                <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="TRIMMING" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="VideoDurationLabel" Grid.Column="1" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="SpotifyApiStatusTextBlock" Grid.Column="0" Text="" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0"/>
+                                    <Button x:Name="TestApiConnectionButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Test Connection" Click="TestApiConnectionButton_Click" Padding="16,8"/>
                                 </Grid>
-                                
-                                <CheckBox x:Name="EnableTrimmingCheckBox" Content="Enable trim" Style="{StaticResource ModernCheckBox}" Margin="0,0,0,20" IsChecked="False" Checked="EnableTrimmingCheckBox_CheckedChanged" Unchecked="EnableTrimmingCheckBox_CheckedChanged"/>
-                                
-                                <StackPanel x:Name="TrimControlsPanel" Visibility="Collapsed">
-                                    <!-- Slider with padding -->
-                                    <Canvas x:Name="SliderCanvas" Height="30" Margin="8,0,8,16" SizeChanged="SliderCanvas_SizeChanged" MouseLeftButtonDown="SliderCanvas_MouseLeftButtonDown">
-                                        <!-- Track Background -->
-                                        <Rectangle x:Name="SliderTrack" Height="6" Fill="{StaticResource BorderBrush}" Canvas.Top="12" RadiusX="3" RadiusY="3" IsHitTestVisible="False"/>
-                                        
-                                        <!-- Active Range Fill -->
-                                        <Rectangle x:Name="SliderFill" Height="6" Fill="{StaticResource PrimaryGradient}" Canvas.Top="12" RadiusX="3" RadiusY="3" IsHitTestVisible="False"/>
-                                        
-                                        <!-- Start Thumb -->
-                                        <Thumb x:Name="StartThumb" Width="18" Height="18" Canvas.Top="6" Style="{StaticResource ModernThumbStyle}" DragDelta="StartThumb_DragDelta" Margin="-9,0,0,0"/>
-
-                                        <!-- End Thumb -->
-                                        <Thumb x:Name="EndThumb" Width="18" Height="18" Canvas.Top="6" Style="{StaticResource ModernThumbStyle}" DragDelta="EndThumb_DragDelta" Margin="-9,0,0,0"/>
-                                    </Canvas>
-                                    
-                                    <!-- Time inputs with labels -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        
-                                        <!-- Start time -->
-                                        <StackPanel Grid.Column="0" HorizontalAlignment="Left">
-                                            <TextBlock Text="START" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,6" HorizontalAlignment="Center"/>
-                                            <TextBox x:Name="StartTimeTextBox" Style="{StaticResource TrimTimeTextBox}" Width="110" Height="44" TextChanged="TimeTextBox_TextChanged" LostFocus="TimeTextBox_LostFocus" KeyDown="TimeTextBox_KeyDown"/>
-                                        </StackPanel>
-                                        
-                                        <!-- End time -->
-                                        <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                                            <TextBlock Text="END" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,6" HorizontalAlignment="Center"/>
-                                            <TextBox x:Name="EndTimeTextBox" Style="{StaticResource TrimTimeTextBox}" Width="110" Height="44" TextChanged="TimeTextBox_TextChanged" LostFocus="TimeTextBox_LostFocus" KeyDown="TimeTextBox_KeyDown"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </StackPanel>
-                                
                             </StackPanel>
                         </Border>
                     </StackPanel>
-
-                    <!-- Download Trigger -->
-                    <Grid HorizontalAlignment="Center" Margin="0,0,0,40">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <Button x:Name="DownloadButton" Grid.Column="0" Style="{StaticResource ModernButton}" Content="Start Download" Click="DownloadButton_Click" IsEnabled="False" Width="200" Height="46"/>
-                        <Button x:Name="CancelDownloadButton" Grid.Column="1" Style="{StaticResource MinimalistCancelButton}" Click="CancelDownloadButton_Click" Visibility="Collapsed" Margin="12,0,0,0" Height="46" Width="46"/>
-                    </Grid>
-
-                    <!-- Status Display -->
-                    <Border x:Name="StatusPanel"
-                            Background="{StaticResource GlassGradient}" 
-                            CornerRadius="16" 
-                            Padding="28,24"
-                            BorderThickness="1"
-                            BorderBrush="{StaticResource BorderBrush}">
-                        <StackPanel>
-                            <!-- File name / title -->
-                            <TextBlock x:Name="FileNameTextBlock" 
-                                       Text="" 
-                                       FontWeight="SemiBold" 
-                                       FontSize="15" 
-                                       Foreground="{StaticResource TextPrimaryBrush}" 
-                                       TextAlignment="Center"
-                                       TextTrimming="CharacterEllipsis"
-                                       Margin="0,0,0,14"
-                                       Visibility="Collapsed"/>
-                                       
-                            <!-- Progress bar -->
-                            <ProgressBar x:Name="DownloadProgressBar" Style="{StaticResource ModernProgressBar}" Margin="0,0,0,12"/>
-
-                            <!-- Status message -->
-                            <TextBlock x:Name="StatusTextBlock" 
-                                       Text="Ready to download. Paste a URL above." 
-                                       Foreground="{StaticResource TextSecondaryBrush}" 
-                                       TextAlignment="Center" 
-                                       TextWrapping="Wrap"
-                                       FontSize="13"/>
-                        </StackPanel>
-                    </Border>
-
-                </StackPanel>
-            </ScrollViewer>
+                </ScrollViewer>
+            </Grid>
         </Grid>
     </Border>
 </Window>

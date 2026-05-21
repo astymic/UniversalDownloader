@@ -35,11 +35,14 @@ namespace UniversalDownloader.Services
             _httpClient.Timeout = TimeSpan.FromMinutes(10);
         }
 
+        public string? ProgressPrefix { get; set; }
+
         private void ReportProgress(string status, string? filename = null, double percentage = 0, bool isIndeterminate = false)
         {
+            string finalStatus = string.IsNullOrEmpty(ProgressPrefix) ? status : $"{ProgressPrefix} {status}";
             ProgressChanged?.Invoke(this, new DownloadProgressArgs
             {
-                StatusMessage = status,
+                StatusMessage = finalStatus,
                 Filename = filename,
                 Percentage = percentage,
                 IsIndeterminate = isIndeterminate
@@ -796,6 +799,288 @@ namespace UniversalDownloader.Services
             public string Title { get; set; } = "";
             public string Artist { get; set; } = "";
             public string TrackId { get; set; } = "";
+        }
+
+        public class SpotifyPlaylistMetadata
+        {
+            public string Name { get; set; } = "";
+            public string Type { get; set; } = ""; // "playlist" or "album"
+            public List<SpotifyTrack> Tracks { get; set; } = new List<SpotifyTrack>();
+        }
+
+        public class SpotifyTrack
+        {
+            public string Title { get; set; } = "";
+            public string Artist { get; set; } = "";
+            public string Uri { get; set; } = "";
+        }
+
+        public bool IsSpotifyPlaylistOrAlbumLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"open\.spotify\.com/(playlist|album)/", RegexOptions.IgnoreCase);
+        }
+
+        public async Task<string?> GetSpotifyDeveloperTokenAsync(string clientId, string clientSecret)
+        {
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Post, "https://accounts.spotify.com/api/token"))
+                {
+                    var keyValues = new List<KeyValuePair<string, string>>
+                    {
+                        new KeyValuePair<string, string>("grant_type", "client_credentials")
+                    };
+                    request.Content = new FormUrlEncodedContent(keyValues);
+                    
+                    string credentials = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}"));
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+                    
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string json = await response.Content.ReadAsStringAsync();
+                            var jObj = JObject.Parse(json);
+                            return jObj["access_token"]?.ToString();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to get developer token: {ex.Message}");
+            }
+            return null;
+        }
+
+        public async Task<bool> TestSpotifyApiConnectionAsync(string token)
+        {
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/playlists/37i9dQZF1DXcBWIGsy6aRO"))
+                {
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        return response.IsSuccessStatusCode;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Test API connection failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        public async Task<SpotifyPlaylistMetadata?> GetSpotifyPlaylistMetadataFromScrapingAsync(string type, string id)
+        {
+            string embedUrl = $"https://open.spotify.com/embed/{type}/{id}";
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, embedUrl))
+                {
+                    request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string html = await response.Content.ReadAsStringAsync();
+                            var match = Regex.Match(html, @"<script\s+id=""__NEXT_DATA__""\s+type=""application/json""[^>]*>(.*?)</script>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                            if (match.Success)
+                            {
+                                string jsonStr = match.Groups[1].Value.Trim();
+                                var jObj = JObject.Parse(jsonStr);
+                                var pageProps = jObj["props"]?["pageProps"];
+                                var entity = pageProps?["state"]?["data"]?["entity"] ?? pageProps?["state"]?["entity"];
+                                
+                                string name = entity?["name"]?.ToString() ?? entity?["title"]?.ToString() ?? pageProps?["name"]?.ToString() ?? pageProps?["title"]?.ToString() ?? (type == "playlist" ? "Spotify Playlist" : "Spotify Album");
+                                
+                                var metadata = new SpotifyPlaylistMetadata
+                                {
+                                    Name = name,
+                                    Type = type,
+                                    Tracks = new List<SpotifyTrack>()
+                                };
+
+                                var trackList = entity?["trackList"] as JArray;
+                                if (trackList != null)
+                                {
+                                    foreach (var item in trackList)
+                                    {
+                                        string? trackTitle = item["title"]?.ToString();
+                                        string? trackArtist = item["subtitle"]?.ToString() ?? item["artist"]?.ToString();
+                                        string? trackUri = item["uri"]?.ToString();
+                                        
+                                        if (!string.IsNullOrEmpty(trackTitle))
+                                        {
+                                            metadata.Tracks.Add(new SpotifyTrack
+                                            {
+                                                Title = trackTitle,
+                                                Artist = string.IsNullOrEmpty(trackArtist) ? "Unknown Artist" : trackArtist,
+                                                Uri = trackUri ?? ""
+                                            });
+                                        }
+                                    }
+                                }
+                                
+                                return metadata;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Spotify playlist scraping failed: {ex.Message}");
+            }
+            return null;
+        }
+
+        public async Task<SpotifyPlaylistMetadata?> GetSpotifyPlaylistMetadataAsync(string url, string? userToken, string? clientId, string? clientSecret)
+        {
+            var match = Regex.Match(url, @"open\.spotify\.com/(playlist|album)/([a-zA-Z0-9]+)", RegexOptions.IgnoreCase);
+            if (!match.Success) return null;
+
+            string type = match.Groups[1].Value.ToLower();
+            string id = match.Groups[2].Value;
+
+            string? token = null;
+
+            // 1. Try User Account Token if valid
+            if (!string.IsNullOrEmpty(userToken))
+            {
+                token = userToken;
+            }
+            // 2. Try Developer Client Credentials Flow
+            else if (!string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(clientSecret))
+            {
+                token = await GetSpotifyDeveloperTokenAsync(clientId, clientSecret);
+            }
+
+            // 3. If token is available, use API Mode
+            if (!string.IsNullOrEmpty(token))
+            {
+                try
+                {
+                    string name = type == "playlist" ? "Spotify Playlist" : "Spotify Album";
+                    using (var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.spotify.com/v1/{type}s/{id}"))
+                    {
+                        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                        using (var response = await _httpClient.SendAsync(request))
+                        {
+                            if (response.IsSuccessStatusCode)
+                            {
+                                var jObj = JObject.Parse(await response.Content.ReadAsStringAsync());
+                                name = jObj["name"]?.ToString() ?? name;
+                            }
+                        }
+                    }
+
+                    var metadata = new SpotifyPlaylistMetadata
+                    {
+                        Name = name,
+                        Type = type,
+                        Tracks = new List<SpotifyTrack>()
+                    };
+
+                    int offset = 0;
+                    int limit = (type == "playlist") ? 100 : 50;
+                    bool hasMore = true;
+
+                    while (hasMore)
+                    {
+                        string tracksUrl = $"https://api.spotify.com/v1/{type}s/{id}/tracks?offset={offset}&limit={limit}";
+                        using (var request = new HttpRequestMessage(HttpMethod.Get, tracksUrl))
+                        {
+                            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                            using (var response = await _httpClient.SendAsync(request))
+                            {
+                                if (!response.IsSuccessStatusCode)
+                                {
+                                    hasMore = false;
+                                    break;
+                                }
+
+                                var jObj = JObject.Parse(await response.Content.ReadAsStringAsync());
+                                var items = jObj["items"] as JArray;
+                                if (items == null || items.Count == 0)
+                                {
+                                    hasMore = false;
+                                    break;
+                                }
+
+                                foreach (var item in items)
+                                {
+                                    string title = "";
+                                    string artist = "";
+                                    string trackUri = "";
+
+                                    if (type == "playlist")
+                                    {
+                                        var trackObj = item["track"];
+                                        if (trackObj != null)
+                                        {
+                                            title = trackObj["name"]?.ToString() ?? "";
+                                            trackUri = trackObj["uri"]?.ToString() ?? "";
+                                            var artistsList = new List<string>();
+                                            var artistsArr = trackObj["artists"] as JArray;
+                                            if (artistsArr != null)
+                                            {
+                                                foreach (var art in artistsArr)
+                                                {
+                                                    string? aName = art["name"]?.ToString();
+                                                    if (!string.IsNullOrEmpty(aName)) artistsList.Add(aName);
+                                                }
+                                            }
+                                            artist = string.Join(", ", artistsList);
+                                        }
+                                    }
+                                    else // album
+                                    {
+                                        title = item["name"]?.ToString() ?? "";
+                                        trackUri = item["uri"]?.ToString() ?? "";
+                                        var artistsList = new List<string>();
+                                        var artistsArr = item["artists"] as JArray;
+                                        if (artistsArr != null)
+                                        {
+                                            foreach (var art in artistsArr)
+                                            {
+                                                string? aName = art["name"]?.ToString();
+                                                if (!string.IsNullOrEmpty(aName)) artistsList.Add(aName);
+                                            }
+                                        }
+                                        artist = string.Join(", ", artistsList);
+                                    }
+
+                                    if (!string.IsNullOrEmpty(title))
+                                    {
+                                        metadata.Tracks.Add(new SpotifyTrack
+                                        {
+                                            Title = title,
+                                            Artist = string.IsNullOrEmpty(artist) ? "Unknown Artist" : artist,
+                                            Uri = trackUri
+                                        });
+                                    }
+                                }
+
+                                offset += items.Count;
+                                hasMore = jObj["next"] != null && jObj["next"].Type != JTokenType.Null;
+                            }
+                        }
+                    }
+
+                    return metadata;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Spotify API retrieval failed: {ex.Message}. Falling back to scraping.");
+                }
+            }
+
+            // 4. Fallback to scraping
+            return await GetSpotifyPlaylistMetadataFromScrapingAsync(type, id);
         }
 
 
