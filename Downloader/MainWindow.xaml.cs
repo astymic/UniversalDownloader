@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -532,6 +532,36 @@ namespace UniversalDownloader
                     FileNameTextBlock.Visibility = Visibility.Visible;
                 }
             }
+            else if (_downloadService.IsSpotifyLink(url))
+            {
+                if (!url.Contains("/track/", StringComparison.OrdinalIgnoreCase))
+                {
+                    _currentItemTitle = "";
+                    FileNameTextBlock.Text = "Spotify Playlist/Album URL";
+                    FileNameTextBlock.Visibility = Visibility.Visible;
+                    StatusTextBlock.Text = "Only individual Spotify tracks are currently supported.";
+                    return;
+                }
+
+                FileNameTextBlock.Text = "Fetching Spotify track metadata...";
+                FileNameTextBlock.Visibility = Visibility.Visible;
+                StatusTextBlock.Text = "Resolving track information...";
+
+                var metadata = await _downloadService.GetSpotifyMetadataAsync(url);
+                if (metadata != null)
+                {
+                    string beautifulTitle = $"{metadata.Artist} - {metadata.Title}";
+                    _currentItemTitle = beautifulTitle;
+                    FileNameTextBlock.Text = beautifulTitle;
+                    StatusTextBlock.Text = "Spotify track resolved. Ready to download.";
+                }
+                else
+                {
+                    _currentItemTitle = "Spotify Track";
+                    FileNameTextBlock.Text = "Spotify Track";
+                    StatusTextBlock.Text = "Ready to download (metadata lookup failed).";
+                }
+            }
             else if (_downloadService.IsKnownAudioPlatformLink(url))
             {
                 string title = await _downloadService.GetTitleWithYtDlpAsync(url);
@@ -744,6 +774,12 @@ namespace UniversalDownloader
         {
             if (StatusTextBlock == null || FileNameTextBlock == null || DownloadProgressBar == null || UrlTextBox == null) return;
 
+            if (_isProcessingUrl)
+            {
+                StatusTextBlock.Text = "Please wait for URL resolution to complete...";
+                return;
+            }
+
             string url = UrlTextBox.Text;
             if (!CanInitiateDownload()) return;
 
@@ -815,6 +851,59 @@ namespace UniversalDownloader
                     {
                         await _downloadService.DownloadWithYtDlpAsync(url, "bestaudio/best", Downloader.App.AppTempDirectory, SelectedDirectory, true, "mp3", false, 0, 0, _cancellationTokenSource.Token);
                     }
+                }
+                else if (_downloadService.IsSpotifyLink(url))
+                {
+                    string initialArtist = "Unknown Artist";
+                    string initialTitle = "Spotify Track";
+
+                    StatusTextBlock.Text = "Получение метаданных трека...";
+                    var metadata = await _downloadService.GetSpotifyMetadataAsync(url);
+                    if (metadata != null)
+                    {
+                        initialArtist = metadata.Artist;
+                        initialTitle = metadata.Title;
+                    }
+
+                    // If metadata lookup failed or returned generic/unknown values, prompt user
+                    if (string.IsNullOrWhiteSpace(initialArtist) || initialArtist == "Unknown Artist" || 
+                        string.IsNullOrWhiteSpace(initialTitle) || initialTitle == "Spotify Track" ||
+                        initialTitle.StartsWith("Unknown Artist", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var dialog = new SpotifyManualInputDialog(initialArtist, initialTitle)
+                        {
+                            Owner = this
+                        };
+
+                        if (dialog.ShowDialog() == true)
+                        {
+                            _currentItemTitle = $"{dialog.Artist} - {dialog.TrackTitle}".Trim();
+                            if (_currentItemTitle.StartsWith("- "))
+                            {
+                                _currentItemTitle = _currentItemTitle.Substring(2);
+                            }
+                            FileNameTextBlock.Text = _currentItemTitle;
+                        }
+                        else
+                        {
+                            StatusTextBlock.Text = "Скачивание отменено пользователем.";
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        _currentItemTitle = $"{initialArtist} - {initialTitle}";
+                        FileNameTextBlock.Text = _currentItemTitle;
+                    }
+
+                    // Remove internal double quotes from query to ensure yt-dlp parses it properly
+                    string cleanQueryTitle = _currentItemTitle.Replace("\"", "").Replace("'", "");
+                    string query = $"ytsearch1:{cleanQueryTitle}";
+
+                    StatusTextBlock.Text = $"Поиск '{_currentItemTitle}' на YouTube...";
+                    await _downloadService.DownloadWithYtDlpAsync(query, "bestaudio/best", Downloader.App.AppTempDirectory, SelectedDirectory, true, "mp3", false, 0, 0, _cancellationTokenSource.Token, _currentItemTitle);
+                    
+                    StatusTextBlock.Text = $"Скачивание завершено: {_currentItemTitle}";
                 }
                 else if (_downloadService.IsKnownAudioPlatformLink(url))
                 {
@@ -925,5 +1014,188 @@ namespace UniversalDownloader
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
+    public class SpotifyManualInputDialog : Window
+    {
+        private TextBox _artistTextBox;
+        private TextBox _titleTextBox;
+        
+        public string Artist => _artistTextBox.Text.Trim();
+        public string TrackTitle => _titleTextBox.Text.Trim();
+
+        public SpotifyManualInputDialog(string initialArtist, string initialTitle)
+        {
+            Title = "Ввод метаданных Spotify";
+            Width = 420;
+            Height = 260;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            ResizeMode = ResizeMode.NoResize;
+            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#121212"));
+            Foreground = Brushes.White;
+            FontFamily = new FontFamily("Segoe UI");
+            
+            WindowStyle = WindowStyle.None;
+            BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1DB954"));
+            BorderThickness = new Thickness(2);
+
+            var mainGrid = new Grid();
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(40) });
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            
+            var titleBar = new Border
+            {
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#191919")),
+                Padding = new Thickness(15, 0, 15, 0)
+            };
+            titleBar.MouseLeftButtonDown += (s, e) => { if (e.LeftButton == System.Windows.Input.MouseButtonState.Pressed) DragMove(); };
+            
+            var titleBarGrid = new Grid();
+            titleBarGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            titleBarGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            
+            var titleText = new TextBlock
+            {
+                Text = "Метаданные трека Spotify",
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1DB954")),
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = 14
+            };
+            Grid.SetColumn(titleText, 0);
+            titleBarGrid.Children.Add(titleText);
+            
+            var closeButton = new Button
+            {
+                Content = "×",
+                Background = Brushes.Transparent,
+                Foreground = Brushes.Gray,
+                BorderThickness = new Thickness(0),
+                FontSize = 20,
+                FontWeight = FontWeights.Bold,
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Width = 30,
+                Height = 30,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            closeButton.Click += (s, e) => { DialogResult = false; Close(); };
+            closeButton.MouseEnter += (s, e) => closeButton.Foreground = Brushes.Red;
+            closeButton.MouseLeave += (s, e) => closeButton.Foreground = Brushes.Gray;
+            
+            Grid.SetColumn(closeButton, 1);
+            titleBarGrid.Children.Add(closeButton);
+            titleBar.Child = titleBarGrid;
+            
+            Grid.SetRow(titleBar, 0);
+            mainGrid.Children.Add(titleBar);
+            
+            var contentStack = new StackPanel
+            {
+                Margin = new Thickness(20)
+            };
+            
+            var infoText = new TextBlock
+            {
+                Text = "Не удалось автоматически получить информацию о треке.\nПожалуйста, введите название и исполнителя:",
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B3B3B3")),
+                FontSize = 12,
+                Margin = new Thickness(0, 0, 0, 15),
+                TextWrapping = TextWrapping.Wrap
+            };
+            contentStack.Children.Add(infoText);
+            
+            var artistLabel = new TextBlock { Text = "Исполнитель:", Foreground = Brushes.White, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4), FontSize = 12 };
+            contentStack.Children.Add(artistLabel);
+            
+            _artistTextBox = new TextBox
+            {
+                Text = initialArtist == "Unknown Artist" ? "" : initialArtist,
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#282828")),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#404040")),
+                CaretBrush = Brushes.White,
+                Padding = new Thickness(6, 4, 6, 4),
+                FontSize = 13,
+                Margin = new Thickness(0, 0, 0, 12),
+                BorderThickness = new Thickness(1)
+            };
+            _artistTextBox.GotFocus += (s, e) => _artistTextBox.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1DB954"));
+            _artistTextBox.LostFocus += (s, e) => _artistTextBox.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#404040"));
+            contentStack.Children.Add(_artistTextBox);
+            
+            var titleLabel = new TextBlock { Text = "Название трека:", Foreground = Brushes.White, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4), FontSize = 12 };
+            contentStack.Children.Add(titleLabel);
+            
+            _titleTextBox = new TextBox
+            {
+                Text = initialTitle == "Spotify Track" ? "" : initialTitle,
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#282828")),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#404040")),
+                CaretBrush = Brushes.White,
+                Padding = new Thickness(6, 4, 6, 4),
+                FontSize = 13,
+                Margin = new Thickness(0, 0, 0, 15),
+                BorderThickness = new Thickness(1)
+            };
+            _titleTextBox.GotFocus += (s, e) => _titleTextBox.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1DB954"));
+            _titleTextBox.LostFocus += (s, e) => _titleTextBox.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#404040"));
+            contentStack.Children.Add(_titleTextBox);
+            
+            var buttonsGrid = new Grid();
+            buttonsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            buttonsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            
+            var cancelButton = new Button
+            {
+                Content = "Отмена",
+                Background = Brushes.Transparent,
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#404040")),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(10, 6, 10, 6),
+                Margin = new Thickness(0, 0, 10, 0),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                FontWeight = FontWeights.SemiBold
+            };
+            cancelButton.Click += (s, e) => { DialogResult = false; Close(); };
+            cancelButton.MouseEnter += (s, e) => { cancelButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#282828")); };
+            cancelButton.MouseLeave += (s, e) => { cancelButton.Background = Brushes.Transparent; };
+            Grid.SetColumn(cancelButton, 0);
+            buttonsGrid.Children.Add(cancelButton);
+            
+            var okButton = new Button
+            {
+                Content = "Скачать",
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1DB954")),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(10, 6, 10, 6),
+                Margin = new Thickness(10, 0, 0, 0),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                FontWeight = FontWeights.Bold
+            };
+            okButton.Click += (s, e) =>
+            {
+                if (string.IsNullOrWhiteSpace(TrackTitle))
+                {
+                    MessageBox.Show("Пожалуйста, введите название трека.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                DialogResult = true;
+                Close();
+            };
+            okButton.MouseEnter += (s, e) => { okButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1ED760")); };
+            okButton.MouseLeave += (s, e) => { okButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1DB954")); };
+            Grid.SetColumn(okButton, 1);
+            buttonsGrid.Children.Add(okButton);
+            
+            contentStack.Children.Add(buttonsGrid);
+            
+            Grid.SetRow(contentStack, 1);
+            mainGrid.Children.Add(contentStack);
+            
+            Content = mainGrid;
+        }
     }
 }

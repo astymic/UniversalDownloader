@@ -6,6 +6,9 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Globalization;
+using System.Collections.Generic;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace UniversalDownloader.Services
 {
@@ -302,7 +305,7 @@ namespace UniversalDownloader.Services
             return string.IsNullOrWhiteSpace(fileName) ? "unknown_file.dat" : Utilities.SanitizeFileName(fileName);
         }
 
-        public async Task<bool> DownloadWithYtDlpAsync(string url, string? formatSelection, string tempDownloadFolder, string finalDestinationFolder, bool extractAudio, string audioFormat, bool useTrimming, double trimStartSeconds, double trimEndSeconds, CancellationToken cancellationToken)
+        public async Task<bool> DownloadWithYtDlpAsync(string url, string? formatSelection, string tempDownloadFolder, string finalDestinationFolder, bool extractAudio, string audioFormat, bool useTrimming, double trimStartSeconds, double trimEndSeconds, CancellationToken cancellationToken, string? overrideFileName = null)
         {
             if (!_dependencyManager.IsYtDlpReady)
             {
@@ -319,20 +322,9 @@ namespace UniversalDownloader.Services
             }
             string outputTemplate = Path.Combine(tempDownloadFolder, baseFileNameTemplate);
 
-            string formatArgument = extractAudio 
-                ? $"--extract-audio --audio-format {audioFormat} --audio-quality 0 -f \"{(string.IsNullOrWhiteSpace(formatSelection) ? "bestaudio/best" : formatSelection)}\""
-                // --merge-output-format mp4 ensures the final container is always MP4,
-                // even when yt-dlp picks WebM/VP9 streams (common on Shorts)
-                : $"-f \"{formatSelection}\" --merge-output-format mp4";
-
-            string trimArgument = "";
-
-            string arguments = $"-o \"{outputTemplate}\" {formatArgument} {trimArgument} --no-playlist --no-continue --progress --newline --no-warnings --ignore-config \"{url}\"";
-
             ProcessStartInfo psi = new ProcessStartInfo
             {
                 FileName = _dependencyManager.YtDlpExecutablePath,
-                Arguments = arguments,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -340,14 +332,47 @@ namespace UniversalDownloader.Services
                 StandardOutputEncoding = System.Text.Encoding.UTF8,
                 StandardErrorEncoding = System.Text.Encoding.UTF8
             };
+
+            psi.ArgumentList.Add("-o");
+            psi.ArgumentList.Add(outputTemplate);
+
+            if (extractAudio)
+            {
+                psi.ArgumentList.Add("--extract-audio");
+                psi.ArgumentList.Add("--audio-format");
+                psi.ArgumentList.Add(audioFormat);
+                psi.ArgumentList.Add("--audio-quality");
+                psi.ArgumentList.Add("0");
+                psi.ArgumentList.Add("-f");
+                psi.ArgumentList.Add(string.IsNullOrWhiteSpace(formatSelection) ? "bestaudio/best" : formatSelection);
+            }
+            else
+            {
+                psi.ArgumentList.Add("-f");
+                psi.ArgumentList.Add(formatSelection ?? "bestvideo+bestaudio/best");
+                psi.ArgumentList.Add("--merge-output-format");
+                psi.ArgumentList.Add("mp4");
+            }
+
+            psi.ArgumentList.Add("--no-playlist");
+            psi.ArgumentList.Add("--no-continue");
+            psi.ArgumentList.Add("--progress");
+            psi.ArgumentList.Add("--newline");
+            psi.ArgumentList.Add("--no-warnings");
+            psi.ArgumentList.Add("--ignore-config");
+
             if (_dependencyManager.IsFfmpegReady)
             {
-                psi.Arguments += $" --ffmpeg-location \"{_dependencyManager.FfmpegExecutablePath}\"";
+                psi.ArgumentList.Add("--ffmpeg-location");
+                psi.ArgumentList.Add(_dependencyManager.FfmpegExecutablePath);
             }
+
+            psi.ArgumentList.Add(url);
             psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
 
             bool progressStarted = false;
             double lastPercentage = 0;
+            var stderrOutput = new System.Text.StringBuilder();
 
             using (Process process = new Process { StartInfo = psi, EnableRaisingEvents = true })
             {
@@ -363,6 +388,7 @@ namespace UniversalDownloader.Services
                 {
                     if (e.Data != null)
                     {
+                        stderrOutput.AppendLine(e.Data);
                         if (useTrimming && e.Data.Contains("time="))
                         {
                             ParseFfmpegProgress(e.Data, trimStartSeconds, trimEndSeconds, ref lastPercentage);
@@ -397,24 +423,64 @@ namespace UniversalDownloader.Services
 
                 if (process.ExitCode == 0)
                 {
-                    if (useTrimming && trimEndSeconds > trimStartSeconds)
+                    string[] downloadedFiles = Directory.GetFiles(tempDownloadFolder);
+                    if (downloadedFiles.Length > 0)
                     {
-                        // Offline trimming route: Video is fully downloaded to temp, now fast-trim it
-                        string[] downloadedFiles = Directory.GetFiles(tempDownloadFolder);
-                        if (downloadedFiles.Length > 0)
+                        string downloadedFile = downloadedFiles[0];
+                        string extension = Path.GetExtension(downloadedFile);
+                        
+                        if (!string.IsNullOrWhiteSpace(overrideFileName))
                         {
-                            string sourceFile = downloadedFiles[0]; // yt-dlp final merged file
-                            await TrimLocalVideoAsync(sourceFile, finalDestinationFolder, extractAudio, audioFormat, trimStartSeconds, trimEndSeconds, cancellationToken);
+                            string sanitized = Utilities.SanitizeFileName(overrideFileName);
+                            string newFileName = sanitized;
+                            if (!newFileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+                            {
+                                newFileName += extension;
+                            }
+                            string newFilePath = Path.Combine(tempDownloadFolder, newFileName);
+                            try
+                            {
+                                if (string.Compare(downloadedFile, newFilePath, StringComparison.OrdinalIgnoreCase) != 0)
+                                {
+                                    if (File.Exists(newFilePath))
+                                    {
+                                        File.Delete(newFilePath);
+                                    }
+                                    File.Move(downloadedFile, newFilePath);
+                                }
+                                downloadedFile = newFilePath;
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"Failed to rename downloaded file to override name: {ex.Message}");
+                            }
+                        }
+
+                        if (useTrimming && trimEndSeconds > trimStartSeconds)
+                        {
+                            // Offline trimming route: Video is fully downloaded to temp, now fast-trim it
+                            await TrimLocalVideoAsync(downloadedFile, finalDestinationFolder, extractAudio, audioFormat, trimStartSeconds, trimEndSeconds, cancellationToken);
+                        }
+                        else
+                        {
+                            CopyToFinalDestinationAndClean(tempDownloadFolder, finalDestinationFolder);
                         }
                     }
                     else
                     {
-                        CopyToFinalDestinationAndClean(tempDownloadFolder, finalDestinationFolder);
+                        throw new Exception("No downloaded files found in the temporary folder.");
                     }
                 }
                 else
                 {
                     CleanDirectory(tempDownloadFolder);
+                    string errorMsg = stderrOutput.ToString();
+                    var errorLines = errorMsg.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                                           .Where(line => line.ToLower().Contains("error") || line.ToLower().Contains("failed"))
+                                           .Take(3)
+                                           .ToArray();
+                    string details = errorLines.Length > 0 ? string.Join("; ", errorLines) : "Unknown error";
+                    throw new Exception($"yt-dlp failed (exit code {process.ExitCode}): {details}");
                 }
 
                 return process.ExitCode == 0;
@@ -438,27 +504,300 @@ namespace UniversalDownloader.Services
 
         private void CopyToFinalDestinationAndClean(string tempDownloadFolder, string finalDestinationFolder)
         {
+            if (!Directory.Exists(finalDestinationFolder))
+            {
+                Directory.CreateDirectory(finalDestinationFolder);
+            }
+
+            string[] files = Directory.GetFiles(tempDownloadFolder);
+            foreach (var sourceFile in files)
+            {
+                string fileName = Path.GetFileName(sourceFile);
+                string destFile = Path.Combine(finalDestinationFolder, fileName);
+                
+                ReportProgress("Copying to destination...", fileName, 100, true);
+                File.Copy(sourceFile, destFile, true);
+                
+                try { File.Delete(sourceFile); } catch { }
+            }
+        }
+
+        public async Task<SpotifyMetadata?> GetSpotifyMetadataAsync(string url)
+        {
+            var match = Regex.Match(url, @"/track/([a-zA-Z0-9]+)", RegexOptions.IgnoreCase);
+            if (!match.Success) return null;
+            string trackId = match.Groups[1].Value;
+
+            string? oEmbedTitle = null;
+            string? oEmbedArtist = null;
+
+            // Layer 1: oEmbed Endpoint
             try
             {
-                if (!Directory.Exists(finalDestinationFolder)) Directory.CreateDirectory(finalDestinationFolder);
-
-                string[] files = Directory.GetFiles(tempDownloadFolder);
-                foreach (var sourceFile in files)
+                string oEmbedUrl = $"https://open.spotify.com/oembed?url={Uri.EscapeDataString(url)}";
+                using (var request = new HttpRequestMessage(HttpMethod.Get, oEmbedUrl))
                 {
-                    string fileName = Path.GetFileName(sourceFile);
-                    string destFile = Path.Combine(finalDestinationFolder, fileName);
-                    
-                    ReportProgress("Copying to destination...", fileName, 100, true);
-                    File.Copy(sourceFile, destFile, true);
-                    
-                    try { File.Delete(sourceFile); } catch { }
+                    request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string jsonStr = await response.Content.ReadAsStringAsync();
+                            var jObj = JObject.Parse(jsonStr);
+                            oEmbedTitle = jObj["title"]?.ToString()?.Trim();
+                            oEmbedArtist = jObj["author_name"]?.ToString()?.Trim();
+
+                            if (!string.IsNullOrWhiteSpace(oEmbedTitle))
+                            {
+                                if (string.IsNullOrWhiteSpace(oEmbedArtist))
+                                {
+                                    if (oEmbedTitle.Contains(" - "))
+                                    {
+                                        var parts = oEmbedTitle.Split(new[] { " - " }, StringSplitOptions.RemoveEmptyEntries);
+                                        if (parts.Length >= 2)
+                                        {
+                                            oEmbedArtist = parts[0].Trim();
+                                            oEmbedTitle = parts[1].Trim();
+                                        }
+                                    }
+                                    else if (oEmbedTitle.Contains(" by "))
+                                    {
+                                        var parts = oEmbedTitle.Split(new[] { " by " }, StringSplitOptions.RemoveEmptyEntries);
+                                        if (parts.Length >= 2)
+                                        {
+                                            oEmbedTitle = parts[0].Trim();
+                                            oEmbedArtist = parts[1].Trim();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error during copy/cleanup: {ex.Message}");
+                Debug.WriteLine($"Layer 1 (oEmbed) failed: {ex.Message}");
             }
+
+            // Layer 2: initialState base64 parsing (from main track page)
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+                {
+                    request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+                    request.Headers.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string html = await response.Content.ReadAsStringAsync();
+                            var scriptMatch = Regex.Match(html, @"<script\s+id=""initialState""\s+type=""text/plain""[^>]*>(.*?)</script>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                            if (scriptMatch.Success)
+                            {
+                                string base64 = scriptMatch.Groups[1].Value.Trim();
+                                byte[] bytes = Convert.FromBase64String(base64);
+                                string jsonStr = System.Text.Encoding.UTF8.GetString(bytes);
+                                var jObj = JObject.Parse(jsonStr);
+
+                                // Find trackEntity at entities.items["spotify:track:{trackId}"]
+                                string entityKey = $"spotify:track:{trackId}";
+                                var trackEntity = jObj["entities"]?["items"]?[entityKey];
+                                if (trackEntity != null)
+                                {
+                                    string? title = trackEntity["name"]?.ToString()?.Trim();
+                                    
+                                    // Primary artist
+                                    string? primaryArtist = trackEntity["firstArtist"]?["items"]?[0]?["profile"]?["name"]?.ToString()?.Trim();
+                                    
+                                    // Other artists
+                                    var otherArtistsList = new List<string>();
+                                    var otherArtistsArray = trackEntity["otherArtists"]?["items"] as JArray;
+                                    if (otherArtistsArray != null)
+                                    {
+                                        foreach (var artistItem in otherArtistsArray)
+                                        {
+                                            string? name = artistItem["profile"]?["name"]?.ToString()?.Trim();
+                                            if (!string.IsNullOrWhiteSpace(name))
+                                            {
+                                                otherArtistsList.Add(name);
+                                            }
+                                        }
+                                    }
+
+                                    if (!string.IsNullOrWhiteSpace(title))
+                                    {
+                                        string artistStr = primaryArtist ?? "Unknown Artist";
+                                        if (otherArtistsList.Count > 0)
+                                        {
+                                            artistStr = $"{artistStr}, {string.Join(", ", otherArtistsList)}";
+                                        }
+
+                                        return new SpotifyMetadata
+                                        {
+                                            Title = title,
+                                            Artist = artistStr,
+                                            TrackId = trackId
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Layer 2 (initialState) failed: {ex.Message}");
+            }
+
+            // Layer 3: Embed Widget Scraper (__NEXT_DATA__)
+            try
+            {
+                string embedUrl = $"https://open.spotify.com/embed/track/{trackId}";
+                using (var request = new HttpRequestMessage(HttpMethod.Get, embedUrl))
+                {
+                    request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string html = await response.Content.ReadAsStringAsync();
+                            var jsonMatch = Regex.Match(html, @"<script\s+id=""__NEXT_DATA__""\s+type=""application/json""[^>]*>(.*?)</script>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                            if (jsonMatch.Success)
+                            {
+                                string jsonStr = jsonMatch.Groups[1].Value.Trim();
+                                var jObj = JObject.Parse(jsonStr);
+                                var pageProps = jObj["props"]?["pageProps"];
+                                if (pageProps != null)
+                                {
+                                    var entity = pageProps["state"]?["data"]?["entity"] ?? pageProps["state"]?["entity"];
+                                    string? title = entity?["name"]?.ToString() ?? entity?["title"]?.ToString() ?? pageProps["name"]?.ToString() ?? pageProps["title"]?.ToString();
+                                    
+                                    string? artist = null;
+                                    var artistsArray = (entity?["artists"] ?? pageProps["artists"]) as JArray;
+                                    if (artistsArray != null && artistsArray.Count > 0)
+                                    {
+                                        var artistNames = new List<string>();
+                                        foreach (var art in artistsArray)
+                                        {
+                                            string? name = art?["name"]?.ToString()?.Trim();
+                                            if (!string.IsNullOrWhiteSpace(name)) artistNames.Add(name);
+                                        }
+                                        if (artistNames.Count > 0) artist = string.Join(", ", artistNames);
+                                    }
+                                    
+                                    artist = artist ?? entity?["subtitle"]?.ToString() ?? entity?["author_name"]?.ToString() ?? pageProps["author_name"]?.ToString();
+
+                                    if (!string.IsNullOrWhiteSpace(title))
+                                    {
+                                        return new SpotifyMetadata
+                                        {
+                                            Title = title.Trim(),
+                                            Artist = !string.IsNullOrWhiteSpace(artist) ? artist.Trim() : "Unknown Artist",
+                                            TrackId = trackId
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Layer 3 (Embed Widget) failed: {ex.Message}");
+            }
+
+            // Layer 4: HTML title / description meta tags on main track page
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+                {
+                    request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+                    request.Headers.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string html = await response.Content.ReadAsStringAsync();
+                            var titleMatch = Regex.Match(html, @"<title[^>]*>(.*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                            var ogTitleMatch = Regex.Match(html, @"<meta\s+property=""og:title""\s+content=""([^""]+)""", RegexOptions.IgnoreCase);
+                            var ogDescMatch = Regex.Match(html, @"<meta\s+property=""og:description""\s+content=""([^""]+)""", RegexOptions.IgnoreCase);
+                            
+                            string? scrapedTitle = null;
+                            if (ogTitleMatch.Success) scrapedTitle = System.Net.WebUtility.HtmlDecode(ogTitleMatch.Groups[1].Value.Trim());
+                            else if (titleMatch.Success) scrapedTitle = System.Net.WebUtility.HtmlDecode(titleMatch.Groups[1].Value.Trim());
+
+                            if (!string.IsNullOrWhiteSpace(scrapedTitle))
+                            {
+                                // Remove general Spotify postfixes if present in title
+                                if (scrapedTitle.EndsWith(" | Spotify", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    scrapedTitle = scrapedTitle.Substring(0, scrapedTitle.Length - " | Spotify".Length).Trim();
+                                }
+
+                                string artist = "Unknown Artist";
+                                if (ogDescMatch.Success)
+                                {
+                                    string ogDesc = System.Net.WebUtility.HtmlDecode(ogDescMatch.Groups[1].Value.Trim());
+                                    var songDotMatch = Regex.Match(ogDesc, @"Song\s+·\s+(.+?)\s+·\s+\d{4}", RegexOptions.IgnoreCase);
+                                    var byMatch = Regex.Match(ogDesc, @"Song by\s+(.+?)(?:\s+on\s+|\s+·|\s*$)", RegexOptions.IgnoreCase);
+                                    if (songDotMatch.Success) artist = songDotMatch.Groups[1].Value;
+                                    else if (byMatch.Success) artist = byMatch.Groups[1].Value;
+                                    else
+                                    {
+                                        var parts = ogDesc.Split(new[] { " · ", " - " }, StringSplitOptions.RemoveEmptyEntries);
+                                        if (parts.Length > 0) artist = parts[0];
+                                    }
+                                }
+
+                                // Check if title regex matches the English style "scrapedTitle - song and lyrics by artist | Spotify"
+                                // or Russian style "scrapedTitle - песня и текст от artist | Spotify"
+                                var songByMatch = Regex.Match(scrapedTitle, @"^(?<title>.*?) - song (?:and lyrics )?by (?<artist>.*?)$", RegexOptions.IgnoreCase);
+                                if (songByMatch.Success)
+                                {
+                                    scrapedTitle = songByMatch.Groups["title"].Value.Trim();
+                                    artist = songByMatch.Groups["artist"].Value.Trim();
+                                }
+
+                                return new SpotifyMetadata
+                                {
+                                    Title = scrapedTitle,
+                                    Artist = artist,
+                                    TrackId = trackId
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Layer 4 failed: {ex.Message}");
+            }
+
+            // Layer 5 Fallback: oEmbed
+            if (!string.IsNullOrWhiteSpace(oEmbedTitle))
+            {
+                return new SpotifyMetadata
+                {
+                    Title = oEmbedTitle,
+                    Artist = !string.IsNullOrWhiteSpace(oEmbedArtist) ? oEmbedArtist : "Unknown Artist",
+                    TrackId = trackId
+                };
+            }
+
+            return null;
         }
+
+        public class SpotifyMetadata
+        {
+            public string Title { get; set; } = "";
+            public string Artist { get; set; } = "";
+            public string TrackId { get; set; } = "";
+        }
+
 
         private void ParseFfmpegProgress(string line, double trimStartSeconds, double trimEndSeconds, ref double lastPercentage)
         {
