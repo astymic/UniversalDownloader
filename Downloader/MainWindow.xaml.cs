@@ -12,6 +12,10 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Ookii.Dialogs.Wpf;
 using UniversalDownloader.Services;
+using System.Text;
+using System.Windows.Media.Animation;
+using System.Windows.Input;
+using System.Linq;
 
 namespace UniversalDownloader
 {
@@ -40,6 +44,11 @@ namespace UniversalDownloader
         private string _currentItemTitle = "";
         private ObservableCollection<PlaylistVideoItem> _playlistItems = new ObservableCollection<PlaylistVideoItem>();
         private bool _isPlaylistMode = false;
+
+        private List<PlaylistVideoItem> _spotifyCsvPlaylistItems = new List<PlaylistVideoItem>();
+        private string _spotifyCsvPlaylistName = "";
+        private bool _isSpotifyDrawerExpanded = false;
+        private ObservableCollection<SpotifyImportedPlaylist> _spotifyImports = new ObservableCollection<SpotifyImportedPlaylist>();
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -265,7 +274,7 @@ namespace UniversalDownloader
                 bool canInputUrl = !isBusy;
                 bool canDownloadAction = CanInitiateDownload() && !isBusy;
 
-                if (UrlTextBox != null) UrlTextBox.IsEnabled = canInputUrl;
+                if (UrlTextBox != null) UrlTextBox.IsEnabled = canInputUrl && !_isSpotifyDrawerExpanded;
                 if (BrowseButton != null) BrowseButton.IsEnabled = canBrowse;
 
                 if (CancelDownloadButton != null)
@@ -305,10 +314,16 @@ namespace UniversalDownloader
 
         private bool CanInitiateDownload()
         {
-            if (UrlTextBox == null || string.IsNullOrWhiteSpace(UrlTextBox.Text) || UrlTextBox.Text == "Paste URL here...")
+            bool hasSpotifyCsvTracks = _playlistItems.Count > 0 && _isPlaylistMode && 
+                (_playlistItems[0].VideoUrl.StartsWith("ytsearch1:", StringComparison.OrdinalIgnoreCase));
+
+            bool isUrlValid = UrlTextBox != null && !string.IsNullOrWhiteSpace(UrlTextBox.Text) && UrlTextBox.Text != "Paste URL here...";
+
+            if (!isUrlValid && !hasSpotifyCsvTracks)
             {
                 return false;
             }
+
             if (string.IsNullOrWhiteSpace(SelectedDirectory) || !Directory.Exists(SelectedDirectory))
             {
                 return false;
@@ -318,6 +333,11 @@ namespace UniversalDownloader
 
         private void UrlTextBox_GotFocus(object sender, RoutedEventArgs e)
         {
+            if (_isSpotifyDrawerExpanded)
+            {
+                CollapseSpotifyDrawer();
+            }
+
             if (UrlTextBox.Text == "Paste URL here...")
             {
                 UrlTextBox.Text = "";
@@ -383,18 +403,66 @@ namespace UniversalDownloader
         {
             YouTubeQualityComboBox.ItemsSource = null;
             QualitySection.Visibility = Visibility.Collapsed;
-            // Reset playlist section
-            _isPlaylistMode = false;
-            _playlistItems.Clear();
-            if (FindName("PlaylistSection") is Border playlistBorder) playlistBorder.Visibility = Visibility.Collapsed;
 
             if (string.IsNullOrWhiteSpace(url) || url == "Paste URL here...")
             {
-                if (FileNameTextBlock != null) { FileNameTextBlock.Text = ""; FileNameTextBlock.Visibility = Visibility.Collapsed; }
-                if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
-                if (VideoDurationLabel != null) VideoDurationLabel.Text = "";
+                if (_spotifyCsvPlaylistItems.Count > 0)
+                {
+                    // Restore Spotify CSV state!
+                    _playlistItems.Clear();
+                    foreach (var item in _spotifyCsvPlaylistItems)
+                    {
+                        _playlistItems.Add(item);
+                    }
+                    _isPlaylistMode = true;
+                    _currentItemTitle = _spotifyCsvPlaylistName;
+                    
+                    if (FileNameTextBlock != null)
+                    {
+                        FileNameTextBlock.Text = _spotifyCsvPlaylistName;
+                        FileNameTextBlock.Visibility = Visibility.Visible;
+                    }
+                    if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
+                    if (VideoDurationLabel != null) VideoDurationLabel.Text = "";
+
+                    if (FindName("PlaylistSection") is Border plBorder)
+                    {
+                        plBorder.Visibility = Visibility.Visible;
+                    }
+                    if (FindName("PlaylistTitleLabel") is TextBlock plTitle)
+                    {
+                        string shortPl = _spotifyCsvPlaylistName.Length > 35 ? _spotifyCsvPlaylistName.Substring(0, 32) + "..." : _spotifyCsvPlaylistName;
+                        plTitle.Text = shortPl;
+                    }
+                    if (FindName("PlaylistCountLabel") is TextBlock plCount)
+                    {
+                        plCount.Text = $"{_playlistItems.Count} tracks";
+                    }
+                    if (FindName("PlaylistItemsControl") is ItemsControl plItems)
+                    {
+                        plItems.ItemsSource = null;
+                        plItems.ItemsSource = _playlistItems;
+                    }
+
+                    StatusTextBlock.Text = $"Imported {_playlistItems.Count} tracks from CSV. Ready to download!";
+                }
+                else
+                {
+                    // Normal reset
+                    _isPlaylistMode = false;
+                    _playlistItems.Clear();
+                    if (FindName("PlaylistSection") is Border playlistBorder) playlistBorder.Visibility = Visibility.Collapsed;
+                    if (FileNameTextBlock != null) { FileNameTextBlock.Text = ""; FileNameTextBlock.Visibility = Visibility.Collapsed; }
+                    if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
+                    if (VideoDurationLabel != null) VideoDurationLabel.Text = "";
+                }
                 return;
             }
+
+            // Reset playlist section for incoming URL
+            _isPlaylistMode = false;
+            _playlistItems.Clear();
+            if (FindName("PlaylistSection") is Border playlistBorder2) playlistBorder2.Visibility = Visibility.Collapsed;
 
             // ── Playlist check FIRST (before single video) ──
             if (_downloadService.IsSpotifyPlaylistOrAlbumLink(url))
@@ -405,7 +473,7 @@ namespace UniversalDownloader
 
                 try
                 {
-                    var plMetadata = await _downloadService.GetSpotifyPlaylistMetadataAsync(url, _spotifyUserToken, _spotifyClientId, _spotifyClientSecret);
+                    var plMetadata = await _downloadService.GetSpotifyPlaylistMetadataAsync(url, null, null, null);
                     if (plMetadata != null && plMetadata.Tracks.Count > 0)
                     {
                         _currentItemTitle = plMetadata.Name;
@@ -452,9 +520,9 @@ namespace UniversalDownloader
                             plItems.ItemsSource = _playlistItems;
                         }
 
-                        if (_playlistItems.Count == 100 && string.IsNullOrEmpty(_spotifyUserToken) && (string.IsNullOrEmpty(_spotifyClientId) || string.IsNullOrEmpty(_spotifyClientSecret)))
+                        if (_playlistItems.Count == 100)
                         {
-                            StatusTextBlock.Text = "Playlist loaded (limit 100). Connect Spotify in Settings to bypass the limit!";
+                            StatusTextBlock.Text = "Playlist loaded (limit 100). Use the CSV Import card to load playlists of any size!";
                         }
                         else
                         {
@@ -859,6 +927,15 @@ namespace UniversalDownloader
             }
 
             string url = UrlTextBox.Text;
+            bool hasSpotifyCsvTracks = _playlistItems.Count > 0 && _isPlaylistMode && 
+                (_playlistItems[0].VideoUrl.StartsWith("ytsearch1:", StringComparison.OrdinalIgnoreCase));
+            bool isUrlValid = !string.IsNullOrWhiteSpace(url) && url != "Paste URL here...";
+
+            if (hasSpotifyCsvTracks && !isUrlValid)
+            {
+                _isPlaylistMode = true;
+            }
+
             if (!CanInitiateDownload()) return;
 
             _isDownloadingFile = true;
@@ -908,7 +985,7 @@ namespace UniversalDownloader
 
                         string downloadUrl = plItem.VideoUrl;
                         string? overrideName = null;
-                        if (downloadUrl.StartsWith("spotify:", StringComparison.OrdinalIgnoreCase) || downloadUrl.Contains("open.spotify.com"))
+                        if (downloadUrl.StartsWith("spotify:", StringComparison.OrdinalIgnoreCase) || downloadUrl.Contains("open.spotify.com") || downloadUrl.StartsWith("ytsearch1:", StringComparison.OrdinalIgnoreCase))
                         {
                             string cleanTitle = plItem.Title.Replace("\"", "").Replace("'", "");
                             downloadUrl = $"ytsearch1:{cleanTitle}";
@@ -1073,6 +1150,443 @@ namespace UniversalDownloader
                 new YouTubeQualityItem { Label = "MP3", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "mp3", SortPriority = 48 },
             };
         }
+
+        private void OpenExportifyButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://exportify.net",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not open browser: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void ImportSpotifyCsvButton_Click(object sender, RoutedEventArgs e)
+        {
+            var openFileDialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                Title = "Select Spotify Playlist CSV"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                string filePath = openFileDialog.FileName;
+                try
+                {
+                    StatusTextBlock.Text = "Importing tracks from CSV...";
+                    string playlistName = Path.GetFileNameWithoutExtension(filePath);
+
+                    var tracks = new List<(string Title, string Artist)>();
+
+                    // Read CSV lines
+                    var lines = await Task.Run(() => File.ReadAllLines(filePath, Encoding.UTF8));
+                    if (lines.Length <= 1)
+                    {
+                        MessageBox.Show("The selected CSV file is empty.", "Import Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        StatusTextBlock.Text = "Failed to import CSV: file is empty.";
+                        return;
+                    }
+
+                    // Parse header to find column indices
+                    string header = lines[0];
+                    string[] headers = ParseCsvLine(header);
+
+                    int trackNameIdx = -1;
+                    int artistNameIdx = -1;
+
+                    for (int i = 0; i < headers.Length; i++)
+                    {
+                        string h = headers[i].Trim().ToLower();
+                        if (h.Contains("track name") || h == "title" || h == "name")
+                        {
+                            trackNameIdx = i;
+                        }
+                        else if (h.Contains("artist name") || h == "artist" || h == "artists")
+                        {
+                            artistNameIdx = i;
+                        }
+                    }
+
+                    if (trackNameIdx == -1 || artistNameIdx == -1)
+                    {
+                        // Fallback to default indices if headers aren't clear:
+                        // Exportify columns:
+                        // [0] Track URI, [1] Track Name, [2] Artist URI(s), [3] Artist Name(s)
+                        trackNameIdx = 1;
+                        artistNameIdx = 3;
+                    }
+
+                    for (int i = 1; i < lines.Length; i++)
+                    {
+                        string line = lines[i];
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+
+                        string[] fields = ParseCsvLine(line);
+                        if (fields.Length > Math.Max(trackNameIdx, artistNameIdx))
+                        {
+                            string title = fields[trackNameIdx].Trim();
+                            string artist = fields[artistNameIdx].Trim();
+                            if (!string.IsNullOrEmpty(title))
+                            {
+                                tracks.Add((title, artist));
+                            }
+                        }
+                    }
+
+                    if (tracks.Count > 0)
+                    {
+                        _currentItemTitle = playlistName;
+                        _spotifyCsvPlaylistName = playlistName;
+                        FileNameTextBlock.Text = playlistName;
+                        FileNameTextBlock.Visibility = Visibility.Visible;
+
+                        var defaultQualities = GetDefaultQualities();
+
+                        _playlistItems.Clear();
+                        _spotifyCsvPlaylistItems.Clear();
+                        _isPlaylistMode = true;
+                        QualitySection.Visibility = Visibility.Collapsed;
+                        if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
+
+                        foreach (var track in tracks)
+                        {
+                            var item = new PlaylistVideoItem
+                            {
+                                IsSelected = true,
+                                Title = $"{track.Artist} - {track.Title}",
+                                VideoUrl = $"ytsearch1:{track.Artist} - {track.Title}", // Search query for yt-dlp
+                                DurationText = "",
+                                AvailableQualities = new List<YouTubeQualityItem>(defaultQualities),
+                                SelectedQualityIndex = 7 // Default to MP3
+                            };
+                            _playlistItems.Add(item);
+                            _spotifyCsvPlaylistItems.Add(item);
+                        }
+
+                        if (FindName("PlaylistSection") is Border plBorder)
+                        {
+                            plBorder.Visibility = Visibility.Visible;
+                        }
+                        if (FindName("PlaylistTitleLabel") is TextBlock plTitle)
+                        {
+                            string shortPl = playlistName.Length > 35 ? playlistName.Substring(0, 32) + "..." : playlistName;
+                            plTitle.Text = shortPl;
+                        }
+                        if (FindName("PlaylistCountLabel") is TextBlock plCount)
+                        {
+                            plCount.Text = $"{_playlistItems.Count} tracks";
+                        }
+                        if (FindName("PlaylistItemsControl") is ItemsControl plItems)
+                        {
+                            plItems.ItemsSource = null;
+                            plItems.ItemsSource = _playlistItems;
+                        }
+
+                        // Update Spotify side drawer elements
+                        if (SpotifyCsvInfoBorder != null)
+                        {
+                            SpotifyCsvInfoBorder.Visibility = Visibility.Visible;
+                        }
+                        if (SpotifyCsvNameText != null)
+                        {
+                            SpotifyCsvNameText.Text = playlistName;
+                        }
+                        if (SpotifyCsvCountText != null)
+                        {
+                            SpotifyCsvCountText.Text = $"{tracks.Count} tracks loaded";
+                        }
+
+                        // Create and add the playlist to history
+                        var importedPlaylist = new SpotifyImportedPlaylist
+                        {
+                            Name = playlistName,
+                            Tracks = new List<PlaylistVideoItem>(_playlistItems)
+                        };
+
+                        var existing = _spotifyImports.FirstOrDefault(p => p.Name == playlistName);
+                        if (existing != null)
+                        {
+                            _spotifyImports.Remove(existing);
+                        }
+                        _spotifyImports.Insert(0, importedPlaylist);
+
+                        if (SpotifyImportsItemsControl != null)
+                        {
+                            SpotifyImportsItemsControl.ItemsSource = null;
+                            SpotifyImportsItemsControl.ItemsSource = _spotifyImports;
+                        }
+                        if (SpotifyImportsBorder != null)
+                        {
+                            SpotifyImportsBorder.Visibility = Visibility.Visible;
+                        }
+
+                        StatusTextBlock.Text = $"Imported {_playlistItems.Count} tracks from CSV. Ready to download!";
+                        CollapseSpotifyDrawer();
+                        UpdateUiElementStates();
+                    }
+                    else
+                    {
+                        MessageBox.Show("No tracks could be parsed from the CSV file.", "Import Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        StatusTextBlock.Text = "Failed to parse tracks from CSV.";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to parse CSV file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    StatusTextBlock.Text = "Error importing CSV.";
+                }
+            }
+        }
+
+        private string[] ParseCsvLine(string line)
+        {
+            var fields = new List<string>();
+            bool inQuotes = false;
+            var builder = new StringBuilder();
+
+            for (int i = 0; i < line.Length; i++)
+            {
+                char c = line[i];
+                if (c == '"')
+                {
+                    inQuotes = !inQuotes;
+                }
+                else if (c == ',' && !inQuotes)
+                {
+                    fields.Add(builder.ToString());
+                    builder.Clear();
+                }
+                else
+                {
+                    builder.Append(c);
+                }
+            }
+            fields.Add(builder.ToString());
+            return fields.ToArray();
+        }
+
+        private void SpotifyCollapsedButton_Click(object sender, RoutedEventArgs e)
+        {
+            ExpandSpotifyDrawer();
+        }
+
+        private void SpotifyExpandedHeaderButton_Click(object sender, RoutedEventArgs e)
+        {
+            CollapseSpotifyDrawer();
+        }
+
+        private void ExpandSpotifyDrawer()
+        {
+            if (_isSpotifyDrawerExpanded) return;
+            _isSpotifyDrawerExpanded = true;
+
+            // Block URL text input
+            if (UrlTextBox != null)
+            {
+                UrlTextBox.IsEnabled = false;
+            }
+
+            // Show overlay
+            if (MainContentOverlayBorder != null)
+            {
+                MainContentOverlayBorder.Visibility = Visibility.Visible;
+                var opacityAnim = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(250))
+                {
+                    DecelerationRatio = 0.95
+                };
+                MainContentOverlayBorder.BeginAnimation(OpacityProperty, opacityAnim);
+            }
+
+            // Slide drawer using TranslateTransform (extremely smooth GPU animation!)
+            if (DrawerTransform != null)
+            {
+                var slideAnim = new DoubleAnimation(260, 0, TimeSpan.FromMilliseconds(300))
+                {
+                    DecelerationRatio = 0.95
+                };
+                DrawerTransform.BeginAnimation(TranslateTransform.XProperty, slideAnim);
+            }
+
+            // Toggle content visibility with fades
+            if (SpotifyCollapsedView != null)
+            {
+                var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(120));
+                fadeOut.Completed += (s, e2) => SpotifyCollapsedView.Visibility = Visibility.Collapsed;
+                SpotifyCollapsedView.BeginAnimation(OpacityProperty, fadeOut);
+            }
+
+            if (SpotifyExpandedView != null)
+            {
+                SpotifyExpandedView.Visibility = Visibility.Visible;
+                var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(250))
+                {
+                    BeginTime = TimeSpan.FromMilliseconds(80),
+                    DecelerationRatio = 0.95
+                };
+                SpotifyExpandedView.BeginAnimation(OpacityProperty, fadeIn);
+            }
+
+            UpdateUiElementStates();
+        }
+
+        private void CollapseSpotifyDrawer()
+        {
+            if (!_isSpotifyDrawerExpanded) return;
+            _isSpotifyDrawerExpanded = false;
+
+            // Hide overlay
+            if (MainContentOverlayBorder != null)
+            {
+                var opacityAnim = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(200))
+                {
+                    DecelerationRatio = 0.95
+                };
+                opacityAnim.Completed += (s, e2) => MainContentOverlayBorder.Visibility = Visibility.Collapsed;
+                MainContentOverlayBorder.BeginAnimation(OpacityProperty, opacityAnim);
+            }
+
+            // Slide drawer back using TranslateTransform
+            if (DrawerTransform != null)
+            {
+                var slideAnim = new DoubleAnimation(0, 260, TimeSpan.FromMilliseconds(300))
+                {
+                    DecelerationRatio = 0.95
+                };
+                DrawerTransform.BeginAnimation(TranslateTransform.XProperty, slideAnim);
+            }
+
+            // Toggle content visibility back
+            if (SpotifyExpandedView != null)
+            {
+                var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(120));
+                fadeOut.Completed += (s, e2) => SpotifyExpandedView.Visibility = Visibility.Collapsed;
+                SpotifyExpandedView.BeginAnimation(OpacityProperty, fadeOut);
+            }
+
+            if (SpotifyCollapsedView != null)
+            {
+                SpotifyCollapsedView.Visibility = Visibility.Visible;
+                var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(250))
+                {
+                    BeginTime = TimeSpan.FromMilliseconds(80),
+                    DecelerationRatio = 0.95
+                };
+                SpotifyCollapsedView.BeginAnimation(OpacityProperty, fadeIn);
+            }
+
+            // Re-enable UrlTextBox if needed
+            if (UrlTextBox != null)
+            {
+                UrlTextBox.IsEnabled = true;
+            }
+
+            UpdateUiElementStates();
+        }
+
+        private void MainContentOverlayBorder_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            bool overUrlTextBox = UrlTextBox != null && UrlTextBox.IsMouseOver;
+            CollapseSpotifyDrawer();
+            if (overUrlTextBox && UrlTextBox != null)
+            {
+                UrlTextBox.Focus();
+                if (UrlTextBox.Text == "Paste URL here...")
+                {
+                    UrlTextBox.Text = "";
+                    UrlTextBox.Foreground = (Brush)FindResource("TextPrimaryBrush");
+                }
+            }
+        }
+
+        private void UrlTextBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_isSpotifyDrawerExpanded)
+            {
+                CollapseSpotifyDrawer();
+            }
+        }
+
+        private void SpotifyImportItem_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            if (button == null) return;
+
+            var playlist = button.Tag as SpotifyImportedPlaylist;
+            if (playlist == null) return;
+
+            // Load playlist details into main application state
+            _currentItemTitle = playlist.Name;
+            _spotifyCsvPlaylistName = playlist.Name;
+            
+            if (FileNameTextBlock != null)
+            {
+                FileNameTextBlock.Text = playlist.Name;
+                FileNameTextBlock.Visibility = Visibility.Visible;
+            }
+
+            _playlistItems.Clear();
+            _spotifyCsvPlaylistItems.Clear();
+            _isPlaylistMode = true;
+            
+            if (QualitySection != null) QualitySection.Visibility = Visibility.Collapsed;
+            if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
+
+            foreach (var item in playlist.Tracks)
+            {
+                _playlistItems.Add(item);
+                _spotifyCsvPlaylistItems.Add(item);
+            }
+
+            if (FindName("PlaylistSection") is Border plBorder)
+            {
+                plBorder.Visibility = Visibility.Visible;
+            }
+            if (FindName("PlaylistTitleLabel") is TextBlock plTitle)
+            {
+                string shortPl = playlist.Name.Length > 35 ? playlist.Name.Substring(0, 32) + "..." : playlist.Name;
+                plTitle.Text = shortPl;
+            }
+            if (FindName("PlaylistCountLabel") is TextBlock plCount)
+            {
+                plCount.Text = $"{_playlistItems.Count} tracks";
+            }
+            if (FindName("PlaylistItemsControl") is ItemsControl plItems)
+            {
+                plItems.ItemsSource = null;
+                plItems.ItemsSource = _playlistItems;
+            }
+
+            // Highlight the active import status panel in the drawer
+            if (SpotifyCsvInfoBorder != null)
+            {
+                SpotifyCsvInfoBorder.Visibility = Visibility.Visible;
+            }
+            if (SpotifyCsvNameText != null)
+            {
+                SpotifyCsvNameText.Text = playlist.Name;
+            }
+            if (SpotifyCsvCountText != null)
+            {
+                SpotifyCsvCountText.Text = $"{playlist.Tracks.Count} tracks loaded";
+            }
+
+            StatusTextBlock.Text = $"Loaded playlist '{playlist.Name}' from previous imports. Ready to download!";
+            CollapseSpotifyDrawer();
+            UpdateUiElementStates();
+        }
+    }
+
+    public class SpotifyImportedPlaylist
+    {
+        public string Name { get; set; } = "";
+        public List<PlaylistVideoItem> Tracks { get; set; } = new List<PlaylistVideoItem>();
     }
 
     public class YouTubeQualityItem

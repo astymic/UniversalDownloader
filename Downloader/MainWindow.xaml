@@ -507,7 +507,6 @@
                     </StackPanel>
                 </Grid>
             </Border>
-            <!-- Main Content Area -->
             <Grid Grid.Row="1">
                 <!-- Main Downloader View -->
                 <ScrollViewer x:Name="MainScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Visible">
@@ -536,7 +535,7 @@
                                 Effect="{StaticResource CardShadow}">
                             <StackPanel>
                                 <TextBlock Text="LINK TO DOWNLOAD" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
-                                <TextBox x:Name="UrlTextBox" Style="{StaticResource ModernTextBox}" Text="Paste URL here..." TextChanged="UrlTextBox_TextChanged" GotFocus="UrlTextBox_GotFocus" LostFocus="UrlTextBox_LostFocus"/>
+                                <TextBox x:Name="UrlTextBox" Style="{StaticResource ModernTextBox}" Text="Paste URL here..." TextChanged="UrlTextBox_TextChanged" GotFocus="UrlTextBox_GotFocus" LostFocus="UrlTextBox_LostFocus" PreviewMouseDown="UrlTextBox_PreviewMouseDown"/>
                             </StackPanel>
                         </Border>
 
@@ -766,83 +765,173 @@
                                 </Grid>
                             </StackPanel>
                         </Border>
-
-                        <!-- Spotify Settings -->
-                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
-                            <StackPanel>
-                                <TextBlock Text="SPOTIFY INTEGRATION" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" FontWeight="Bold" Margin="0,0,0,8"/>
-                                <TextBlock Text="Required to fetch all tracks in playlists/albums exceeding the 100-track limit." Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,20" TextWrapping="Wrap"/>
-
-                                <!-- Option A: User Account (Browser Token) -->
-                                <TextBlock Text="METHOD A: CONNECT SPOTIFY ACCOUNT (RECOMMENDED)" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,8"/>
-                                <TextBlock Text="No developer account required. Log in via your web browser to authorize." Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,12" TextWrapping="Wrap"/>
-                                
-                                <Grid Margin="0,0,0,16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="SpotifyAccountStatusTextBlock" Grid.Column="0" Text="Status: Not Connected" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <Button x:Name="ConnectAccountBrowserButton" Style="{StaticResource SecondaryButton}" Content="Connect Account" Click="ConnectAccountBrowserButton_Click" Padding="14,8" Margin="0,0,8,0"/>
-                                        <Button x:Name="DisconnectAccountButton" Style="{StaticResource SecondaryButton}" Content="Log Out" Click="DisconnectAccountButton_Click" Padding="14,8" Visibility="Collapsed"/>
-                                    </StackPanel>
-                                </Grid>
-
-                                <!-- Token Paste Panel -->
-                                <Border x:Name="SpotifyTokenPastePanel" Background="#0DFFFFFF" CornerRadius="8" Padding="16" Margin="0,0,0,20" Visibility="Collapsed" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
-                                    <StackPanel>
-                                        <TextBlock Text="1. Log in to Spotify in the browser window that just opened." Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" Margin="0,0,0,4" TextWrapping="Wrap"/>
-                                        <TextBlock Text="2. After authorizing, copy the entire URL from the browser address bar (it starts with open.spotify.com/#access_token=...)." Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" Margin="0,0,0,12" TextWrapping="Wrap"/>
-                                        <TextBlock Text="PASTE THE REDIRECTED URL HERE:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,6"/>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBox x:Name="SpotifyRedirectUrlTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Padding="10,8"/>
-                                            <Button x:Name="ConfirmTokenButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Confirm" Click="ConfirmTokenButton_Click" Padding="16,8"/>
-                                        </Grid>
-                                        <TextBlock x:Name="SpotifyTokenErrorTextBlock" Foreground="#EF4444" FontSize="11" Margin="0,8,0,0" Visibility="Collapsed" TextWrapping="Wrap"/>
-                                    </StackPanel>
-                                </Border>
-
-                                <Separator Height="1" Background="{StaticResource BorderBrush}" Margin="0,8,0,20"/>
-
-                                <!-- Option B: Developer Credentials -->
-                                <TextBlock Text="METHOD B: SPOTIFY API DEVELOPER CREDENTIALS" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,8"/>
-                                <TextBlock Text="Use your own Spotify Developer App credentials for permanent offline access." Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,16" TextWrapping="Wrap"/>
-                                
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Client ID:" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" FontSize="12"/>
-                                    <TextBox x:Name="SpotifyClientIdTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" TextChanged="SpotifyCredentials_TextChanged" Padding="10,8"/>
-                                </Grid>
-                                
-                                <Grid Margin="0,0,0,16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Client Secret:" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" FontSize="12"/>
-                                    <TextBox x:Name="SpotifyClientSecretTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" TextChanged="SpotifyCredentials_TextChanged" Padding="10,8"/>
-                                </Grid>
-
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="SpotifyApiStatusTextBlock" Grid.Column="0" Text="" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0"/>
-                                    <Button x:Name="TestApiConnectionButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Test Connection" Click="TestApiConnectionButton_Click" Padding="16,8"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
                     </StackPanel>
                 </ScrollViewer>
+
+                <!-- Blocking Overlay for Spotify Import -->
+                <Border x:Name="MainContentOverlayBorder" 
+                        Background="#B009090B" 
+                        Visibility="Collapsed" 
+                        Opacity="0"
+                        Panel.ZIndex="10"
+                        PreviewMouseLeftButtonDown="MainContentOverlayBorder_PreviewMouseLeftButtonDown">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <!-- Spotify Logo -->
+                        <Path Width="64" Height="64" Stretch="Uniform" Fill="#1DB954" Margin="0,0,0,16"
+                              Data="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.565.387-.86.207-2.377-1.454-5.37-1.783-8.893-1.007-.336.075-.67-.14-.744-.477-.074-.336.14-.67.477-.744 3.844-.877 7.143-.5 9.843 1.15.295.18.387.565.207.86zm1.223-2.72c-.226.367-.707.487-1.074.26-2.72-1.672-6.87-2.157-10.082-1.182-.413.125-.85-.107-.975-.52-.125-.413.107-.85.52-.975 3.678-1.117 8.243-.57 11.35 1.343.367.227.487.708.26 1.074zm.107-2.82C14.792 8.98 9.68 8.81 6.74 9.7c-.476.143-.982-.123-1.127-.6-.143-.475.124-.982.6-1.126 3.407-1.033 9.04-.842 12.63 1.287.428.254.57.802.315 1.23-.254.428-.802.57-1.23.315z"/>
+                        <TextBlock Text="Spotify Import Active" Foreground="{StaticResource TextPrimaryBrush}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                        <TextBlock Text="Click anywhere here to return to normal downloading" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Spotify Drawer Panel -->
+                <Border x:Name="SpotifyDrawerBorder"
+                        HorizontalAlignment="Right"
+                        Width="320"
+                        Background="#161619"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1,0,0,0"
+                        Panel.ZIndex="20">
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="DrawerTransform" X="260"/>
+                    </Border.RenderTransform>
+                    <Grid>
+                        <!-- COLLAPSED STATE (Spotify Green Button) -->
+                        <Grid x:Name="SpotifyCollapsedView" Width="60" HorizontalAlignment="Left" Visibility="Visible" Opacity="1">
+                            <Button x:Name="SpotifyCollapsedButton"
+                                    Width="44"
+                                    Height="44"
+                                    Margin="0,20,0,0"
+                                    VerticalAlignment="Top"
+                                    HorizontalAlignment="Center"
+                                    Click="SpotifyCollapsedButton_Click"
+                                    Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="border" Background="#1DB954" CornerRadius="22">
+                                            <Path Width="24" Height="24" Stretch="Uniform" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Data="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.565.387-.86.207-2.377-1.454-5.37-1.783-8.893-1.007-.336.075-.67-.14-.744-.477-.074-.336.14-.67.477-.744 3.844-.877 7.143-.5 9.843 1.15.295.18.387.565.207.86zm1.223-2.72c-.226.367-.707.487-1.074.26-2.72-1.672-6.87-2.157-10.082-1.182-.413.125-.85-.107-.975-.52-.125-.413.107-.85.52-.975 3.678-1.117 8.243-.57 11.35 1.343.367.227.487.708.26 1.074zm.107-2.82C14.792 8.98 9.68 8.81 6.74 9.7c-.476.143-.982-.123-1.127-.6-.143-.475.124-.982.6-1.126 3.407-1.033 9.04-.842 12.63 1.287.428.254.57.802.315 1.23-.254.428-.802.57-1.23.315z"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="#1ed760"/>
+                                                <Setter TargetName="border" Property="Effect">
+                                                    <Setter.Value>
+                                                        <DropShadowEffect BlurRadius="15" ShadowDepth="0" Color="#1DB954" Opacity="0.6"/>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
+
+                        <!-- EXPANDED STATE (Full Drawer Panel) -->
+                        <Grid x:Name="SpotifyExpandedView" Visibility="Collapsed" Opacity="0" Margin="16,20,16,20">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Header: Spotify Icon + Text + Collapse Button -->
+                            <Grid Grid.Row="0" Margin="0,0,0,24">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Clicking the top Spotify logo will collapse it! -->
+                                <Button x:Name="SpotifyExpandedHeaderButton"
+                                        Grid.Column="0"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Padding="0"
+                                        Cursor="Hand"
+                                        Click="SpotifyExpandedHeaderButton_Click">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Path Width="32" Height="32" Stretch="Uniform" Fill="#1DB954"
+                                                  Data="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.565.387-.86.207-2.377-1.454-5.37-1.783-8.893-1.007-.336.075-.67-.14-.744-.477-.074-.336.14-.67.477-.744 3.844-.877 7.143-.5 9.843 1.15.295.18.387.565.207.86zm1.223-2.72c-.226.367-.707.487-1.074.26-2.72-1.672-6.87-2.157-10.082-1.182-.413.125-.85-.107-.975-.52-.125-.413.107-.85.52-.975 3.678-1.117 8.243-.57 11.35 1.343.367.227.487.708.26 1.074zm.107-2.82C14.792 8.98 9.68 8.81 6.74 9.7c-.476.143-.982-.123-1.127-.6-.143-.475.124-.982.6-1.126 3.407-1.033 9.04-.842 12.63 1.287.428.254.57.802.315 1.23-.254.428-.802.57-1.23.315z"/>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                                    <TextBlock Text="SPOTIFY IMPORT" Foreground="{StaticResource TextPrimaryBrush}" FontSize="14" FontWeight="Bold"/>
+                                    <TextBlock Text="Playlist CSV Importer" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10"/>
+                                </StackPanel>
+
+                                <!-- Close Button on top right -->
+                                <Button Grid.Column="2" Content="✕" Style="{StaticResource MinimalistCancelButton}" Click="SpotifyExpandedHeaderButton_Click" Height="28" Width="28" FontSize="12"/>
+                            </Grid>
+
+                            <!-- Scrollable Panel Content -->
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel>
+                                    <TextBlock Text="Загрузка плейлистов любого размера через экспорт CSV." Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,20" TextWrapping="Wrap"/>
+
+                                    <!-- Step 1: Open Exportify -->
+                                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="16" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Margin="0,0,0,16">
+                                        <StackPanel>
+                                            <TextBlock Text="ШАГ 1: ЭКСПОРТ CSV" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
+                                            <TextBlock Text="Откройте бесплатный сервис Exportify и скачайте CSV файл вашего плейлиста." Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,12" TextWrapping="Wrap"/>
+                                            <Button Style="{StaticResource SecondaryButton}" Content="Открыть Exportify ↗" Click="OpenExportifyButton_Click" Padding="10,8" FontSize="11" HorizontalAlignment="Stretch"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Step 2: Load CSV -->
+                                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="16" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Margin="0,0,0,20">
+                                        <StackPanel>
+                                            <TextBlock Text="ШАГ 2: ИМПОРТ ФАЙЛА" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
+                                            <Button Style="{StaticResource ModernButton}" Content="Выбрать CSV файл" Click="ImportSpotifyCsvButton_Click" Padding="10,8" FontSize="11" HorizontalAlignment="Stretch"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- CSV Info / Status Panel -->
+                                    <Border x:Name="SpotifyCsvInfoBorder" Background="#0DFFFFFF" CornerRadius="8" Padding="16" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Visibility="Collapsed" Margin="0,0,0,16">
+                                        <StackPanel>
+                                            <TextBlock Text="ТЕКУЩИЙ ИМПОРТ" Foreground="{StaticResource SuccessBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
+                                            <TextBlock x:Name="SpotifyCsvNameText" Text="Playlist Name" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
+                                            <TextBlock x:Name="SpotifyCsvCountText" Text="0 tracks loaded" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Previous Imports Section -->
+                                    <Border x:Name="SpotifyImportsBorder" Background="#0DFFFFFF" CornerRadius="8" Padding="16" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Margin="0,0,0,16" Visibility="Collapsed">
+                                        <StackPanel>
+                                            <TextBlock Text="ИМПОРТЫ" Foreground="{StaticResource PrimaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,12"/>
+                                            <ItemsControl x:Name="SpotifyImportsItemsControl">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Style="{StaticResource SecondaryButton}" 
+                                                                Margin="0,0,0,8" 
+                                                                Padding="12,10" 
+                                                                HorizontalAlignment="Stretch" 
+                                                                Click="SpotifyImportItem_Click"
+                                                                Tag="{Binding}">
+                                                            <Button.Content>
+                                                                <Grid HorizontalAlignment="Stretch" Width="240">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" HorizontalAlignment="Left"/>
+                                                                    <TextBlock Grid.Column="1" Text="{Binding Tracks.Count, StringFormat='{}{0} треков'}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" HorizontalAlignment="Right" Margin="8,0,0,0"/>
+                                                                </Grid>
+                                                            </Button.Content>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+                    </Grid>
+                </Border>
             </Grid>
         </Grid>
     </Border>

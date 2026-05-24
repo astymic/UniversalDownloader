@@ -854,25 +854,7 @@ namespace UniversalDownloader.Services
             return null;
         }
 
-        public async Task<bool> TestSpotifyApiConnectionAsync(string token)
-        {
-            try
-            {
-                using (var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/playlists/37i9dQZF1DXcBWIGsy6aRO"))
-                {
-                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-                    using (var response = await _httpClient.SendAsync(request))
-                    {
-                        return response.IsSuccessStatusCode;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Test API connection failed: {ex.Message}");
-                return false;
-            }
-        }
+
 
         public async Task<SpotifyPlaylistMetadata?> GetSpotifyPlaylistMetadataFromScrapingAsync(string type, string id)
         {
@@ -970,10 +952,18 @@ namespace UniversalDownloader.Services
                         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
                         using (var response = await _httpClient.SendAsync(request))
                         {
+                            string body = await response.Content.ReadAsStringAsync();
+                            Debug.WriteLine($"[Spotify {type}] GET /{type}s/{id}: HTTP {(int)response.StatusCode}, Body={body.Substring(0, Math.Min(300, body.Length))}");
                             if (response.IsSuccessStatusCode)
                             {
-                                var jObj = JObject.Parse(await response.Content.ReadAsStringAsync());
+                                var jObj = JObject.Parse(body);
                                 name = jObj["name"]?.ToString() ?? name;
+                            }
+                            else
+                            {
+                                // Token is invalid, expired, or insufficient scope — fall through to scraping
+                                Debug.WriteLine($"[Spotify] Playlist metadata fetch failed: {body}. Falling back to scraping.");
+                                return await GetSpotifyPlaylistMetadataFromScrapingAsync(type, id);
                             }
                         }
                     }
@@ -999,8 +989,9 @@ namespace UniversalDownloader.Services
                             {
                                 if (!response.IsSuccessStatusCode)
                                 {
-                                    hasMore = false;
-                                    break;
+                                    string errBody = await response.Content.ReadAsStringAsync();
+                                    Debug.WriteLine($"[Spotify tracks] HTTP {(int)response.StatusCode}: {errBody}. Falling back to scraping.");
+                                    return await GetSpotifyPlaylistMetadataFromScrapingAsync(type, id);
                                 }
 
                                 var jObj = JObject.Parse(await response.Content.ReadAsStringAsync());
