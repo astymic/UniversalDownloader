@@ -285,7 +285,9 @@ namespace UniversalDownloader
                 if (DownloadButton != null)
                 {
                     bool youtubeSpecificConditionsMet = true;
-                    if (_downloadService.IsYouTubeLink(UrlTextBox?.Text ?? string.Empty))
+                    string currentUrl = UrlTextBox?.Text ?? string.Empty;
+                    bool isYtDlpLink = _downloadService.IsYouTubeLink(currentUrl) || _downloadService.IsInstagramLink(currentUrl) || _downloadService.IsSocialVideoLink(currentUrl);
+                    if (isYtDlpLink)
                     {
                         youtubeSpecificConditionsMet = _dependencyManager.IsYtDlpReady && (YouTubeQualityComboBox?.SelectedItem != null) && (QualitySection?.Visibility == Visibility.Visible);
                     }
@@ -298,7 +300,9 @@ namespace UniversalDownloader
 
                 if (YouTubeQualityComboBox != null)
                 {
-                    YouTubeQualityComboBox.IsEnabled = canInputUrl && _dependencyManager.IsYtDlpReady && _downloadService.IsYouTubeLink(UrlTextBox?.Text ?? string.Empty) && YouTubeQualityComboBox.HasItems;
+                    string currentUrl = UrlTextBox?.Text ?? string.Empty;
+                    bool isYtDlpLink = _downloadService.IsYouTubeLink(currentUrl) || _downloadService.IsInstagramLink(currentUrl) || _downloadService.IsSocialVideoLink(currentUrl);
+                    YouTubeQualityComboBox.IsEnabled = canInputUrl && _dependencyManager.IsYtDlpReady && isYtDlpLink && YouTubeQualityComboBox.HasItems;
                 }
 
                 if (statusMessageUpdate != null && StatusTextBlock != null)
@@ -307,7 +311,7 @@ namespace UniversalDownloader
                 }
                 else if (StatusTextBlock != null && !isBusy)
                 {
-                    StatusTextBlock.Text = _dependencyManager.IsYtDlpReady ? "Ready. Paste a URL to get started." : "YouTube features unavailable.";
+                    StatusTextBlock.Text = _dependencyManager.IsYtDlpReady ? "Ready. Paste a URL to get started." : "Media features unavailable.";
                 }
             });
         }
@@ -625,10 +629,11 @@ namespace UniversalDownloader
                 }
             }
 
-            if (_downloadService.IsYouTubeLink(url))
+            if (_downloadService.IsYouTubeLink(url) || _downloadService.IsInstagramLink(url) || _downloadService.IsSocialVideoLink(url))
             {
-                FileNameTextBlock.Text = "Processing YouTube URL...";
-                StatusTextBlock.Text = "Status: Fetching YouTube qualities...";
+                string platformName = _downloadService.IsInstagramLink(url) ? "Instagram" : (_downloadService.IsYouTubeLink(url) ? "YouTube" : "Video");
+                FileNameTextBlock.Text = $"Processing {platformName} URL...";
+                StatusTextBlock.Text = $"Status: Fetching {platformName} qualities...";
                 
                 try
                 {
@@ -662,21 +667,39 @@ namespace UniversalDownloader
                                     if (VideoDurationLabel != null) VideoDurationLabel.Text = MaxVideoTimeText;
                                 }
                             } catch { }
-                        }
-                        else
-                        {
-                            StatusTextBlock.Text = "No downloadable formats found.";
-                            FileNameTextBlock.Text = "No formats available";
-                            FileNameTextBlock.Visibility = Visibility.Visible;
+                            return;
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    StatusTextBlock.Text = ex.Message;
-                    FileNameTextBlock.Text = "Failed to load video info";
-                    FileNameTextBlock.Visibility = Visibility.Visible;
+                    Debug.WriteLine($"Format info fetch error: {ex.Message}");
                 }
+
+                // Fallback for Instagram / Social video links when format pre-fetching is restricted by Instagram
+                if (_downloadService.IsInstagramLink(url) || _downloadService.IsSocialVideoLink(url))
+                {
+                    var fallbackQualities = new List<YouTubeQualityItem>
+                    {
+                        new YouTubeQualityItem { Label = "Best Video + Audio", FormatCode = "bestvideo+bestaudio/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 9999 },
+                        new YouTubeQualityItem { Label = "Best Audio Only", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "best", SortPriority = 49 },
+                        new YouTubeQualityItem { Label = "Download as MP3", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "mp3", SortPriority = 48 }
+                    };
+                    YouTubeQualityComboBox.ItemsSource = fallbackQualities;
+                    QualitySection.Visibility = Visibility.Visible;
+                    YouTubeQualityComboBox.SelectedIndex = 0;
+
+                    string cleanTitle = _downloadService.IsInstagramLink(url) ? "Instagram Reel / Media" : "Social Video";
+                    _currentItemTitle = cleanTitle;
+                    FileNameTextBlock.Text = cleanTitle;
+                    FileNameTextBlock.Visibility = Visibility.Visible;
+                    StatusTextBlock.Text = "Ready to download. Click Start Download.";
+                    return;
+                }
+
+                StatusTextBlock.Text = "No downloadable formats found.";
+                FileNameTextBlock.Text = "Failed to load video info";
+                FileNameTextBlock.Visibility = Visibility.Visible;
             }
             else if (_downloadService.IsSpotifyLink(url))
             {
@@ -738,8 +761,11 @@ namespace UniversalDownloader
              var list = new System.Collections.Generic.List<YouTubeQualityItem>();
              try
              {
-                 var videoInfo = Newtonsoft.Json.Linq.JObject.Parse(jsonOutput);
-                 var title = videoInfo["title"]?.ToString() ?? "Unknown Video";
+                  var videoInfo = Newtonsoft.Json.Linq.JObject.Parse(jsonOutput);
+                  var title = videoInfo["title"]?.ToString();
+                  if (string.IsNullOrWhiteSpace(title)) title = videoInfo["fulltitle"]?.ToString();
+                  if (string.IsNullOrWhiteSpace(title) && videoInfo["uploader"] != null) title = $"Video by {videoInfo["uploader"]}";
+                  if (string.IsNullOrWhiteSpace(title)) title = "Media Video";
                  string sanitizedTitle = Utilities.SanitizeFileName(title);
                  // Store for restore after cancel
                  _currentItemTitle = sanitizedTitle;
@@ -1011,7 +1037,7 @@ namespace UniversalDownloader
                     FileNameTextBlock.Text = _currentItemTitle;
                 }
                 // ── Single video download mode ──
-                else if (_downloadService.IsYouTubeLink(url))
+                else if (_downloadService.IsYouTubeLink(url) || _downloadService.IsInstagramLink(url) || _downloadService.IsSocialVideoLink(url))
                 {
                     var selectedQuality = YouTubeQualityComboBox.SelectedItem as YouTubeQualityItem;
                     if (selectedQuality != null)

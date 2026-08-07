@@ -55,6 +55,18 @@ namespace UniversalDownloader.Services
             return Regex.IsMatch(url, @"(youtube\.com\/(watch\?v=|embed\/|shorts\/)|youtu\.be\/)", RegexOptions.IgnoreCase);
         }
 
+        public bool IsInstagramLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"(instagram\.com|instagr\.am)\/", RegexOptions.IgnoreCase);
+        }
+
+        public bool IsSocialVideoLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"(tiktok\.com|twitter\.com|x\.com|facebook\.com|fb\.watch|vimeo\.com|reddit\.com|twitch\.tv|pinterest\.com)\/", RegexOptions.IgnoreCase);
+        }
+
         public bool IsYouTubePlaylistLink(string url)
         {
             if (string.IsNullOrWhiteSpace(url)) return false;
@@ -85,9 +97,26 @@ namespace UniversalDownloader.Services
             return IsSpotifyLink(url) || IsSoundCloudLink(url);
         }
 
+        public string CleanUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return url;
+            string clean = url.Trim();
+            if (IsInstagramLink(clean))
+            {
+                int qIdx = clean.IndexOf('?');
+                if (qIdx > 0)
+                {
+                    clean = clean.Substring(0, qIdx);
+                }
+                clean = Regex.Replace(clean, @"/reels/", "/reel/", RegexOptions.IgnoreCase);
+            }
+            return clean;
+        }
+
         public async Task<string?> GetTitleWithYtDlpAsync(string url)
         {
             if (!_dependencyManager.IsYtDlpReady) return null;
+            url = CleanUrl(url);
 
             try
             {
@@ -122,44 +151,74 @@ namespace UniversalDownloader.Services
         public async Task<(string? Title, string? FormatsJson)> GetYouTubeInfoAsync(string url)
         {
             if (!_dependencyManager.IsYtDlpReady) return (null, null);
+            url = CleanUrl(url);
 
             try
             {
-                ProcessStartInfo psi = new ProcessStartInfo
+                var result = await RunYtDlpJsonAsync(url, null);
+                if (result.Success && !string.IsNullOrWhiteSpace(result.FormatsJson))
                 {
-                    FileName = _dependencyManager.YtDlpExecutablePath,
-                    Arguments = $"-J --no-warnings --ignore-config --no-playlist \"{url}\"",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = System.Text.Encoding.UTF8,
-                    StandardErrorEncoding = System.Text.Encoding.UTF8
-                };
-                psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
-
-                using (Process process = Process.Start(psi))
-                {
-                    string jsonOutput = await process.StandardOutput.ReadToEndAsync();
-                    string errorOutput = await process.StandardError.ReadToEndAsync();
-                    await process.WaitForExitAsync();
-                    
-                    if (process.ExitCode != 0 || (!string.IsNullOrWhiteSpace(errorOutput) && !errorOutput.ToLower().Contains("deprecated") && !errorOutput.ToLower().Contains("warning:")))
-                    {
-                        throw new Exception($"yt-dlp error: {(errorOutput.Split('\n')[0])?.Trim()}");
-                    }
-
-                    if (string.IsNullOrWhiteSpace(jsonOutput))
-                    {
-                        throw new Exception("yt-dlp returned empty info. Video might be unavailable.");
-                    }
-
-                    return ("Success", jsonOutput);
+                    return ("Success", result.FormatsJson);
                 }
+
+                if (IsInstagramLink(url))
+                {
+                    // Return fast so UI populates fallback qualities immediately without 30s delays
+                    return ("Success", null);
+                }
+
+                throw new Exception(result.ErrorMessage ?? "yt-dlp returned empty info. Video might be unavailable.");
             }
             catch (Exception ex)
             {
-                throw new Exception($"Error getting YouTube info: {ex.Message}");
+                if (IsInstagramLink(url))
+                {
+                    return ("Success", null);
+                }
+                throw new Exception($"Error getting video info: {ex.Message}");
+            }
+        }
+
+        private async Task<(bool Success, string? FormatsJson, string? ErrorMessage)> RunYtDlpJsonAsync(string url, string? cookiesFromBrowser)
+        {
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = _dependencyManager.YtDlpExecutablePath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = System.Text.Encoding.UTF8,
+                StandardErrorEncoding = System.Text.Encoding.UTF8
+            };
+
+            psi.ArgumentList.Add("-J");
+            psi.ArgumentList.Add("--no-warnings");
+            psi.ArgumentList.Add("--ignore-config");
+            psi.ArgumentList.Add("--no-playlist");
+
+            if (!string.IsNullOrWhiteSpace(cookiesFromBrowser))
+            {
+                psi.ArgumentList.Add("--cookies-from-browser");
+                psi.ArgumentList.Add(cookiesFromBrowser);
+            }
+
+            psi.ArgumentList.Add(url);
+            psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+
+            using (Process process = Process.Start(psi)!)
+            {
+                string jsonOutput = await process.StandardOutput.ReadToEndAsync();
+                string errorOutput = await process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(jsonOutput))
+                {
+                    return (true, jsonOutput, null);
+                }
+
+                string firstErrorLine = (errorOutput.Split('\n')[0])?.Trim();
+                return (false, null, string.IsNullOrWhiteSpace(firstErrorLine) ? "yt-dlp process failed." : firstErrorLine);
             }
         }
 
@@ -205,7 +264,7 @@ namespace UniversalDownloader.Services
             }
         }
 
-        public async Task DownloadDirectFileAsync(string url, string tempDownloadFolder, string finalDestinationFolder, CancellationToken cancellationToken)
+        public async Task DownloadDirectFileAsync(string url, string tempDownloadFolder, string finalDestinationFolder, CancellationToken cancellationToken, Dictionary<string, string>? customHeaders = null)
         {
             CleanDirectory(tempDownloadFolder);
 
@@ -215,8 +274,18 @@ namespace UniversalDownloader.Services
             try
             {
                 using (var request = new HttpRequestMessage(HttpMethod.Get, url))
-                using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                 {
+                    request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+                    if (customHeaders != null)
+                    {
+                        foreach (var kvp in customHeaders)
+                        {
+                            request.Headers.TryAddWithoutValidation(kvp.Key, kvp.Value);
+                        }
+                    }
+
+                    using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                    {
                     cancellationToken.ThrowIfCancellationRequested();
                     response.EnsureSuccessStatusCode();
 
@@ -259,7 +328,8 @@ namespace UniversalDownloader.Services
                     ReportProgress($"Download complete — saved as '{tempFileName}'", tempFileName, 100, false);
                 }
             }
-            catch (OperationCanceledException)
+        }
+        catch (OperationCanceledException)
             {
                 if (tempFilePath != null && File.Exists(tempFilePath))
                 {
@@ -315,6 +385,190 @@ namespace UniversalDownloader.Services
                 throw new Exception("yt-dlp is not available.");
             }
 
+            url = CleanUrl(url);
+
+            try
+            {
+                return await ExecuteYtDlpDownloadAsync(url, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, null);
+            }
+            catch
+            {
+                if (IsInstagramLink(url))
+                {
+                    // Attempt 1: Fast direct HTTP extraction fallback (SnapSave / SaveIG API)
+                    var (directMediaUrl, referer) = await TryExtractInstagramDirectUrlAsync(url);
+                    if (!string.IsNullOrWhiteSpace(directMediaUrl))
+                    {
+                        try
+                        {
+                            var headers = new Dictionary<string, string>();
+                            if (!string.IsNullOrWhiteSpace(referer))
+                            {
+                                headers["Referer"] = referer;
+                            }
+                            await DownloadDirectFileAsync(directMediaUrl, tempDownloadFolder, finalDestinationFolder, cancellationToken, headers);
+                            return true;
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Direct Instagram download fallback failed: {ex.Message}");
+                        }
+                    }
+
+                    // Attempt 2: Browser cookies fallback
+                    string[] browsers = new[] { "chrome", "edge", "firefox", "brave", "opera", "vivaldi" };
+                    foreach (var browser in browsers)
+                    {
+                        try
+                        {
+                            return await ExecuteYtDlpDownloadAsync(url, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, browser);
+                        }
+                        catch { /* best effort */ }
+                    }
+
+                    throw new Exception("Instagram requires login for this video. Log in to Instagram in your browser (Chrome/Edge/Firefox) or verify the link.");
+                }
+                throw;
+            }
+        }
+
+        public async Task<(string? DirectUrl, string? Referer)> TryExtractInstagramDirectUrlAsync(string instagramUrl)
+        {
+            string cleanUrl = CleanUrl(instagramUrl).Replace("/reels/", "/reel/");
+
+            // Provider 1: SnapSave (snapsave.app) with JS Unpacker
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, "https://snapsave.app/action.php");
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+                request.Headers.Add("Origin", "https://snapsave.app");
+                request.Headers.Add("Referer", "https://snapsave.app/");
+                request.Content = new FormUrlEncodedContent(new[]
+                {
+                    new KeyValuePair<string, string>("url", cleanUrl)
+                });
+
+                using (var response = await _httpClient.SendAsync(request))
+                {
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string jsText = await response.Content.ReadAsStringAsync();
+                        string? html = DecodeSnapSaveJs(jsText);
+                        if (string.IsNullOrWhiteSpace(html)) html = jsText;
+
+                        var match = Regex.Match(html, @"href=\\?""(https://[^""\\]*rapidcdn\.app[^""\\]*)\\?""", RegexOptions.IgnoreCase);
+                        if (!match.Success) match = Regex.Match(html, @"href=\\?""(https://[^""\\]+\.mp4[^""\\]*)\\?""", RegexOptions.IgnoreCase);
+                        if (!match.Success) match = Regex.Match(html, @"href=\\?""(https://[^""\\]*cdninstagram[^""\\]*)\\?""", RegexOptions.IgnoreCase);
+                        if (!match.Success) match = Regex.Match(html, @"href=\\?""(https://[^""\\]+)\\?""", RegexOptions.IgnoreCase);
+
+                        if (match.Success)
+                        {
+                            string link = System.Net.WebUtility.HtmlDecode(match.Groups[1].Value);
+                            return (link, "https://snapsave.app/");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"SnapSave extraction error: {ex.Message}");
+            }
+
+            // Provider 2: SaveIG (saveig.app)
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, "https://saveig.app/api/ajaxSearch");
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+                request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+                request.Headers.Add("Origin", "https://saveig.app");
+                request.Headers.Add("Referer", "https://saveig.app/");
+                request.Content = new FormUrlEncodedContent(new[]
+                {
+                    new KeyValuePair<string, string>("q", cleanUrl),
+                    new KeyValuePair<string, string>("t", "media"),
+                    new KeyValuePair<string, string>("lang", "en")
+                });
+
+                using (var response = await _httpClient.SendAsync(request))
+                {
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string json = await response.Content.ReadAsStringAsync();
+                        var obj = Newtonsoft.Json.Linq.JObject.Parse(json);
+                        string? htmlData = obj["data"]?.ToString();
+                        if (!string.IsNullOrWhiteSpace(htmlData))
+                        {
+                            var match = Regex.Match(htmlData, @"href=""([^""]*download\.php[^""]*)""", RegexOptions.IgnoreCase);
+                            if (!match.Success) match = Regex.Match(htmlData, @"href=""([^""]+\.mp4[^""]*)""", RegexOptions.IgnoreCase);
+                            if (!match.Success) match = Regex.Match(htmlData, @"href=""([^""]*cdninstagram[^""]*)""", RegexOptions.IgnoreCase);
+
+                            if (match.Success)
+                            {
+                                string link = match.Groups[1].Value;
+                                if (link.StartsWith("/")) link = "https://saveig.app" + link;
+                                return (link, "https://saveig.app/");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"SaveIG extraction error: {ex.Message}");
+            }
+
+            return (null, null);
+        }
+
+        private static string? DecodeSnapSaveJs(string jsText)
+        {
+            try
+            {
+                var m = Regex.Match(jsText, @"\}\s*\(\s*""([^""]*)""\s*,\s*(\d+)\s*,\s*""([^""]*)""\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)");
+                if (!m.Success) return null;
+
+                string h = m.Groups[1].Value;
+                int u = int.Parse(m.Groups[2].Value);
+                string n = m.Groups[3].Value;
+                int t = int.Parse(m.Groups[4].Value);
+                int e = int.Parse(m.Groups[5].Value);
+
+                char delim = n[e];
+                var sb = new System.Text.StringBuilder();
+
+                string[] tokens = h.Split(delim);
+                foreach (string rawS in tokens)
+                {
+                    if (string.IsNullOrEmpty(rawS)) continue;
+
+                    long val = 0;
+                    long multiplier = 1;
+
+                    for (int idx = rawS.Length - 1; idx >= 0; idx--)
+                    {
+                        int pos = n.IndexOf(rawS[idx]);
+                        if (pos >= 0)
+                        {
+                            val += pos * multiplier;
+                        }
+                        multiplier *= e;
+                    }
+
+                    long decodedVal = val - t;
+                    sb.Append((char)decodedVal);
+                }
+
+                return sb.ToString();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"SnapSave JS decode error: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task<bool> ExecuteYtDlpDownloadAsync(string url, string? formatSelection, string tempDownloadFolder, string finalDestinationFolder, bool extractAudio, string audioFormat, bool useTrimming, double trimStartSeconds, double trimEndSeconds, CancellationToken cancellationToken, string? overrideFileName, string? cookiesFromBrowser)
+        {
             CleanDirectory(tempDownloadFolder);
 
             // We want the final filename to match the YouTube title as closely as possible without extra tags.
@@ -363,6 +617,12 @@ namespace UniversalDownloader.Services
             psi.ArgumentList.Add("--newline");
             psi.ArgumentList.Add("--no-warnings");
             psi.ArgumentList.Add("--ignore-config");
+
+            if (!string.IsNullOrWhiteSpace(cookiesFromBrowser))
+            {
+                psi.ArgumentList.Add("--cookies-from-browser");
+                psi.ArgumentList.Add(cookiesFromBrowser);
+            }
 
             if (_dependencyManager.IsFfmpegReady)
             {
@@ -461,7 +721,6 @@ namespace UniversalDownloader.Services
 
                         if (useTrimming && trimEndSeconds > trimStartSeconds)
                         {
-                            // Offline trimming route: Video is fully downloaded to temp, now fast-trim it
                             await TrimLocalVideoAsync(downloadedFile, finalDestinationFolder, extractAudio, audioFormat, trimStartSeconds, trimEndSeconds, cancellationToken);
                         }
                         else
