@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -138,19 +139,44 @@ namespace UniversalDownloader.Controls
                 CaretBrush = Brushes.White
             };
             _urlsTextBox.TextChanged += (s, e) => UpdateDetectedUrls();
+            DataObject.AddPastingHandler(_urlsTextBox, OnUrlsTextBoxPasting);
             textBorder.Child = _urlsTextBox;
             contentStack.Children.Add(textBorder);
 
-            // Detected Count Badge
+            // Detected Count Badge & Auto-Separate Actions
+            var badgePanel = new DockPanel
+            {
+                Margin = new Thickness(0, 8, 0, 16)
+            };
+
             _detectedCountTextBlock = new TextBlock
             {
                 Text = "0 valid URLs detected",
                 Foreground = new SolidColorBrush(Color.FromRgb(139, 92, 246)),
                 FontSize = 12,
                 FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 8, 0, 16)
+                VerticalAlignment = VerticalAlignment.Center
             };
-            contentStack.Children.Add(_detectedCountTextBlock);
+            DockPanel.SetDock(_detectedCountTextBlock, Dock.Left);
+
+            var autoFormatButton = new Button
+            {
+                Content = "✨ Auto-Separate URLs",
+                FontSize = 11.5,
+                Foreground = new SolidColorBrush(Color.FromRgb(161, 161, 170)),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(6, 2, 6, 2)
+            };
+            autoFormatButton.Click += (s, e) => FormatUrlsToLines();
+            DockPanel.SetDock(autoFormatButton, Dock.Right);
+
+            badgePanel.Children.Add(autoFormatButton);
+            badgePanel.Children.Add(_detectedCountTextBlock);
+            contentStack.Children.Add(badgePanel);
 
             // Options Grid
             var optionsGrid = new Grid { Margin = new Thickness(0, 0, 0, 12) };
@@ -515,22 +541,92 @@ namespace UniversalDownloader.Controls
             return (ComboBox)XamlReader.Parse(xaml);
         }
 
-        private List<string> GetCleanUrls()
+        private void OnUrlsTextBoxPasting(object sender, DataObjectPastingEventArgs e)
         {
-            string text = _urlsTextBox.Text ?? "";
-            var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            var validUrls = new List<string>();
-
-            foreach (var line in lines)
+            try
             {
-                string u = line.Trim();
-                if (Uri.TryCreate(u, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+                if (e.DataObject.GetDataPresent(DataFormats.UnicodeText))
                 {
-                    validUrls.Add(u);
+                    string text = (string)e.DataObject.GetData(DataFormats.UnicodeText);
+                    var urls = ExtractUrls(text);
+                    if (urls.Count > 1)
+                    {
+                        e.CancelCommand();
+                        string formatted = string.Join(Environment.NewLine, urls);
+                        int caretIndex = _urlsTextBox.CaretIndex;
+                        string current = _urlsTextBox.Text ?? "";
+                        if (caretIndex > current.Length) caretIndex = current.Length;
+                        
+                        string prefix = (caretIndex > 0 && !current.Substring(0, caretIndex).EndsWith("\n")) ? Environment.NewLine : "";
+                        string suffix = (caretIndex < current.Length && !current.Substring(caretIndex).StartsWith("\r") && !current.Substring(caretIndex).StartsWith("\n")) ? Environment.NewLine : "";
+                        
+                        string updated = current.Insert(caretIndex, prefix + formatted + suffix);
+                        _urlsTextBox.Text = updated;
+                        _urlsTextBox.CaretIndex = caretIndex + prefix.Length + formatted.Length;
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback to default paste if any exception
+            }
+        }
+
+        private void FormatUrlsToLines()
+        {
+            var urls = GetCleanUrls();
+            if (urls.Count > 0)
+            {
+                _urlsTextBox.Text = string.Join(Environment.NewLine, urls);
+                _urlsTextBox.CaretIndex = _urlsTextBox.Text.Length;
+            }
+        }
+
+        public static List<string> ExtractUrls(string rawText)
+        {
+            if (string.IsNullOrWhiteSpace(rawText)) return new List<string>();
+
+            // 1. Separate concatenated URLs where http://, https://, or www. are glued directly
+            // e.g., "...4af9d51f69ae4389https://youtu.be/..." or "...abc,https://..."
+            var pattern = @"(?<!^)(?=(?:https?://|(?<![/a-zA-Z0-9])www\.))";
+            var tokens = Regex.Split(rawText, pattern, RegexOptions.IgnoreCase);
+
+            var validUrls = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var token in tokens)
+            {
+                if (string.IsNullOrWhiteSpace(token)) continue;
+
+                // Split on whitespace, commas, semicolons, quotes, etc.
+                var subTokens = token.Split(new[] { ' ', '\t', '\r', '\n', ',', ';', '|', '"', '\'', '<', '>', '`' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var sub in subTokens)
+                {
+                    string candidate = sub.Trim().TrimEnd('.', ',', ';', ')', ']', '}', '"', '\'');
+                    if (string.IsNullOrWhiteSpace(candidate)) continue;
+
+                    if (candidate.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidate = "https://" + candidate;
+                    }
+
+                    if (Uri.TryCreate(candidate, UriKind.Absolute, out var uri) &&
+                        (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+                    {
+                        if (seen.Add(candidate))
+                        {
+                            validUrls.Add(candidate);
+                        }
+                    }
                 }
             }
 
             return validUrls;
+        }
+
+        private List<string> GetCleanUrls()
+        {
+            return ExtractUrls(_urlsTextBox?.Text ?? "");
         }
 
         private void UpdateDetectedUrls()
