@@ -923,7 +923,7 @@ namespace UniversalDownloader.Services
                         }
                         else
                         {
-                            CopyToFinalDestinationAndClean(tempDownloadFolder, finalDestinationFolder);
+                            CopyToFinalDestinationAndClean(tempDownloadFolder, finalDestinationFolder, url);
                         }
                     }
                     else

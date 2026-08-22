@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using UniversalDownloader.Models;
 using UniversalDownloader.Controls;
+using System.Windows.Media;
 
 namespace UniversalDownloader
 {
@@ -81,12 +82,38 @@ namespace UniversalDownloader
             {
                 try
                 {
-                    if (!string.IsNullOrWhiteSpace(item.Url))
+                    string urlToCopy = item.Url;
+                    if (string.IsNullOrWhiteSpace(urlToCopy) && !string.IsNullOrWhiteSpace(item.Title))
                     {
-                        Clipboard.SetText(item.Url);
+                        urlToCopy = $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(item.Title)}";
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(urlToCopy))
+                    {
+                        Clipboard.SetDataObject(urlToCopy, true);
+
+                        string originalContent = btn.Content?.ToString() ?? "📋 Link";
+                        btn.Content = "✓ Copied!";
+                        btn.Foreground = (Brush)FindResource("SuccessBrush");
+
+                        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+                        timer.Tick += (s, ev) =>
+                        {
+                            btn.Content = originalContent;
+                            btn.Foreground = (Brush)FindResource("TextPrimaryBrush");
+                            timer.Stop();
+                        };
+                        timer.Start();
+                    }
+                    else
+                    {
+                        ModernMessageBox.Show("No source link was recorded for this item.", "Link Unavailable", MessageBoxButton.OK, MessageBoxImage.Information, this);
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    ModernMessageBox.Show($"Could not copy link to clipboard: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error, this);
+                }
             }
         }
 

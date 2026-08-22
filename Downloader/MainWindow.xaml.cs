@@ -119,21 +119,36 @@ namespace UniversalDownloader
                     await _metadataService.ApplyAudioMetadataAsync(filePath, title, artist);
                 }
 
+                // Resolve real source URL for history and link copying
+                string originalUrl = sourceUrl;
+                if (string.IsNullOrWhiteSpace(originalUrl) || originalUrl.StartsWith("ytsearch", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (UrlTextBox != null && !string.IsNullOrWhiteSpace(UrlTextBox.Text) && UrlTextBox.Text != "Paste URL here...")
+                    {
+                        originalUrl = UrlTextBox.Text.Trim();
+                    }
+                    else if (sourceUrl.StartsWith("ytsearch", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string query = sourceUrl.Substring(sourceUrl.IndexOf(':') + 1);
+                        originalUrl = $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(query)}";
+                    }
+                }
+
                 // Determine platform name for history badge
                 string platform = "Media";
-                if (_downloadService.IsYouTubeLink(sourceUrl) || sourceUrl.StartsWith("ytsearch", StringComparison.OrdinalIgnoreCase)) platform = "YouTube";
-                else if (_downloadService.IsSpotifyLink(sourceUrl)) platform = "Spotify";
-                else if (_downloadService.IsInstagramLink(sourceUrl)) platform = "Instagram";
-                else if (_downloadService.IsTikTokLink(sourceUrl)) platform = "TikTok";
-                else if (_downloadService.IsTwitterLink(sourceUrl)) platform = "Twitter/X";
-                else if (_downloadService.IsRedditLink(sourceUrl)) platform = "Reddit";
-                else if (_downloadService.IsSoundCloudLink(sourceUrl)) platform = "SoundCloud";
-                else if (_downloadService.IsGoogleDriveLink(sourceUrl)) platform = "Google Drive";
+                if (_downloadService.IsSpotifyLink(originalUrl) || _downloadService.IsSpotifyLink(UrlTextBox?.Text ?? "") || _isSpotifyDrawerExpanded || _spotifyImports.Count > 0) platform = "Spotify";
+                else if (_downloadService.IsYouTubeLink(originalUrl) || originalUrl.Contains("youtube.com") || originalUrl.Contains("youtu.be")) platform = "YouTube";
+                else if (_downloadService.IsInstagramLink(originalUrl)) platform = "Instagram";
+                else if (_downloadService.IsTikTokLink(originalUrl)) platform = "TikTok";
+                else if (_downloadService.IsTwitterLink(originalUrl)) platform = "Twitter/X";
+                else if (_downloadService.IsRedditLink(originalUrl)) platform = "Reddit";
+                else if (_downloadService.IsSoundCloudLink(originalUrl)) platform = "SoundCloud";
+                else if (_downloadService.IsGoogleDriveLink(originalUrl)) platform = "Google Drive";
 
                 var historyItem = new DownloadHistoryItem
                 {
                     Title = !string.IsNullOrWhiteSpace(_currentItemTitle) ? _currentItemTitle : Path.GetFileNameWithoutExtension(filePath),
-                    Url = sourceUrl,
+                    Url = originalUrl,
                     Platform = platform,
                     FilePath = filePath,
                     FileSizeBytes = fileInfo.Length,
