@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using UniversalDownloader.Models;
+using UniversalDownloader.Controls;
 
 namespace UniversalDownloader
 {
@@ -42,12 +43,12 @@ namespace UniversalDownloader
                     }
                     else
                     {
-                        MessageBox.Show("File no longer exists on disk at the saved location.", "File Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        ModernMessageBox.Show("File no longer exists on disk at the saved location.", "File Not Found", MessageBoxButton.OK, MessageBoxImage.Warning, this);
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Could not open file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    ModernMessageBox.Show($"Could not open file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error, this);
                 }
             }
         }
@@ -99,7 +100,7 @@ namespace UniversalDownloader
 
         private async void ClearAllHistory_Click(object sender, RoutedEventArgs e)
         {
-            var result = MessageBox.Show("Are you sure you want to clear all download history?", "Clear History", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            var result = ModernMessageBox.Show("Are you sure you want to clear all download history?", "Clear History", MessageBoxButton.YesNo, MessageBoxImage.Question, this);
             if (result == MessageBoxResult.Yes)
             {
                 await _historyService.ClearHistoryAsync();

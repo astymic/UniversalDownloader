@@ -13,6 +13,7 @@ using System.Windows.Threading;
 using Ookii.Dialogs.Wpf;
 using UniversalDownloader.Services;
 using UniversalDownloader.Models;
+using UniversalDownloader.Controls;
 using System.Text;
 using System.Windows.Media.Animation;
 using System.Windows.Input;
@@ -1296,7 +1297,7 @@ namespace UniversalDownloader
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Could not open browser: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                ModernMessageBox.Show($"Could not open browser: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error, this);
             }
         }
 
@@ -1322,7 +1323,7 @@ namespace UniversalDownloader
                     var lines = await Task.Run(() => File.ReadAllLines(filePath, Encoding.UTF8));
                     if (lines.Length <= 1)
                     {
-                        MessageBox.Show("The selected CSV file is empty.", "Import Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        ModernMessageBox.Show("The selected CSV file is empty.", "Import Error", MessageBoxButton.OK, MessageBoxImage.Warning, this);
                         StatusTextBlock.Text = "Failed to import CSV: file is empty.";
                         return;
                     }
@@ -1466,13 +1467,13 @@ namespace UniversalDownloader
                     }
                     else
                     {
-                        MessageBox.Show("No tracks could be parsed from the CSV file.", "Import Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        ModernMessageBox.Show("No tracks could be parsed from the CSV file.", "Import Error", MessageBoxButton.OK, MessageBoxImage.Warning, this);
                         StatusTextBlock.Text = "Failed to parse tracks from CSV.";
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to parse CSV file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    ModernMessageBox.Show($"Failed to parse CSV file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error, this);
                     StatusTextBlock.Text = "Error importing CSV.";
                 }
             }
@@ -1768,160 +1769,193 @@ namespace UniversalDownloader
 
         public SpotifyManualInputDialog(string initialArtist, string initialTitle)
         {
-            Title = "Ввод метаданных Spotify";
-            Width = 420;
-            Height = 260;
+            Title = "Spotify Track Metadata";
+            Width = 460;
+            SizeToContent = SizeToContent.Height;
+            MinHeight = 240;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ResizeMode = ResizeMode.NoResize;
-            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#121212"));
-            Foreground = Brushes.White;
-            FontFamily = new FontFamily("Segoe UI");
-            
             WindowStyle = WindowStyle.None;
-            BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1DB954"));
-            BorderThickness = new Thickness(2);
+            AllowsTransparency = true;
+            Background = Brushes.Transparent;
+            Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FAFAFA"));
+            FontFamily = new FontFamily("Inter, Segoe UI, Arial");
+            ShowInTaskbar = false;
+
+            var shadowBorder = new Border
+            {
+                Margin = new Thickness(12),
+                CornerRadius = new CornerRadius(16),
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#09090B")),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27272A")),
+                BorderThickness = new Thickness(1),
+                Effect = new DropShadowEffect
+                {
+                    BlurRadius = 24,
+                    ShadowDepth = 6,
+                    Color = Colors.Black,
+                    Opacity = 0.75
+                }
+            };
 
             var mainGrid = new Grid();
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(40) });
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(46) }); // TitleBar
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // Content
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Buttons
+
+            // --- Title Bar ---
             var titleBar = new Border
             {
-                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#191919")),
-                Padding = new Thickness(15, 0, 15, 0)
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#121118")),
+                CornerRadius = new CornerRadius(16, 16, 0, 0),
+                Padding = new Thickness(18, 0, 12, 0),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1F1E29")),
+                BorderThickness = new Thickness(0, 0, 0, 1)
             };
-            titleBar.MouseLeftButtonDown += (s, e) => { if (e.LeftButton == System.Windows.Input.MouseButtonState.Pressed) DragMove(); };
-            
+            titleBar.MouseLeftButtonDown += (s, e) => { if (e.LeftButton == MouseButtonState.Pressed) DragMove(); };
+
             var titleBarGrid = new Grid();
             titleBarGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             titleBarGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            
+
             var titleText = new TextBlock
             {
-                Text = "Метаданные трека Spotify",
+                Text = "Spotify Track Metadata",
                 Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1DB954")),
                 FontWeight = FontWeights.Bold,
                 VerticalAlignment = VerticalAlignment.Center,
-                FontSize = 14
+                FontSize = 13.5
             };
             Grid.SetColumn(titleText, 0);
             titleBarGrid.Children.Add(titleText);
-            
+
             var closeButton = new Button
             {
-                Content = "×",
+                Content = "✕",
                 Background = Brushes.Transparent,
-                Foreground = Brushes.Gray,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A1A1AA")),
                 BorderThickness = new Thickness(0),
-                FontSize = 20,
-                FontWeight = FontWeights.Bold,
-                Cursor = System.Windows.Input.Cursors.Hand,
-                Width = 30,
-                Height = 30,
+                FontSize = 12,
+                Cursor = Cursors.Hand,
+                Width = 28,
+                Height = 28,
                 VerticalAlignment = VerticalAlignment.Center
             };
             closeButton.Click += (s, e) => { DialogResult = false; Close(); };
-            closeButton.MouseEnter += (s, e) => closeButton.Foreground = Brushes.Red;
-            closeButton.MouseLeave += (s, e) => closeButton.Foreground = Brushes.Gray;
-            
+            closeButton.MouseEnter += (s, e) => closeButton.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EF4444"));
+            closeButton.MouseLeave += (s, e) => closeButton.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A1A1AA"));
+
             Grid.SetColumn(closeButton, 1);
             titleBarGrid.Children.Add(closeButton);
             titleBar.Child = titleBarGrid;
-            
+
             Grid.SetRow(titleBar, 0);
             mainGrid.Children.Add(titleBar);
-            
+
+            // --- Content ---
             var contentStack = new StackPanel
             {
-                Margin = new Thickness(20)
+                Margin = new Thickness(24, 18, 24, 16)
             };
-            
+
             var infoText = new TextBlock
             {
-                Text = "Не удалось автоматически получить информацию о треке.\nПожалуйста, введите название и исполнителя:",
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B3B3B3")),
-                FontSize = 12,
-                Margin = new Thickness(0, 0, 0, 15),
+                Text = "Could not automatically retrieve track information.\nPlease enter the artist and track title manually:",
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A1A1AA")),
+                FontSize = 12.5,
+                Margin = new Thickness(0, 0, 0, 16),
+                LineHeight = 18,
                 TextWrapping = TextWrapping.Wrap
             };
             contentStack.Children.Add(infoText);
-            
-            var artistLabel = new TextBlock { Text = "Исполнитель:", Foreground = Brushes.White, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4), FontSize = 12 };
+
+            var artistLabel = new TextBlock { Text = "Artist / Band:", Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FAFAFA")), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 6), FontSize = 12 };
             contentStack.Children.Add(artistLabel);
-            
+
             _artistTextBox = new TextBox
             {
                 Text = initialArtist == "Unknown Artist" ? "" : initialArtist,
-                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#282828")),
-                Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#404040")),
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#18181B")),
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FAFAFA")),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27272A")),
                 CaretBrush = Brushes.White,
-                Padding = new Thickness(6, 4, 6, 4),
+                Padding = new Thickness(10, 8, 10, 8),
                 FontSize = 13,
-                Margin = new Thickness(0, 0, 0, 12),
+                Margin = new Thickness(0, 0, 0, 14),
                 BorderThickness = new Thickness(1)
             };
             _artistTextBox.GotFocus += (s, e) => _artistTextBox.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1DB954"));
-            _artistTextBox.LostFocus += (s, e) => _artistTextBox.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#404040"));
+            _artistTextBox.LostFocus += (s, e) => _artistTextBox.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27272A"));
             contentStack.Children.Add(_artistTextBox);
-            
-            var titleLabel = new TextBlock { Text = "Название трека:", Foreground = Brushes.White, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4), FontSize = 12 };
+
+            var titleLabel = new TextBlock { Text = "Track Title:", Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FAFAFA")), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 6), FontSize = 12 };
             contentStack.Children.Add(titleLabel);
-            
+
             _titleTextBox = new TextBox
             {
                 Text = initialTitle == "Spotify Track" ? "" : initialTitle,
-                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#282828")),
-                Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#404040")),
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#18181B")),
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FAFAFA")),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27272A")),
                 CaretBrush = Brushes.White,
-                Padding = new Thickness(6, 4, 6, 4),
+                Padding = new Thickness(10, 8, 10, 8),
                 FontSize = 13,
-                Margin = new Thickness(0, 0, 0, 15),
+                Margin = new Thickness(0, 0, 0, 8),
                 BorderThickness = new Thickness(1)
             };
             _titleTextBox.GotFocus += (s, e) => _titleTextBox.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1DB954"));
-            _titleTextBox.LostFocus += (s, e) => _titleTextBox.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#404040"));
+            _titleTextBox.LostFocus += (s, e) => _titleTextBox.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27272A"));
             contentStack.Children.Add(_titleTextBox);
-            
-            var buttonsGrid = new Grid();
-            buttonsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            buttonsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            
+
+            Grid.SetRow(contentStack, 1);
+            mainGrid.Children.Add(contentStack);
+
+            // --- Action Buttons ---
+            var buttonsPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(24, 0, 24, 20)
+            };
+
             var cancelButton = new Button
             {
-                Content = "Отмена",
-                Background = Brushes.Transparent,
-                Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#404040")),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(10, 6, 10, 6),
+                Content = "Cancel",
+                MinWidth = 80,
+                Height = 36,
+                Padding = new Thickness(16, 0, 16, 0),
                 Margin = new Thickness(0, 0, 10, 0),
-                Cursor = System.Windows.Input.Cursors.Hand,
-                FontWeight = FontWeights.SemiBold
+                Cursor = Cursors.Hand,
+                FontWeight = FontWeights.Medium,
+                FontSize = 13,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#D4D4D8")),
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#18181B")),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27272A")),
+                BorderThickness = new Thickness(1)
             };
             cancelButton.Click += (s, e) => { DialogResult = false; Close(); };
-            cancelButton.MouseEnter += (s, e) => { cancelButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#282828")); };
-            cancelButton.MouseLeave += (s, e) => { cancelButton.Background = Brushes.Transparent; };
-            Grid.SetColumn(cancelButton, 0);
-            buttonsGrid.Children.Add(cancelButton);
-            
+            cancelButton.MouseEnter += (s, e) => { cancelButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27272A")); };
+            cancelButton.MouseLeave += (s, e) => { cancelButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#18181B")); };
+            buttonsPanel.Children.Add(cancelButton);
+
             var okButton = new Button
             {
-                Content = "Скачать",
-                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1DB954")),
+                Content = "Download",
+                MinWidth = 95,
+                Height = 36,
+                Padding = new Thickness(18, 0, 18, 0),
+                Cursor = Cursors.Hand,
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 13,
                 Foreground = Brushes.White,
-                BorderThickness = new Thickness(0),
-                Padding = new Thickness(10, 6, 10, 6),
-                Margin = new Thickness(10, 0, 0, 0),
-                Cursor = System.Windows.Input.Cursors.Hand,
-                FontWeight = FontWeights.Bold
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1DB954")),
+                BorderThickness = new Thickness(0)
             };
             okButton.Click += (s, e) =>
             {
                 if (string.IsNullOrWhiteSpace(TrackTitle))
                 {
-                    MessageBox.Show("Пожалуйста, введите название трека.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ModernMessageBox.Show("Please enter a track title.", "Input Required", MessageBoxButton.OK, MessageBoxImage.Warning, this);
                     return;
                 }
                 DialogResult = true;
@@ -1929,15 +1963,34 @@ namespace UniversalDownloader
             };
             okButton.MouseEnter += (s, e) => { okButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1ED760")); };
             okButton.MouseLeave += (s, e) => { okButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1DB954")); };
-            Grid.SetColumn(okButton, 1);
-            buttonsGrid.Children.Add(okButton);
-            
-            contentStack.Children.Add(buttonsGrid);
-            
-            Grid.SetRow(contentStack, 1);
-            mainGrid.Children.Add(contentStack);
-            
-            Content = mainGrid;
+            buttonsPanel.Children.Add(okButton);
+
+            Grid.SetRow(buttonsPanel, 2);
+            mainGrid.Children.Add(buttonsPanel);
+
+            shadowBorder.Child = mainGrid;
+            Content = shadowBorder;
+
+            KeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    if (string.IsNullOrWhiteSpace(TrackTitle))
+                    {
+                        ModernMessageBox.Show("Please enter a track title.", "Input Required", MessageBoxButton.OK, MessageBoxImage.Warning, this);
+                        return;
+                    }
+                    DialogResult = true;
+                    Close();
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    DialogResult = false;
+                    Close();
+                    e.Handled = true;
+                }
+            };
         }
     }
 }
