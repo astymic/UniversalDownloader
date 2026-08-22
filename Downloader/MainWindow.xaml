@@ -989,7 +989,7 @@
                             <!-- Custom Filename Template -->
                             <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
                                 <StackPanel>
-                                    <TextBlock Text="CUSTOM FILENAME TEMPLATE" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,8"/>
+                                    <TextBlock Text="CUSTOM FILENAME TEMPLATE" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,8"/>
                                     <TextBlock Text="Customize how downloaded files are named using placeholders:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,12"/>
                                     
                                     <!-- Template Input Field -->
