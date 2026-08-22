@@ -964,8 +964,8 @@
                                     <!-- Multi-Connection Acceleration CheckBox -->
                                     <CheckBox x:Name="MultiConnectionAccelerationCheckBox" Style="{StaticResource ModernCheckBox}" Content="Enable multi-connection download acceleration (aria2c)" Margin="0,0,0,12" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed"/>
 
-                                    <!-- Download Spotify Synced Lyrics CheckBox -->
-                                    <CheckBox x:Name="DownloadLyricsCheckBox" Style="{StaticResource ModernCheckBox}" Content="Fetch &amp; embed synchronized lyrics (.lrc / ID3) for Spotify tracks" Margin="0,0,0,12" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed"/>
+                                    <!-- Download Synced Lyrics (.lrc) CheckBox -->
+                                    <CheckBox x:Name="DownloadLyricsCheckBox" Style="{StaticResource ModernCheckBox}" Content="Auto-download synchronized lyrics (.lrc companion file) for audio tracks" Margin="0,0,0,12" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed"/>
 
                                     <!-- Minimize to Tray CheckBox -->
                                     <CheckBox x:Name="MinimizeToTrayCheckBox" Style="{StaticResource ModernCheckBox}" Content="Minimize to system tray on close" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed"/>

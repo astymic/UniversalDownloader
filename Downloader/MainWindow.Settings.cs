@@ -24,7 +24,7 @@ namespace UniversalDownloader
         public bool EmbedMetadataEnabled { get; set; } = true;
         public bool DownloadSubtitlesEnabled { get; set; } = false;
         public bool MultiConnectionAccelerationEnabled { get; set; } = true;
-        public bool DownloadLyricsEnabled { get; set; } = true;
+        public bool DownloadLyricsEnabled { get; set; } = false;
         public string FilenameTemplate { get; set; } = "{title}";
 
         private string GetSettingsFilePath()
