@@ -784,6 +784,15 @@
                                 <CheckBox x:Name="DownloadSubtitlesCheckBox" Style="{StaticResource ModernCheckBox}" Content="Download subtitles/captions with video when available" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,4"/>
                             </StackPanel>
                         </Border>
+
+                        <!-- Network & Acceleration Settings -->
+                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                            <StackPanel>
+                                <TextBlock Text="NETWORK &amp; ACCELERATION" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
+                                <CheckBox x:Name="MultiConnectionAccelerationCheckBox" Style="{StaticResource ModernCheckBox}" Content="Multi-connection segmented download acceleration" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,4" IsChecked="True"/>
+                                <TextBlock Text="Downloads files using concurrent chunks for maximum transfer speed. Disable if your network restricts multiple parallel connections." Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Margin="28,4,0,0"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
 

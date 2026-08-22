@@ -16,10 +16,12 @@ namespace UniversalDownloader
         private const string SettingsKeyEmbedMetadata = "EmbedMetadata";
         private const string SettingsKeyDownloadSubtitles = "DownloadSubtitles";
         private const string SettingsKeyMinimizeToTray = "MinimizeToTray";
+        private const string SettingsKeyMultiConnectionAcceleration = "MultiConnectionAcceleration";
 
         public bool AutoDetectClipboardEnabled { get; set; } = true;
         public bool EmbedMetadataEnabled { get; set; } = true;
         public bool DownloadSubtitlesEnabled { get; set; } = false;
+        public bool MultiConnectionAccelerationEnabled { get; set; } = true;
 
         private string GetSettingsFilePath()
         {
@@ -75,6 +77,12 @@ namespace UniversalDownloader
                     if (settings.TryGetValue(SettingsKeyMinimizeToTray, out JToken? trayToken) && trayToken != null)
                     {
                         MinimizeToTrayEnabled = trayToken.ToObject<bool>();
+                    }
+
+                    if (settings.TryGetValue(SettingsKeyMultiConnectionAcceleration, out JToken? accelToken) && accelToken != null)
+                    {
+                        MultiConnectionAccelerationEnabled = accelToken.ToObject<bool>();
+                        if (_downloadService != null) _downloadService.EnableMultiConnectionAcceleration = MultiConnectionAccelerationEnabled;
                     }
                 }
                 catch (Exception ex)
@@ -137,6 +145,7 @@ namespace UniversalDownloader
             if (EmbedMetadataCheckBox != null) EmbedMetadataCheckBox.IsChecked = EmbedMetadataEnabled;
             if (DownloadSubtitlesCheckBox != null) DownloadSubtitlesCheckBox.IsChecked = DownloadSubtitlesEnabled;
             if (MinimizeToTrayCheckBox != null) MinimizeToTrayCheckBox.IsChecked = MinimizeToTrayEnabled;
+            if (MultiConnectionAccelerationCheckBox != null) MultiConnectionAccelerationCheckBox.IsChecked = MultiConnectionAccelerationEnabled;
         }
 
         private void BackToDownloader_Click(object sender, RoutedEventArgs e)
@@ -171,6 +180,13 @@ namespace UniversalDownloader
             {
                 MinimizeToTrayEnabled = MinimizeToTrayCheckBox.IsChecked == true;
                 SaveSetting(SettingsKeyMinimizeToTray, MinimizeToTrayEnabled.ToString().ToLower());
+            }
+
+            if (MultiConnectionAccelerationCheckBox != null)
+            {
+                MultiConnectionAccelerationEnabled = MultiConnectionAccelerationCheckBox.IsChecked == true;
+                SaveSetting(SettingsKeyMultiConnectionAcceleration, MultiConnectionAccelerationEnabled.ToString().ToLower());
+                if (_downloadService != null) _downloadService.EnableMultiConnectionAcceleration = MultiConnectionAccelerationEnabled;
             }
         }
     }

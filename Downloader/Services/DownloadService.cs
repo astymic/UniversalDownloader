@@ -39,6 +39,7 @@ namespace UniversalDownloader.Services
         }
 
         public string? ProgressPrefix { get; set; }
+        public bool EnableMultiConnectionAcceleration { get; set; } = true;
 
         private void ReportProgress(string status, string? filename = null, double percentage = 0, bool isIndeterminate = false)
         {
@@ -807,6 +808,12 @@ namespace UniversalDownloader.Services
             psi.ArgumentList.Add("5");
             psi.ArgumentList.Add("--extractor-args");
             psi.ArgumentList.Add("youtube:player_client=android,web");
+
+            if (EnableMultiConnectionAcceleration)
+            {
+                psi.ArgumentList.Add("--concurrent-fragments");
+                psi.ArgumentList.Add("4");
+            }
 
             if (!string.IsNullOrWhiteSpace(cookiesFromBrowser))
             {
