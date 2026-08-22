@@ -2042,7 +2042,7 @@
                                         Click="LiveStreamToggleSessionsButton_Click"/>
                                 <Button x:Name="LiveStreamDownloadAllButton" 
                                         Content="⬇ Download All (0)" 
-                                        Style="{StaticResource PrimaryButton}" 
+                                        Style="{StaticResource ModernButton}" 
                                         Padding="16,8" 
                                         FontSize="12" 
                                         Click="LiveStreamDownloadAllButton_Click"
@@ -2094,7 +2094,7 @@
                                         <Button Grid.Column="0" 
                                                 x:Name="LiveStreamToggleButton"
                                                 Content="🎙️ Start Listening (PC Audio)"
-                                                Style="{StaticResource PrimaryButton}"
+                                                Style="{StaticResource ModernButton}"
                                                 Height="48"
                                                 Padding="22,0"
                                                 FontSize="13.5"
@@ -2146,7 +2146,7 @@
                                                     </StackPanel>
                                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                                                         <Button Content="📂 Load Tracks" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0" FontSize="11" Margin="0,0,8,0" Click="LiveStreamLoadPastSession_Click" Tag="{Binding}"/>
-                                                        <Button Content="⬇ Download All" Style="{StaticResource PrimaryButton}" Height="32" Padding="12,0" FontSize="11" Click="LiveStreamDownloadPastSession_Click" Tag="{Binding}"/>
+                                                        <Button Content="⬇ Download All" Style="{StaticResource ModernButton}" Height="32" Padding="12,0" FontSize="11" Click="LiveStreamDownloadPastSession_Click" Tag="{Binding}"/>
                                                     </StackPanel>
                                                 </Grid>
                                             </Border>
@@ -2203,7 +2203,7 @@
                                                     <!-- Actions -->
                                                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
                                                         <Button Content="⬇ Download MP3" 
-                                                                Style="{StaticResource PrimaryButton}" 
+                                                                Style="{StaticResource ModernButton}" 
                                                                 Height="34" 
                                                                 Padding="14,0" 
                                                                 FontSize="11.5" 
