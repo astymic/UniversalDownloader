@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -20,6 +22,8 @@ namespace UniversalDownloader.Services
     public class SearchService
     {
         private readonly DependencyManager _dependencyManager;
+        private readonly ConcurrentDictionary<string, (DateTime CachedAt, SearchResultBatch Batch)> _searchCache = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(15);
 
         public SearchService(DependencyManager dependencyManager)
         {
@@ -33,6 +37,13 @@ namespace UniversalDownloader.Services
             if (!_dependencyManager.IsYtDlpReady) return batch;
 
             string cleanQuery = query.Trim();
+            string cacheKey = $"{platformFilter}:{cleanQuery}";
+
+            // 1. Instant in-memory cache lookup (0ms)
+            if (_searchCache.TryGetValue(cacheKey, out var cached) && (DateTime.UtcNow - cached.CachedAt) < CacheTtl)
+            {
+                return cached.Batch;
+            }
 
             bool searchYouTube = string.Equals(platformFilter, "All", StringComparison.OrdinalIgnoreCase) ||
                                  string.Equals(platformFilter, "YouTube", StringComparison.OrdinalIgnoreCase);
@@ -40,27 +51,68 @@ namespace UniversalDownloader.Services
             bool searchSoundCloud = string.Equals(platformFilter, "All", StringComparison.OrdinalIgnoreCase) ||
                                     string.Equals(platformFilter, "SoundCloud", StringComparison.OrdinalIgnoreCase);
 
+            // 2. Parallel async search execution across both platforms
+            var ytSearchTask = searchYouTube 
+                ? SearchYouTubeAsync(cleanQuery, cancellationToken)
+                : Task.FromResult((Items: new List<SearchResultItem>(), IsFallback: false, FallbackQuery: string.Empty));
+
+            var scSearchTask = searchSoundCloud
+                ? SearchSoundCloudAsync(cleanQuery, cancellationToken)
+                : Task.FromResult((Items: new List<SearchResultItem>(), IsFallback: false, FallbackQuery: string.Empty));
+
+            await Task.WhenAll(ytSearchTask, scSearchTask);
+
+            var (ytResults, ytFallback, ytFallbackQuery) = await ytSearchTask;
+            var (scResults, scFallback, scFallbackQuery) = await scSearchTask;
+
+            batch.Items.AddRange(ytResults);
+            batch.Items.AddRange(scResults);
+            batch.IsClosestFallback = ytFallback || scFallback;
+            batch.FallbackQuery = !string.IsNullOrEmpty(ytFallbackQuery) ? ytFallbackQuery : scFallbackQuery;
+
+            if (batch.Items.Count > 0)
+            {
+                _searchCache[cacheKey] = (DateTime.UtcNow, batch);
+            }
+
+            return batch;
+        }
+
+        private async Task<(List<SearchResultItem> Items, bool IsFallback, string FallbackQuery)> SearchYouTubeAsync(string cleanQuery, CancellationToken cancellationToken)
+        {
             var ytResults = new List<SearchResultItem>();
-            var scResults = new List<SearchResultItem>();
             bool usedFallback = false;
             string matchedFallbackQuery = string.Empty;
 
-            // Step 1: YouTube Search (Primary)
-            if (searchYouTube)
+            try
             {
-                try
+                ytResults = await QueryYtDlpSearchAsync($"ytsearch15:{cleanQuery}", "YouTube", cancellationToken);
+
+                if (ytResults.Count == 0 && cleanQuery.Contains(' '))
                 {
-                    ytResults = await QueryYtDlpSearchAsync($"ytsearch15:{cleanQuery}", "YouTube", cancellationToken);
+                    var words = cleanQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-                    // If 0 results, find closest YouTube results by progressive phrase relaxation
-                    if (ytResults.Count == 0 && cleanQuery.Contains(' '))
+                    for (int len = words.Length - 1; len >= 1; len--)
                     {
-                        var words = cleanQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-                        // 1. Try progressive sub-phrases dropping words from right to left
-                        for (int len = words.Length - 1; len >= 1; len--)
+                        string subQuery = string.Join(" ", words, 0, len);
+                        if (subQuery.Length >= 2)
                         {
-                            string subQuery = string.Join(" ", words, 0, len);
+                            var fallbackYt = await QueryYtDlpSearchAsync($"ytsearch15:{subQuery}", "YouTube", cancellationToken);
+                            if (fallbackYt.Count > 0)
+                            {
+                                ytResults.AddRange(fallbackYt);
+                                usedFallback = true;
+                                matchedFallbackQuery = subQuery;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (ytResults.Count == 0 && words.Length > 2)
+                    {
+                        for (int start = 1; start < words.Length; start++)
+                        {
+                            string subQuery = string.Join(" ", words, start, words.Length - start);
                             if (subQuery.Length >= 2)
                             {
                                 var fallbackYt = await QueryYtDlpSearchAsync($"ytsearch15:{subQuery}", "YouTube", cancellationToken);
@@ -73,102 +125,77 @@ namespace UniversalDownloader.Services
                                 }
                             }
                         }
-
-                        // 2. If still 0 results, try skipping first words (e.g. "w2 w3", "w3 w4")
-                        if (ytResults.Count == 0 && words.Length > 2)
-                        {
-                            for (int start = 1; start < words.Length; start++)
-                            {
-                                string subQuery = string.Join(" ", words, start, words.Length - start);
-                                if (subQuery.Length >= 2)
-                                {
-                                    var fallbackYt = await QueryYtDlpSearchAsync($"ytsearch15:{subQuery}", "YouTube", cancellationToken);
-                                    if (fallbackYt.Count > 0)
-                                    {
-                                        ytResults.AddRange(fallbackYt);
-                                        usedFallback = true;
-                                        matchedFallbackQuery = subQuery;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        // 3. If still 0 results, search for the longest distinctive individual words
-                        if (ytResults.Count == 0)
-                        {
-                            var longestWords = words.Where(w => w.Length >= 3).OrderByDescending(w => w.Length).Take(2);
-                            foreach (var word in longestWords)
-                            {
-                                var wordYt = await QueryYtDlpSearchAsync($"ytsearch10:{word}", "YouTube", cancellationToken);
-                                if (wordYt.Count > 0)
-                                {
-                                    foreach (var item in wordYt)
-                                    {
-                                        if (!ytResults.Exists(x => x.Id == item.Id))
-                                        {
-                                            ytResults.Add(item);
-                                        }
-                                    }
-                                    usedFallback = true;
-                                    matchedFallbackQuery = word;
-                                    if (ytResults.Count >= 8) break;
-                                }
-                            }
-                        }
                     }
-                }
-                catch (OperationCanceledException) { throw; }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"YouTube search failed: {ex.Message}");
-                }
-            }
 
-            // Step 2: SoundCloud Search (Secondary)
-            if (searchSoundCloud)
-            {
-                try
-                {
-                    scResults = await QueryYtDlpSearchAsync($"scsearch10:{cleanQuery}", "SoundCloud", cancellationToken);
-
-                    // Fallback for SoundCloud if 0 results
-                    if (scResults.Count == 0 && cleanQuery.Contains(' '))
+                    if (ytResults.Count == 0)
                     {
-                        var words = cleanQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                        for (int len = words.Length - 1; len >= 1; len--)
+                        var longestWords = words.Where(w => w.Length >= 3).OrderByDescending(w => w.Length).Take(2);
+                        foreach (var word in longestWords)
                         {
-                            string subQuery = string.Join(" ", words, 0, len);
-                            if (subQuery.Length >= 2)
+                            var wordYt = await QueryYtDlpSearchAsync($"ytsearch10:{word}", "YouTube", cancellationToken);
+                            if (wordYt.Count > 0)
                             {
-                                var fallbackSc = await QueryYtDlpSearchAsync($"scsearch10:{subQuery}", "SoundCloud", cancellationToken);
-                                if (fallbackSc.Count > 0)
+                                foreach (var item in wordYt)
                                 {
-                                    scResults.AddRange(fallbackSc);
-                                    if (!usedFallback)
+                                    if (!ytResults.Exists(x => x.Id == item.Id))
                                     {
-                                        usedFallback = true;
-                                        matchedFallbackQuery = subQuery;
+                                        ytResults.Add(item);
                                     }
-                                    break;
                                 }
+                                usedFallback = true;
+                                matchedFallbackQuery = word;
+                                if (ytResults.Count >= 8) break;
                             }
                         }
                     }
                 }
-                catch (OperationCanceledException) { throw; }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"SoundCloud search failed: {ex.Message}");
-                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"YouTube search failed: {ex.Message}");
             }
 
-            batch.Items.AddRange(ytResults);
-            batch.Items.AddRange(scResults);
-            batch.IsClosestFallback = usedFallback;
-            batch.FallbackQuery = matchedFallbackQuery;
+            return (ytResults, usedFallback, matchedFallbackQuery);
+        }
 
-            return batch;
+        private async Task<(List<SearchResultItem> Items, bool IsFallback, string FallbackQuery)> SearchSoundCloudAsync(string cleanQuery, CancellationToken cancellationToken)
+        {
+            var scResults = new List<SearchResultItem>();
+            bool usedFallback = false;
+            string matchedFallbackQuery = string.Empty;
+
+            try
+            {
+                scResults = await QueryYtDlpSearchAsync($"scsearch10:{cleanQuery}", "SoundCloud", cancellationToken);
+
+                if (scResults.Count == 0 && cleanQuery.Contains(' '))
+                {
+                    var words = cleanQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    for (int len = words.Length - 1; len >= 1; len--)
+                    {
+                        string subQuery = string.Join(" ", words, 0, len);
+                        if (subQuery.Length >= 2)
+                        {
+                            var fallbackSc = await QueryYtDlpSearchAsync($"scsearch10:{subQuery}", "SoundCloud", cancellationToken);
+                            if (fallbackSc.Count > 0)
+                            {
+                                scResults.AddRange(fallbackSc);
+                                usedFallback = true;
+                                matchedFallbackQuery = subQuery;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"SoundCloud search failed: {ex.Message}");
+            }
+
+            return (scResults, usedFallback, matchedFallbackQuery);
         }
 
         private async Task<List<SearchResultItem>> QueryYtDlpSearchAsync(string searchTarget, string platform, CancellationToken cancellationToken)
@@ -192,6 +219,12 @@ namespace UniversalDownloader.Services
             psi.ArgumentList.Add("--no-warnings");
             psi.ArgumentList.Add("--ignore-config");
             psi.ArgumentList.Add("--no-playlist");
+            psi.ArgumentList.Add("--no-check-certificates");
+            psi.ArgumentList.Add("--no-call-home");
+            psi.ArgumentList.Add("--socket-timeout");
+            psi.ArgumentList.Add("5");
+            psi.ArgumentList.Add("--extractor-args");
+            psi.ArgumentList.Add("youtube:skip=translated_subs,comments,dash");
             psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
 
             using var process = new Process { StartInfo = psi };
