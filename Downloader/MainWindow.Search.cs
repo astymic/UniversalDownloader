@@ -17,6 +17,10 @@ namespace UniversalDownloader
     public partial class MainWindow
     {
         private SearchService? _searchService;
+        private AudioCaptureService? _audioCaptureService;
+        private ShazamRecognitionService? _shazamService;
+        private CancellationTokenSource? _shazamCts;
+
         public ObservableCollection<SearchResultItem> SearchResults { get; } = new();
         private string _activeSearchPlatformFilter = "All";
         private CancellationTokenSource? _searchCts;
@@ -24,6 +28,20 @@ namespace UniversalDownloader
         private void InitializeSearchBindings()
         {
             _searchService = new SearchService(_dependencyManager);
+            _audioCaptureService = new AudioCaptureService();
+            _shazamService = new ShazamRecognitionService(_audioCaptureService);
+
+            _shazamService.AudioLevelChanged += level =>
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    if (ShazamAudioLevelProgressBar != null)
+                    {
+                        ShazamAudioLevelProgressBar.Value = level;
+                    }
+                });
+            };
+
             if (SearchResultsItemsControl != null)
             {
                 SearchResultsItemsControl.ItemsSource = SearchResults;
@@ -299,6 +317,102 @@ namespace UniversalDownloader
             {
                 SearchStatsTextBlock.Text = message;
             }
+        }
+
+        private async void ShazamIdentifyButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_shazamService == null) return;
+
+            // Cancel any ongoing search or listen
+            _shazamCts?.Cancel();
+            _shazamCts = new CancellationTokenSource();
+
+            var token = _shazamCts.Token;
+
+            if (ShazamListeningBorder != null) ShazamListeningBorder.Visibility = Visibility.Visible;
+            if (ShazamIdentifyButton != null) ShazamIdentifyButton.IsEnabled = false;
+
+            var source = (ShazamSourceSystem != null && ShazamSourceSystem.IsChecked == true)
+                ? AudioCaptureSource.SystemAudio
+                : AudioCaptureSource.Microphone;
+
+            try
+            {
+                // Start a visual countdown in the status text
+                _ = Task.Run(async () =>
+                {
+                    for (int sec = 5; sec >= 1; sec--)
+                    {
+                        if (token.IsCancellationRequested) break;
+                        int currentSec = sec;
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            if (ShazamStatusTextBlock != null)
+                                ShazamStatusTextBlock.Text = $"Listening ({ (source == AudioCaptureSource.SystemAudio ? "PC Audio" : "Microphone") })... {currentSec}s";
+                        });
+                        await Task.Delay(1000, token);
+                    }
+
+                    if (!token.IsCancellationRequested)
+                    {
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            if (ShazamStatusTextBlock != null)
+                                ShazamStatusTextBlock.Text = "⚡ Identifying song with Shazam...";
+                        });
+                    }
+                }, token);
+
+                var trackResult = await _shazamService.ListenAndIdentifyAsync(5, source, token);
+
+                if (trackResult.Success)
+                {
+                    if (ShazamStatusTextBlock != null)
+                        ShazamStatusTextBlock.Text = $"✨ Identified: {trackResult.Artist} - {trackResult.Title}";
+
+                    if (SearchQueryTextBox != null)
+                    {
+                        SearchQueryTextBox.Text = trackResult.QueryString;
+                        SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
+                    }
+
+                    // Auto-execute search to present download choices immediately
+                    await PerformSearchAsync();
+
+                    await Task.Delay(3000, CancellationToken.None);
+                    if (ShazamListeningBorder != null) ShazamListeningBorder.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    if (ShazamStatusTextBlock != null)
+                        ShazamStatusTextBlock.Text = $"⚠️ {trackResult.ErrorMessage}";
+
+                    await Task.Delay(3500, CancellationToken.None);
+                    if (ShazamListeningBorder != null && !token.IsCancellationRequested)
+                        ShazamListeningBorder.Visibility = Visibility.Collapsed;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                if (ShazamListeningBorder != null) ShazamListeningBorder.Visibility = Visibility.Collapsed;
+            }
+            catch (Exception ex)
+            {
+                if (ShazamStatusTextBlock != null)
+                    ShazamStatusTextBlock.Text = $"Error: {ex.Message}";
+            }
+            finally
+            {
+                if (ShazamIdentifyButton != null) ShazamIdentifyButton.IsEnabled = true;
+                if (ShazamAudioLevelProgressBar != null) ShazamAudioLevelProgressBar.Value = 0;
+            }
+        }
+
+        private void ShazamCancel_Click(object sender, RoutedEventArgs e)
+        {
+            _shazamCts?.Cancel();
+            if (ShazamListeningBorder != null) ShazamListeningBorder.Visibility = Visibility.Collapsed;
+            if (ShazamIdentifyButton != null) ShazamIdentifyButton.IsEnabled = true;
         }
     }
 }

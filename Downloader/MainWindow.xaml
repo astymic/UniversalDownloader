@@ -1709,6 +1709,7 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
                                     <TextBox x:Name="SearchQueryTextBox" 
@@ -1722,14 +1723,62 @@
                                              TextChanged="SearchQueryTextBox_TextChanged"/>
 
                                     <Button Grid.Column="1" 
+                                            x:Name="ShazamIdentifyButton"
+                                            Content="🎙️ Shazam (5s)" 
+                                            ToolTip="Record 5s from Microphone or PC Audio to identify any song"
+                                            Style="{StaticResource ModernButton}" 
+                                            Height="48" 
+                                            Padding="18,0" 
+                                            Margin="10,0,0,0"
+                                            Background="#1E1E24"
+                                            BorderBrush="#38BDF8"
+                                            BorderThickness="1"
+                                            Click="ShazamIdentifyButton_Click"/>
+
+                                    <Button Grid.Column="2" 
                                             x:Name="ExecuteSearchButton"
                                             Content="🔍 Search" 
                                             Style="{StaticResource ModernButton}" 
                                             Height="48" 
                                             Padding="24,0" 
-                                            Margin="12,0,0,0"
+                                            Margin="10,0,0,0"
                                             Click="ExecuteSearchButton_Click"/>
                                 </Grid>
+
+                                <!-- Shazam Listening Card -->
+                                <Border x:Name="ShazamListeningBorder" 
+                                        Background="#181820" 
+                                        BorderBrush="#38BDF8" 
+                                        BorderThickness="1" 
+                                        CornerRadius="12" 
+                                        Padding="16,12" 
+                                        Margin="0,14,0,0" 
+                                        Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="🎙️" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBlock x:Name="ShazamStatusTextBlock" Text="Listening to audio... (5s)" Foreground="#38BDF8" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <!-- Audio level meter -->
+                                        <ProgressBar Grid.Column="1" x:Name="ShazamAudioLevelProgressBar" Height="6" Minimum="0" Maximum="1" Value="0" Foreground="#38BDF8" Background="#262626" VerticalAlignment="Center" Margin="0,0,16,0"/>
+
+                                        <!-- Audio Source Toggle -->
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <RadioButton x:Name="ShazamSourceMic" Content="🎤 Mic" GroupName="ShazamSourceGroup" IsChecked="True" Style="{StaticResource FilterChipStyle}" Margin="0,0,6,0"/>
+                                            <RadioButton x:Name="ShazamSourceSystem" Content="🔊 PC Audio" GroupName="ShazamSourceGroup" Style="{StaticResource FilterChipStyle}"/>
+                                        </StackPanel>
+
+                                        <Button Grid.Column="3" Content="✖ Cancel" Style="{StaticResource SecondaryButtonStyle}" Height="30" Padding="10,0" FontSize="11" Click="ShazamCancel_Click"/>
+                                    </Grid>
+                                </Border>
 
                                 <!-- Filter Chips -->
                                 <WrapPanel Margin="0,14,0,0" Orientation="Horizontal">
