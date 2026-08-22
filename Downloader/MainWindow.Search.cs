@@ -51,17 +51,10 @@ namespace UniversalDownloader
             if (SearchScrollViewer != null)
             {
                 SearchScrollViewer.Visibility = Visibility.Visible;
-                if (SearchQueryTextBox != null)
+                if (SearchQueryTextBox != null && (string.IsNullOrWhiteSpace(SearchQueryTextBox.Text) || SearchQueryTextBox.Text == "Search track, artist, music name or album..."))
                 {
-                    if (string.IsNullOrWhiteSpace(SearchQueryTextBox.Text) || SearchQueryTextBox.Text == "Search track, artist, music name or album...")
-                    {
-                        SearchQueryTextBox.Text = "Search track, artist, music name or album...";
-                        SearchQueryTextBox.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216));
-                    }
-                    else
-                    {
-                        SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
-                    }
+                    SearchQueryTextBox.Text = "Search track, artist, music name or album...";
+                    SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
                 }
             }
         }
@@ -90,7 +83,8 @@ namespace UniversalDownloader
         {
             if (SearchQueryTextBox != null && SearchQueryTextBox.Text == "Search track, artist, music name or album...")
             {
-                SearchQueryTextBox.SelectAll();
+                SearchQueryTextBox.Text = string.Empty;
+                SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush");
             }
         }
 
@@ -98,14 +92,14 @@ namespace UniversalDownloader
         {
             if (SearchQueryTextBox != null)
             {
-                if (string.IsNullOrWhiteSpace(SearchQueryTextBox.Text) || SearchQueryTextBox.Text == "Search track, artist, music name or album...")
+                if (string.IsNullOrWhiteSpace(SearchQueryTextBox.Text))
                 {
                     SearchQueryTextBox.Text = "Search track, artist, music name or album...";
-                    SearchQueryTextBox.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216));
+                    SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
                 }
                 else
                 {
-                    SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
+                    SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush");
                 }
             }
         }
@@ -114,12 +108,8 @@ namespace UniversalDownloader
         {
             if (SearchQueryTextBox != null && SearchQueryTextBox.Text == "Search track, artist, music name or album...")
             {
-                if (!SearchQueryTextBox.IsKeyboardFocusWithin)
-                {
-                    SearchQueryTextBox.Focus();
-                    SearchQueryTextBox.SelectAll();
-                    e.Handled = true;
-                }
+                SearchQueryTextBox.Text = string.Empty;
+                SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush");
             }
         }
 
@@ -128,11 +118,11 @@ namespace UniversalDownloader
             if (SearchQueryTextBox == null) return;
             if (SearchQueryTextBox.Text == "Search track, artist, music name or album...")
             {
-                SearchQueryTextBox.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216));
+                SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
             }
             else if (!string.IsNullOrEmpty(SearchQueryTextBox.Text))
             {
-                SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
+                SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush");
             }
         }
 

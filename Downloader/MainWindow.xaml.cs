@@ -291,6 +291,11 @@ namespace UniversalDownloader
                 UrlTextBox.Foreground = (Brush)FindResource("TextSecondaryBrush");
             }
 
+            if (SearchQueryTextBox != null && SearchQueryTextBox.Text == "Search track, artist, music name or album...")
+            {
+                SearchQueryTextBox.Foreground = (Brush)FindResource("TextSecondaryBrush");
+            }
+
             try
             {
                 await _dependencyManager.InitializeDependenciesAsync();
