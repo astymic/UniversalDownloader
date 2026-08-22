@@ -13,6 +13,17 @@ A modern, high-performance, cross-platform desktop application (**Windows & Linu
 
 ## 🌟 Key Features
 
+### 📻 Live Stream & DJ Scraper ("Passive DJ Mode")
+- **Continuous Ambient Listening** — 1-click start/stop toggle button (or press global hotkey `[F9]`) to passively listen to all music playing on your PC (streams, DJ sets, mixes, movies, podcasts, gaming).
+- **10s Recognition Cycle** — Efficient continuous sampling loop (5s capture + query + 5s cooldown) identifying songs non-stop with minimal CPU and network footprint.
+- **Smart Duplicate Suppression** — Tracks are cross-referenced in real-time so no song is added more than once, with an intelligent 25-second cooldown during playback.
+- **Real-Time Live Track Feed** — Songs dynamically appear in real-time on your screen with title, artist, time badge, and 1-click download/queue/search buttons.
+- **📜 Expandable Past Sessions Accordion**:
+  - Saved session history tagged with date, time, and song count.
+  - **Interactive Dropdown**: Click any session card or `[▼ View Tracks]` to drop down and inspect all individual tracks in that session.
+  - **Single-Track Downloads**: Download or queue individual tracks directly from past sessions without having to download the entire session.
+  - **Batch Actions**: `[⬇ Download All]` to enqueue the entire session, or `[📂 Load Tracks]` to restore it into the live feed.
+
 ### 🔍 Dual-Mode Search Hub
 - **🎵 Smart Music Hub (Default)** — Multi-source parallel search across YouTube & SoundCloud with intelligent subword/closest-match fallback.
 - **📺 Real YouTube Search** — Authentic YouTube search results matching YouTube.com's live ranking with full video metadata.
@@ -25,14 +36,9 @@ A modern, high-performance, cross-platform desktop application (**Windows & Linu
   - **🎤 Microphone**: Captures ambient audio from speakers or humming.
 - **Real-Time Visualizer & Auto-Search** — Live RMS volume meter, visual countdown, and automatic search retrieval upon song detection for immediate 1-click download.
 
-### 📻 Live Stream & DJ Mix Scraper (Continuous PC Audio Recognition)
-- **Continuous Ambient Listening** — 1-click start/stop toggle button to passively listen to all music playing on your PC (streams, DJ sets, movies, podcasts).
-- **Configurable Global Hotkey** — Press `[F9]` (or custom key configured in Settings) from anywhere to instantly start or pause continuous listening.
-- **Smart Duplicate Suppression** — Tracks are cross-referenced in real-time so no song is added more than once, with an intelligent 25s cooldown during playback.
-- **Real-Time Feed & Session History** — Logs detected tracks with live timestamps, album art, 1-click individual downloads, and persistent history with session dates.
-- **Batch Download** — 1-click `[⬇ Download All]` to enqueue every song detected during a live stream.
-
-### 📥 Multi-Platform Downloader
+### 📥 Multi-Platform Downloader & Isolated Jobs
+- **Isolated Download Pipelines** — Every download runs in an isolated sandbox subdirectory to prevent cross-job interference, ensuring zero partial (`.part`) files leak into output folders.
+- **Strict Audio Extraction** — When downloading audio, video containers (`.mp4`, `.webm`) are automatically cleaned up so only the desired `.mp3` is saved.
 - **YouTube & Playlists** — Video and audio downloads with customizable quality, playlist indexing, and metadata tagging.
 - **Spotify CSV & Exportify Integration** — Dedicated sliding side drawer for importing Spotify playlists of any size via CSV with track checklists and state restoration.
 - **SoundCloud, Google Drive & Direct URLs** — Seamless downloading from direct file links, cloud storage, and video portals.
@@ -62,7 +68,7 @@ A modern, high-performance, cross-platform desktop application (**Windows & Linu
 
 - Custom borderless dark glassmorphism theme with animated glow accents and drop shadows.
 - High-performance GPU-accelerated drawer transitions (`TranslateTransform`) ensuring silky 60/120/144Hz framerates.
-- Compact quick-access right navigation rail for **Search**, **Shazam**, **Spotify**, **History**, **Converter**, and **Queue**.
+- Compact quick-access right navigation rail for **Search**, **Shazam**, **Live Stream / DJ Scraper**, **Spotify**, **History**, **Converter**, and **Queue**.
 
 ---
 
@@ -81,7 +87,7 @@ A modern, high-performance, cross-platform desktop application (**Windows & Linu
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Windows 10 / 11 (64-bit)
+- Windows 10 / 11 (64-bit) or Linux (x64)
 - Visual Studio 2022 (with **.NET Desktop Development** workload) OR [.NET 8 / 9 SDK](https://dotnet.microsoft.com/download)
 
 ### Build & Run
