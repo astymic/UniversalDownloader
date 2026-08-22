@@ -57,6 +57,8 @@ namespace UniversalDownloader
         private System.Windows.Threading.DispatcherTimer? _urlDebounceTimer;
         private CancellationTokenSource? _urlProcessingCts;
         private string _currentItemTitle = "";
+        private string _previewItemTitle = "";
+        private string _downloadingItemTitle = "";
         private ObservableCollection<PlaylistVideoItem> _playlistItems = new ObservableCollection<PlaylistVideoItem>();
         private bool _isPlaylistMode = false;
 
@@ -246,10 +248,16 @@ namespace UniversalDownloader
                     StatusTextBlock.Text = e.StatusMessage;
                 }
                 
-                if (FileNameTextBlock != null && e.Filename != null)
+                if (FileNameTextBlock != null)
                 {
-                    FileNameTextBlock.Text = e.Filename;
-                    FileNameTextBlock.Visibility = string.IsNullOrEmpty(e.Filename) ? Visibility.Collapsed : Visibility.Visible;
+                    string displayName = !string.IsNullOrWhiteSpace(_downloadingItemTitle) 
+                        ? _downloadingItemTitle 
+                        : (e.Filename ?? _currentItemTitle);
+                    if (!string.IsNullOrWhiteSpace(displayName))
+                    {
+                        FileNameTextBlock.Text = displayName;
+                        FileNameTextBlock.Visibility = Visibility.Visible;
+                    }
                 }
 
                 if (DownloadProgressBar != null)
@@ -891,69 +899,88 @@ namespace UniversalDownloader
                     YouTubeQualityComboBox.SelectedIndex = 0;
 
                     string cleanTitle = _downloadService.IsInstagramLink(url) ? "Instagram Reel / Media" : "Social Video";
-                    _currentItemTitle = cleanTitle;
-                    FileNameTextBlock.Text = cleanTitle;
-                    FileNameTextBlock.Visibility = Visibility.Visible;
-                    StatusTextBlock.Text = "Ready to download. Click Start Download.";
+                    ApplyPreviewDiscoveredTitle(cleanTitle, "Ready to download. Click Start Download.");
                     return;
                 }
 
-                StatusTextBlock.Text = "No downloadable formats found.";
-                FileNameTextBlock.Text = "Failed to load video info";
-                FileNameTextBlock.Visibility = Visibility.Visible;
+                if (!_isDownloadingFile)
+                {
+                    StatusTextBlock.Text = "No downloadable formats found.";
+                    FileNameTextBlock.Text = "Failed to load video info";
+                    FileNameTextBlock.Visibility = Visibility.Visible;
+                }
             }
             else if (_downloadService.IsSpotifyLink(url))
             {
                 if (!url.Contains("/track/", StringComparison.OrdinalIgnoreCase))
                 {
+                    _previewItemTitle = "";
                     _currentItemTitle = "";
-                    FileNameTextBlock.Text = "Spotify Playlist/Album URL";
-                    FileNameTextBlock.Visibility = Visibility.Visible;
-                    StatusTextBlock.Text = "Only individual Spotify tracks are currently supported.";
+                    if (!_isDownloadingFile)
+                    {
+                        FileNameTextBlock.Text = "Spotify Playlist/Album URL";
+                        FileNameTextBlock.Visibility = Visibility.Visible;
+                        StatusTextBlock.Text = "Only individual Spotify tracks are currently supported.";
+                    }
                     return;
                 }
 
-                FileNameTextBlock.Text = "Fetching Spotify track metadata...";
-                FileNameTextBlock.Visibility = Visibility.Visible;
-                StatusTextBlock.Text = "Resolving track information...";
+                if (!_isDownloadingFile)
+                {
+                    FileNameTextBlock.Text = "Fetching Spotify track metadata...";
+                    FileNameTextBlock.Visibility = Visibility.Visible;
+                    StatusTextBlock.Text = "Resolving track information...";
+                }
 
                 var metadata = await _downloadService.GetSpotifyMetadataAsync(url);
                 if (metadata != null)
                 {
                     string beautifulTitle = $"{metadata.Artist} - {metadata.Title}";
-                    _currentItemTitle = beautifulTitle;
-                    FileNameTextBlock.Text = beautifulTitle;
-                    StatusTextBlock.Text = "Spotify track resolved. Ready to download.";
+                    ApplyPreviewDiscoveredTitle(beautifulTitle, "Spotify track resolved. Ready to download.");
                 }
                 else
                 {
-                    _currentItemTitle = "Spotify Track";
-                    FileNameTextBlock.Text = "Spotify Track";
-                    StatusTextBlock.Text = "Ready to download (metadata lookup failed).";
+                    ApplyPreviewDiscoveredTitle("Spotify Track", "Ready to download (metadata lookup failed).");
                 }
             }
             else if (_downloadService.IsKnownAudioPlatformLink(url))
             {
                 string title = await _downloadService.GetTitleWithYtDlpAsync(url);
                 string audioTitle = title ?? "Audio Platform Item";
-                _currentItemTitle = audioTitle;
-                FileNameTextBlock.Text = audioTitle;
-                FileNameTextBlock.Visibility = Visibility.Visible;
-                StatusTextBlock.Text = "Ready to download audio.";
+                ApplyPreviewDiscoveredTitle(audioTitle, "Ready to download audio.");
             }
             else if (_downloadService.IsGoogleDriveLink(url))
             {
-                _currentItemTitle = "Google Drive file";
-                FileNameTextBlock.Text = "Google Drive file";
-                FileNameTextBlock.Visibility = Visibility.Visible;
-                StatusTextBlock.Text = "Ready to download from Google Drive.";
+                ApplyPreviewDiscoveredTitle("Google Drive file", "Ready to download from Google Drive.");
             }
             else
             {
-                _currentItemTitle = "Direct link detected";
-                FileNameTextBlock.Text = "Direct link detected";
-                FileNameTextBlock.Visibility = Visibility.Visible;
-                StatusTextBlock.Text = "Ready to download.";
+                ApplyPreviewDiscoveredTitle("Direct link detected", "Ready to download.");
+            }
+        }
+
+        private void ApplyPreviewDiscoveredTitle(string title, string readyStatus)
+        {
+            _previewItemTitle = title;
+            _currentItemTitle = title;
+
+            if (VideoTitleInfoBlock != null)
+            {
+                string shortTitle = title.Length > 30 ? title.Substring(0, 27) + "..." : title;
+                VideoTitleInfoBlock.Text = shortTitle;
+            }
+
+            if (!_isDownloadingFile)
+            {
+                if (FileNameTextBlock != null)
+                {
+                    FileNameTextBlock.Text = title;
+                    FileNameTextBlock.Visibility = Visibility.Visible;
+                }
+                if (StatusTextBlock != null)
+                {
+                    StatusTextBlock.Text = readyStatus;
+                }
             }
         }
 
@@ -967,18 +994,8 @@ namespace UniversalDownloader
                   if (string.IsNullOrWhiteSpace(title)) title = videoInfo["fulltitle"]?.ToString();
                   if (string.IsNullOrWhiteSpace(title) && videoInfo["uploader"] != null) title = $"Video by {videoInfo["uploader"]}";
                   if (string.IsNullOrWhiteSpace(title)) title = "Media Video";
-                 string sanitizedTitle = Utilities.SanitizeFileName(title);
-                 // Store for restore after cancel
-                 _currentItemTitle = sanitizedTitle;
-                 // Show title in the filename block
-                 FileNameTextBlock.Text = sanitizedTitle;
-                 FileNameTextBlock.Visibility = Visibility.Visible;
-                 // Show shortened title in the quality section header
-                 if (VideoTitleInfoBlock != null)
-                 {
-                     string shortTitle = title.Length > 30 ? title.Substring(0, 27) + "..." : title;
-                     VideoTitleInfoBlock.Text = shortTitle;
-                 }
+
+                 ApplyPreviewDiscoveredTitle(title, "Ready to download.");
 
                  // SortPriority 9999 = always first (above any resolution value)
                  // No [ext=] filter — let yt-dlp pick the absolute best quality stream; --merge-output-format mp4 handles the container
@@ -1153,6 +1170,13 @@ namespace UniversalDownloader
                 return;
             }
 
+            // If a download is already in progress, add this new URL to the queue
+            if (_isDownloadingFile)
+            {
+                EnqueueCurrentMainUrl();
+                return;
+            }
+
             string url = UrlTextBox.Text;
             bool hasSpotifyCsvTracks = _playlistItems.Count > 0 && _isPlaylistMode && 
                 (_playlistItems[0].VideoUrl.StartsWith("ytsearch1:", StringComparison.OrdinalIgnoreCase));
@@ -1167,12 +1191,14 @@ namespace UniversalDownloader
 
             _isDownloadingFile = true;
             _cancellationTokenSource = new CancellationTokenSource();
+            _downloadingItemTitle = !string.IsNullOrWhiteSpace(_previewItemTitle) ? _previewItemTitle : _currentItemTitle;
+            _currentItemTitle = _downloadingItemTitle;
+
             UpdateUiElementStates("Preparing to download...");
 
-            // Restore the video title in case it was overwritten by a previous cancel
-            if (!string.IsNullOrEmpty(_currentItemTitle))
+            if (!string.IsNullOrEmpty(_downloadingItemTitle))
             {
-                FileNameTextBlock.Text = _currentItemTitle;
+                FileNameTextBlock.Text = _downloadingItemTitle;
                 FileNameTextBlock.Visibility = Visibility.Visible;
             }
 
@@ -1338,10 +1364,21 @@ namespace UniversalDownloader
             finally
             {
                 _isDownloadingFile = false;
+                _downloadingItemTitle = "";
                 _cancellationTokenSource?.Dispose();
                 _cancellationTokenSource = null;
 
                 DownloadProgressBar.IsIndeterminate = false;
+
+                if (UrlTextBox != null && !string.IsNullOrWhiteSpace(UrlTextBox.Text) && UrlTextBox.Text != "Paste URL here...")
+                {
+                    if (!string.IsNullOrWhiteSpace(_previewItemTitle))
+                    {
+                        FileNameTextBlock.Text = _previewItemTitle;
+                        FileNameTextBlock.Visibility = Visibility.Visible;
+                    }
+                }
+
                 UpdateUiElementStates();
             }
         }
