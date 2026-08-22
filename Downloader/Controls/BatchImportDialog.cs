@@ -504,11 +504,8 @@ namespace UniversalDownloader.Controls
                             </Popup>
                         </Grid>
                         <ControlTemplate.Triggers>
-                            <Trigger Property=""IsMouseOver"" Value=""True"">
-                                <Setter TargetName=""MainBorder"" Property=""BorderBrush"" Value=""#71717A""/>
-                            </Trigger>
-                            <Trigger Property=""IsFocused"" Value=""True"">
-                                <Setter TargetName=""MainBorder"" Property=""BorderBrush"" Value=""#8B5CF6""/>
+                            <Trigger Property=""IsEnabled"" Value=""False"">
+                                <Setter Property=""Opacity"" Value=""0.5""/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
