@@ -861,7 +861,7 @@
                                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                                 <Button Style="{StaticResource SecondaryButton}" Content="▶ Open" Click="HistoryOpenFile_Click" Tag="{Binding}" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Open file with default app"/>
                                                 <Button Style="{StaticResource SecondaryButton}" Content="📂 Folder" Click="HistoryOpenFolder_Click" Tag="{Binding}" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Show file in folder"/>
-                                                <Button Style="{StaticResource SecondaryButton}" Content="📋 Link" Click="HistoryCopyUrl_Click" Tag="{Binding}" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Copy original URL"/>
+                                                <Button Style="{StaticResource SecondaryButton}" Content="🔗 Link" Click="HistoryCopyUrl_Click" Tag="{Binding}" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Open source link in browser and copy URL"/>
                                                 <Button Style="{StaticResource MinimalistCancelButton}" Content="✕" Click="HistoryDeleteItem_Click" Tag="{Binding}" Padding="8,6" FontSize="11" ToolTip="Remove from history"/>
                                             </StackPanel>
                                         </Grid>

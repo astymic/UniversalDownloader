@@ -82,18 +82,39 @@ namespace UniversalDownloader
             {
                 try
                 {
-                    string urlToCopy = item.Url;
-                    if (string.IsNullOrWhiteSpace(urlToCopy) && !string.IsNullOrWhiteSpace(item.Title))
+                    string urlToOpen = item.Url;
+                    if (string.IsNullOrWhiteSpace(urlToOpen) && !string.IsNullOrWhiteSpace(item.Title))
                     {
-                        urlToCopy = $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(item.Title)}";
+                        urlToOpen = $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(item.Title)}";
+                    }
+                    else if (urlToOpen.StartsWith("ytsearch", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string query = urlToOpen.Substring(urlToOpen.IndexOf(':') + 1);
+                        urlToOpen = $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(query)}";
                     }
 
-                    if (!string.IsNullOrWhiteSpace(urlToCopy))
+                    if (!string.IsNullOrWhiteSpace(urlToOpen))
                     {
-                        Clipboard.SetDataObject(urlToCopy, true);
+                        // 1. Copy link to clipboard
+                        try
+                        {
+                            Clipboard.SetDataObject(urlToOpen, true);
+                        }
+                        catch (Exception cbEx)
+                        {
+                            Debug.WriteLine($"Failed to copy to clipboard: {cbEx.Message}");
+                        }
 
-                        string originalContent = btn.Content?.ToString() ?? "📋 Link";
-                        btn.Content = "✓ Copied!";
+                        // 2. Open link in default browser
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = urlToOpen,
+                            UseShellExecute = true
+                        });
+
+                        // 3. Visual button feedback
+                        string originalContent = btn.Content?.ToString() ?? "🔗 Link";
+                        btn.Content = "✓ Opened!";
                         btn.Foreground = (Brush)FindResource("SuccessBrush");
 
                         var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
@@ -112,7 +133,7 @@ namespace UniversalDownloader
                 }
                 catch (Exception ex)
                 {
-                    ModernMessageBox.Show($"Could not copy link to clipboard: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error, this);
+                    ModernMessageBox.Show($"Could not open link in browser: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error, this);
                 }
             }
         }
