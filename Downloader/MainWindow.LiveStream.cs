@@ -21,6 +21,8 @@ namespace UniversalDownloader
         {
             try
             {
+                LiveStreamRecognitionService.DispatcherInvoker = action => Dispatcher.Invoke(action);
+
                 if (_audioCaptureService != null && _shazamService != null)
                 {
                     _liveStreamService = new LiveStreamRecognitionService(_audioCaptureService, _shazamService);

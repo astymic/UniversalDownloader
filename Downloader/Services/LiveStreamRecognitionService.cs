@@ -13,6 +13,8 @@ namespace UniversalDownloader.Services
 {
     public class LiveStreamRecognitionService : IDisposable
     {
+        public static Action<Action>? DispatcherInvoker { get; set; }
+
         private readonly AudioCaptureService _audioCaptureService;
         private readonly ShazamRecognitionService _shazamService;
         private readonly string _sessionsFilePath;
@@ -47,6 +49,25 @@ namespace UniversalDownloader.Services
             LoadSessionHistory();
         }
 
+        private void RunOnUIThread(Action action)
+        {
+            try
+            {
+                if (DispatcherInvoker != null)
+                {
+                    DispatcherInvoker(action);
+                }
+                else
+                {
+                    action();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error running on UI thread: {ex.Message}");
+            }
+        }
+
         public async Task ToggleListeningAsync()
         {
             if (_isListening)
@@ -68,16 +89,18 @@ namespace UniversalDownloader.Services
             _listeningCts = new CancellationTokenSource();
             var token = _listeningCts.Token;
 
-            // Start new session
-            CurrentSession = new LiveStreamSession
+            // Start new session on UI thread
+            var newSession = new LiveStreamSession
             {
                 StartTime = DateTime.Now
             };
 
-            lock (_lock)
+            CurrentSession = newSession;
+
+            RunOnUIThread(() =>
             {
-                _sessionHistory.Insert(0, CurrentSession);
-            }
+                _sessionHistory.Insert(0, newSession);
+            });
 
             ListeningStateChanged?.Invoke(true);
             StatusUpdated?.Invoke("🔴 Listening to PC Audio in real-time...");
@@ -106,15 +129,13 @@ namespace UniversalDownloader.Services
 
         private async Task ListeningLoopAsync(CancellationToken token)
         {
-            string lastIdentifiedKey = string.Empty;
-
             while (!token.IsCancellationRequested && _isListening)
             {
                 try
                 {
                     StatusUpdated?.Invoke("🎙️ Sampling PC Audio (5s)...");
 
-                    // 1. Identify 5-second sample from PC Audio
+                    // 1. Capture 5 seconds of audio from PC loopback
                     var result = await _shazamService.ListenAndIdentifyAsync(
                         durationSeconds: 5,
                         source: AudioCaptureSource.SystemAudio,
@@ -124,71 +145,62 @@ namespace UniversalDownloader.Services
 
                     if (result.Success && !string.IsNullOrWhiteSpace(result.Title))
                     {
-                        string currentTrackKey = $"{result.Artist.Trim()} - {result.Title.Trim()}".ToLowerInvariant();
+                        string currentTitle = result.Title.Trim();
+                        string currentArtist = result.Artist.Trim();
 
                         // Check if already in current session (Deduplication)
                         bool alreadyInSession = false;
                         if (CurrentSession != null)
                         {
-                            lock (CurrentSession.Tracks)
-                            {
-                                alreadyInSession = CurrentSession.Tracks.Any(t =>
-                                    string.Equals(t.Title.Trim(), result.Title.Trim(), StringComparison.OrdinalIgnoreCase) &&
-                                    string.Equals(t.Artist.Trim(), result.Artist.Trim(), StringComparison.OrdinalIgnoreCase));
-                            }
+                            alreadyInSession = CurrentSession.Tracks.Any(t =>
+                                string.Equals(t.Title.Trim(), currentTitle, StringComparison.OrdinalIgnoreCase) &&
+                                string.Equals(t.Artist.Trim(), currentArtist, StringComparison.OrdinalIgnoreCase));
                         }
 
                         if (!alreadyInSession && CurrentSession != null)
                         {
                             var trackItem = new LiveDetectedTrackItem
                             {
-                                Title = result.Title.Trim(),
-                                Artist = result.Artist.Trim(),
+                                Title = currentTitle,
+                                Artist = currentArtist,
                                 Album = result.Album.Trim(),
                                 CoverArtUrl = result.CoverArtUrl,
                                 DetectedAt = DateTime.Now
                             };
 
-                            lock (CurrentSession.Tracks)
+                            // Add to session tracks ON UI THREAD so collection binding updates in real-time
+                            RunOnUIThread(() =>
                             {
                                 CurrentSession.Tracks.Insert(0, trackItem);
-                            }
+                                TrackDetected?.Invoke(trackItem);
+                            });
 
-                            lastIdentifiedKey = currentTrackKey;
-
-                            TrackDetected?.Invoke(trackItem);
                             StatusUpdated?.Invoke($"✨ Detected: {trackItem.QueryString}");
-
                             _ = SaveSessionHistoryAsync();
                         }
                         else
                         {
-                            // Track is already logged in session
+                            // Duplicate detected, track is actively playing
                             StatusUpdated?.Invoke($"🎵 Playing: {result.Artist} - {result.Title}");
-                        }
-
-                        // Smart cooldown: wait 25 seconds before sampling next song since track is actively playing
-                        for (int i = 0; i < 25 && !token.IsCancellationRequested && _isListening; i++)
-                        {
-                            await Task.Delay(1000, token);
                         }
                     }
                     else
                     {
-                        // No track found or silence
-                        StatusUpdated?.Invoke("🎧 Listening for next song...");
-                        // Wait 7 seconds before next sampling cycle
-                        for (int i = 0; i < 7 && !token.IsCancellationRequested && _isListening; i++)
-                        {
-                            await Task.Delay(1000, token);
-                        }
+                        // No track match or quiet moment
+                        StatusUpdated?.Invoke("🎧 Listening for tracks...");
+                    }
+
+                    // 2. Wait 5 seconds so total loop duration is ~10s per cycle
+                    for (int i = 5; i >= 1 && !token.IsCancellationRequested && _isListening; i--)
+                    {
+                        await Task.Delay(1000, token);
                     }
                 }
                 catch (OperationCanceledException) { break; }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"Live Stream Scraper loop error: {ex.Message}");
-                    try { await Task.Delay(5000, token); } catch { }
+                    try { await Task.Delay(3000, token); } catch { }
                 }
             }
         }

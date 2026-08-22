@@ -81,8 +81,9 @@ namespace UniversalDownloader.Avalonia
 
             KeyDown += MainWindow_KeyDown;
 
-            // Hook up cross-platform UI dispatcher for DownloadQueueManager
+            // Hook up cross-platform UI dispatcher for DownloadQueueManager & LiveStreamRecognitionService
             DownloadQueueManager.DispatcherInvoker = action => Dispatcher.UIThread.Post(action);
+            LiveStreamRecognitionService.DispatcherInvoker = action => Dispatcher.UIThread.Post(action);
 
             SearchResultsItemsControl.ItemsSource = SearchResults;
             QueueItemsControl.ItemsSource = _queueManager.Items;
