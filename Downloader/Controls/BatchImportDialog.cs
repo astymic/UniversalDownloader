@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Shell;
@@ -188,12 +189,8 @@ namespace UniversalDownloader.Controls
                 FontSize = 12.5,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            _formatComboBox = new ComboBox
-            {
-                Height = 32,
-                FontSize = 12,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+
+            _formatComboBox = CreateDarkComboBox();
             _formatComboBox.Items.Add("Auto / Best Video + Audio");
             _formatComboBox.Items.Add("Audio (MP3 320kbps)");
             _formatComboBox.Items.Add("Audio (Best Quality / M4A)");
@@ -303,19 +300,7 @@ namespace UniversalDownloader.Controls
             };
             cancelBtn.Click += (s, e) => Close();
 
-            _queueButton = new Button
-            {
-                Content = "📥 Queue All (0 items)",
-                Height = 36,
-                Padding = new Thickness(16, 0, 16, 0),
-                FontSize = 12.5,
-                FontWeight = FontWeights.SemiBold,
-                Background = new SolidColorBrush(Color.FromRgb(139, 92, 246)),
-                Foreground = Brushes.White,
-                BorderThickness = new Thickness(0),
-                Cursor = Cursors.Hand,
-                IsEnabled = false
-            };
+            _queueButton = CreateQueueButton();
             _queueButton.Click += OnQueueAllClicked;
 
             buttonsStack.Children.Add(cancelBtn);
@@ -327,6 +312,175 @@ namespace UniversalDownloader.Controls
 
             rootBorder.Child = mainGrid;
             return rootBorder;
+        }
+
+        private Button CreateQueueButton()
+        {
+            string xaml = @"
+            <Button xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation""
+                    xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml""
+                    Height=""36""
+                    Padding=""16,0,16,0""
+                    FontSize=""12.5""
+                    FontWeight=""SemiBold""
+                    Cursor=""Hand""
+                    IsEnabled=""False"">
+                <Button.Style>
+                    <Style TargetType=""Button"">
+                        <Setter Property=""Template"">
+                            <Setter.Value>
+                                <ControlTemplate TargetType=""Button"">
+                                    <Border x:Name=""btnBorder""
+                                            Background=""#FAFAFA""
+                                            BorderBrush=""#E4E4E7""
+                                            BorderThickness=""1""
+                                            CornerRadius=""8""
+                                            Padding=""{TemplateBinding Padding}"">
+                                        <ContentPresenter HorizontalAlignment=""Center"" 
+                                                          VerticalAlignment=""Center"" 
+                                                          TextBlock.Foreground=""#09090B""
+                                                          TextBlock.FontWeight=""SemiBold""
+                                                          x:Name=""content""/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property=""IsMouseOver"" Value=""True"">
+                                            <Setter TargetName=""btnBorder"" Property=""Background"" Value=""#FFFFFF""/>
+                                            <Setter TargetName=""btnBorder"" Property=""BorderBrush"" Value=""#A1A1AA""/>
+                                        </Trigger>
+                                        <Trigger Property=""IsPressed"" Value=""True"">
+                                            <Setter TargetName=""btnBorder"" Property=""Background"" Value=""#E4E4E7""/>
+                                        </Trigger>
+                                        <Trigger Property=""IsEnabled"" Value=""False"">
+                                            <Setter TargetName=""btnBorder"" Property=""Background"" Value=""#27272A""/>
+                                            <Setter TargetName=""btnBorder"" Property=""BorderBrush"" Value=""#3F3F46""/>
+                                            <Setter TargetName=""content"" Property=""TextBlock.Foreground"" Value=""#71717A""/>
+                                            <Setter Property=""Opacity"" Value=""0.7""/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Button.Style>
+                <Button.Content>📥 Queue All (0 items)</Button.Content>
+            </Button>";
+
+            return (Button)XamlReader.Parse(xaml);
+        }
+
+        private ComboBox CreateDarkComboBox()
+        {
+            string xaml = @"
+            <ComboBox xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation""
+                      xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml""
+                      Height=""34""
+                      FontSize=""12.5""
+                      Foreground=""#FAFAFA""
+                      Background=""#18181B""
+                      BorderBrush=""#3F3F46""
+                      BorderThickness=""1""
+                      Padding=""12,6""
+                      VerticalAlignment=""Center""
+                      MaxDropDownHeight=""220"">
+                <ComboBox.ItemContainerStyle>
+                    <Style TargetType=""ComboBoxItem"">
+                        <Setter Property=""Foreground"" Value=""#FAFAFA""/>
+                        <Setter Property=""Background"" Value=""Transparent""/>
+                        <Setter Property=""Padding"" Value=""12,8""/>
+                        <Setter Property=""FontSize"" Value=""12.5""/>
+                        <Setter Property=""Cursor"" Value=""Hand""/>
+                        <Setter Property=""Template"">
+                            <Setter.Value>
+                                <ControlTemplate TargetType=""ComboBoxItem"">
+                                    <Border x:Name=""itemBorder"" Background=""{TemplateBinding Background}"" Padding=""{TemplateBinding Padding}"" CornerRadius=""6"" Margin=""4,2"">
+                                        <ContentPresenter HorizontalAlignment=""Left"" VerticalAlignment=""Center""/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property=""IsHighlighted"" Value=""True"">
+                                            <Setter TargetName=""itemBorder"" Property=""Background"" Value=""#27272A""/>
+                                        </Trigger>
+                                        <Trigger Property=""IsSelected"" Value=""True"">
+                                            <Setter TargetName=""itemBorder"" Property=""Background"" Value=""#2E2248""/>
+                                            <Setter Property=""Foreground"" Value=""#A78BFA""/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ComboBox.ItemContainerStyle>
+                <ComboBox.Template>
+                    <ControlTemplate TargetType=""ComboBox"">
+                        <Grid>
+                            <Border x:Name=""MainBorder"" 
+                                    Background=""#18181B"" 
+                                    BorderBrush=""#3F3F46"" 
+                                    BorderThickness=""1"" 
+                                    CornerRadius=""8"">
+                                <Grid Margin=""10,4,8,4"">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width=""*""/>
+                                        <ColumnDefinition Width=""Auto""/>
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter Grid.Column=""0"" 
+                                                      IsHitTestVisible=""False"" 
+                                                      Content=""{TemplateBinding SelectionBoxItem}"" 
+                                                      VerticalAlignment=""Center"" 
+                                                      HorizontalAlignment=""Left""
+                                                      TextBlock.Foreground=""#FAFAFA""/>
+                                    <ToggleButton Grid.Column=""1"" 
+                                                  Focusable=""False"" 
+                                                  IsChecked=""{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"" 
+                                                  ClickMode=""Press"" 
+                                                  Width=""24"" 
+                                                  Background=""Transparent""
+                                                  BorderThickness=""0""
+                                                  Cursor=""Hand"">
+                                        <ToggleButton.Template>
+                                            <ControlTemplate TargetType=""ToggleButton"">
+                                                <Border Background=""Transparent"">
+                                                    <Path x:Name=""Arrow"" Data=""M7,10L12,15L17,10"" Stroke=""#A1A1AA"" StrokeThickness=""1.8"" HorizontalAlignment=""Center"" VerticalAlignment=""Center"" Stretch=""None""/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property=""IsMouseOver"" Value=""True"">
+                                                        <Setter TargetName=""Arrow"" Property=""Stroke"" Value=""#8B5CF6""/>
+                                                    </Trigger>
+                                                    <Trigger Property=""IsChecked"" Value=""True"">
+                                                        <Setter TargetName=""Arrow"" Property=""Stroke"" Value=""#8B5CF6""/>
+                                                        <Setter TargetName=""Arrow"" Property=""Data"" Value=""M7,15L12,10L17,15""/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </ToggleButton.Template>
+                                    </ToggleButton>
+                                </Grid>
+                            </Border>
+                            <Popup x:Name=""Popup"" Placement=""Bottom"" IsOpen=""{TemplateBinding IsDropDownOpen}"" AllowsTransparency=""True"" Focusable=""False"" PopupAnimation=""Slide"" StaysOpen=""False"">
+                                <Grid MaxHeight=""{TemplateBinding MaxDropDownHeight}"" MinWidth=""{Binding ActualWidth, ElementName=MainBorder}"">
+                                    <Border Background=""#18181B"" BorderBrush=""#3F3F46"" BorderThickness=""1"" CornerRadius=""8"" Margin=""0,4,0,4"" Padding=""2"">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius=""16"" ShadowDepth=""6"" Color=""Black"" Opacity=""0.6""/>
+                                        </Border.Effect>
+                                        <ScrollViewer SnapsToDevicePixels=""True"" VerticalScrollBarVisibility=""Auto"">
+                                            <StackPanel IsItemsHost=""True""/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property=""IsMouseOver"" Value=""True"">
+                                <Setter TargetName=""MainBorder"" Property=""BorderBrush"" Value=""#71717A""/>
+                            </Trigger>
+                            <Trigger Property=""IsFocused"" Value=""True"">
+                                <Setter TargetName=""MainBorder"" Property=""BorderBrush"" Value=""#8B5CF6""/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </ComboBox.Template>
+            </ComboBox>";
+
+            return (ComboBox)XamlReader.Parse(xaml);
         }
 
         private List<string> GetCleanUrls()
