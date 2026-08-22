@@ -1,57 +1,95 @@
 # Universal Downloader
 
-A premium, self-contained Windows desktop application (WPF / .NET) for downloading video and audio files from YouTube, Spotify, SoundCloud, Google Drive, and any direct URL — with a single URL paste.
+A modern, high-performance, self-contained Windows desktop application (WPF / .NET) for searching, identifying, downloading, converting, and queuing media files from YouTube, Spotify, SoundCloud, Google Drive, direct links, and over 1,000+ supported sites.
 
 ---
 
-## 🌟 Premium Features
+## 🌟 Key Features
 
-- 🎥 **YouTube Integration** — Paste a YouTube video or playlist URL. Select your desired resolution (from 4K down to 360p) or download audio-only (MP3/Best Audio).
-- 🎵 **Spotify CSV Drawer & History** — A dedicated, hardware-accelerated sliding side panel for Spotify playlist imports.
-  - **Exportify Integration** — Easily export playlists of any size (even thousands of tracks) to CSV on exportify.net (completely free, bypasses Spotify's 2026 API restrictions).
-  - **Imports History** — Session-based in-memory catalog saves previous imports. Clicking any previous import restores the playlist tracks and their exact checklist/selection states.
-  - **Auto-Collapse & Focus** — Side drawer smoothly slides shut when a playlist is selected, immediately focusing the track queue.
-- 📁 **Google Drive & Direct URLs** — Direct downloads for raw file URLs and Google Drive links.
-- ✂️ **Precision Time Trimming** — Crop a specific start/end time range from YouTube videos before downloading, with custom slider controls.
-- ⚡ **Zero Setup Dependency Manager** — On launch, the application automatically downloads and updates the latest `yt-dlp.exe` and `ffmpeg.exe` binaries behind the scenes.
-- 🌑 **Stunning Premium UI** — A modern dark glassmorphism design with a custom border chrome, glow dropshadows, gradient progress bars, and high-performance GPU-accelerated slide transitions.
+### 🔍 Music & Video Search Hub
+- **Integrated Multi-Source Search** — Search for tracks, artists, albums, or videos across YouTube and SoundCloud simultaneously without leaving the app.
+- **Parallel Query Acceleration** — Dual-source asynchronous execution with in-memory TTL caching for instant repeat lookups.
+- **Direct Format & Quality Selector** — Choose resolutions (4K, 1440p, 1080p, 720p, 480p, 360p) or audio formats (MP3 / Best Audio) per search result with 1-click Download or Add to Queue.
+
+### 🎙️ Shazam & Audio Song Recognition ("Listen & Identify")
+- **Instant 5-Second Acoustic Fingerprinting** — Identifies playing songs using STFT spectral landmark peak extraction and Shazam's acoustic database (100M+ songs).
+- **Dual Audio Sources**:
+  - **🔊 PC Audio (WASAPI Loopback, Default)**: Direct internal loopback capture of whatever music is currently playing on your computer (browser, Spotify, games, Twitch, etc.).
+  - **🎤 Microphone**: Captures ambient audio from speakers or humming.
+- **Real-Time Visualizer & Auto-Search** — Live RMS volume meter, visual countdown, and automatic search retrieval upon song detection for immediate 1-click download.
+- **Right Sidebar Quick Access** — Accessible via the official Shazam button on the right navigation rail.
+
+### 📥 Multi-Platform Downloader
+- **YouTube & Playlists** — Video and audio downloads with customizable quality, playlist indexing, and metadata tagging.
+- **Spotify CSV & Exportify Integration** — Dedicated sliding side drawer for importing Spotify playlists of any size via CSV with track checklists and state restoration.
+- **SoundCloud, Google Drive & Direct URLs** — Seamless downloading from direct file links, cloud storage, and video portals.
+- **Precision Time Trimming** — Crop custom start and end timestamps before downloading.
+- **Multi-Connection Acceleration (`aria2c`)** — Optional multi-threaded connection acceleration for maximum bandwidth utilization.
+- **Clipboard Auto-Detection** — Automatically captures media links copied to your clipboard.
+
+### 📋 Download Queue Manager
+- Batch queue management with sequential background downloads.
+- Real-time progress bars, pause/cancel controls, retry capability, and a live counter badge in the navigation rail.
+
+### 🔄 Built-in Media Converter
+- Convert local or downloaded files between **MP4, MKV, AVI, MOV, WebM, MP3, AAC, FLAC, WAV, and OGG**.
+- Select target video/audio quality, format presets, and automatic FFmpeg conversion pipelines.
+
+### 📜 Download History & Metadata
+- Filterable and searchable history log with direct file opening, folder navigation, and URL copying.
+- Automatic ID3 tag embedding (Artist, Title, Album, Thumbnail Artwork).
+- Optional auto-download for **Synchronized Lyrics (`.lrc`)** companion files (configurable in Settings).
+
+### ⚡ Zero-Setup Dependency Manager
+- Automatically downloads, verifies, and updates `yt-dlp.exe`, `ffmpeg.exe`, `ffprobe.exe`, and `aria2c.exe` in the background with zero user setup required.
 
 ---
 
-## 📂 Documentation
+## 🎨 Modern UI & Glassmorphism
+
+- Custom borderless dark glassmorphism theme with animated glow accents and drop shadows.
+- High-performance GPU-accelerated drawer transitions (`TranslateTransform`) ensuring silky 60/120/144Hz framerates.
+- Compact quick-access right navigation rail for **Search**, **Shazam**, **Spotify**, **History**, **Converter**, and **Queue**.
+
+---
+
+## 📂 Documentation & Architecture
 
 | Guide | Description |
 |---|---|
-| 📐 [docs/PROJECT.md](docs/PROJECT.md) | Full project architecture and codebase description |
+| 📐 [docs/PROJECT.md](docs/PROJECT.md) | Full project architecture, modules, and codebase design |
 | 🛠️ [docs/BUILD.md](docs/BUILD.md) | How to build (Debug & Release) in Visual Studio and CLI |
-| 📦 [docs/PUBLISH.md](docs/PUBLISH.md) | How to publish a single-file executable for distribution |
-| 🎨 [docs/ICON.md](docs/ICON.md) | How to change the application icon |
-| 🏷️ [docs/VERSIONING.md](docs/VERSIONING.md) | How to set app version, product name, and assembly info |
+| 📦 [docs/PUBLISH.md](docs/PUBLISH.md) | How to publish a single-file portable executable |
+| 🎨 [docs/ICON.md](docs/ICON.md) | How to change application icons and assets |
+| 🏷️ [docs/VERSIONING.md](docs/VERSIONING.md) | Versioning and assembly metadata configuration |
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
 ### Prerequisites
-- Visual Studio 2022 (any edition) with the **.NET Desktop Development** workload installed.
-- **.NET 9 SDK** (automatically pinned via `global.json`).
+- Windows 10 / 11 (64-bit)
+- Visual Studio 2022 (with **.NET Desktop Development** workload) OR [.NET 8 / 9 SDK](https://dotnet.microsoft.com/download)
 
-### Running the App
-1. Clone the repository and navigate to the project directory.
-2. Open `Universal Downloader.sln` in Visual Studio 2022.
-3. Press `F5` to build and run in Debug mode.
-4. Alternatively, use the CLI:
-   ```powershell
-   dotnet build
-   dotnet run --project Downloader
+### Build & Run
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/astymic/UniversalDownloader.git
+   cd UniversalDownloader
    ```
-5. On the first launch, the application will automatically fetch `yt-dlp.exe` and `ffmpeg.exe` and place them in the application data directory.
+
+2. **Build via CLI**:
+   ```powershell
+   dotnet build "Downloader/Universal Downloader.csproj" -c Release
+   ```
+
+3. **Run the application**:
+   ```powershell
+   dotnet run --project "Downloader/Universal Downloader.csproj"
+   ```
 
 ---
 
-## 🎨 UI Architecture & Animations
-
-The side drawer animation utilizes **GPU-accelerated horizontal translation** on `TranslateTransform.XProperty` of the drawer's `RenderTransform`.
-- Shifting coordinates between `X = 260` (collapsed, exposing only the 60px green Spotify button) and `X = 0` (expanded, showing all 320px) avoids expensive CPU layout passes (`Measure`/`Arrange`).
-- This guarantees butter-smooth 60/120/144Hz animations without a single frame drop, even on low-end hardware.
-- A semi-transparent dark overlay (`MainContentOverlayBorder`) provides a sleek frosted-glass effect over the main window, blocking other interactions and automatically closing the panel on click.
+## 📄 License
+This project is licensed under the MIT License.
