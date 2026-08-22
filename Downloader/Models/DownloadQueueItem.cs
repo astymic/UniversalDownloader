@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -38,7 +38,13 @@ namespace UniversalDownloader.Models
         public string Title
         {
             get => _title;
-            set { _title = value; OnPropertyChanged(); }
+            set 
+            { 
+                string clean = value?.Replace("\r", " ").Replace("\n", " ").Trim() ?? "Loading...";
+                if (string.IsNullOrWhiteSpace(clean)) clean = "Media Item";
+                _title = clean; 
+                OnPropertyChanged(); 
+            }
         }
 
         public string Url

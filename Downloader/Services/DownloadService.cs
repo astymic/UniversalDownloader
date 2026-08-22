@@ -233,7 +233,7 @@ namespace UniversalDownloader.Services
                                 !cleaned.StartsWith("WARNING", StringComparison.OrdinalIgnoreCase) && 
                                 !cleaned.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase))
                             {
-                                return System.Net.WebUtility.HtmlDecode(Utilities.SanitizeFileName(cleaned));
+                                return System.Net.WebUtility.HtmlDecode(cleaned);
                             }
                         }
                     }

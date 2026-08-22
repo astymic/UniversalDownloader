@@ -1536,24 +1536,34 @@
                                             </Border>
 
                                             <!-- Center: Title, Progress, Status -->
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+
                                                 <!-- Title -->
-                                                <TextBlock Text="{Binding Title}" 
+                                                <TextBlock Grid.Row="0"
+                                                           Text="{Binding Title}" 
                                                            Foreground="{StaticResource TextPrimaryBrush}" 
                                                            FontSize="13.5" 
                                                            FontWeight="SemiBold" 
                                                            TextTrimming="CharacterEllipsis" 
-                                                           Margin="0,0,0,4"/>
+                                                           TextWrapping="NoWrap"
+                                                           ToolTip="{Binding Title}"
+                                                           Margin="0,0,0,5"/>
                                                 
                                                 <!-- Progress Bar -->
-                                                <ProgressBar Value="{Binding Progress}" 
+                                                <ProgressBar Grid.Row="1"
+                                                             Value="{Binding Progress}" 
                                                              Maximum="100" 
                                                              Height="6" 
                                                              Margin="0,0,0,6" 
                                                              Style="{StaticResource ModernProgressBar}"/>
 
                                                 <!-- Status & URL line -->
-                                                <Grid>
+                                                <Grid Grid.Row="2">
                                                     <TextBlock Text="{Binding StatusText}" 
                                                                Foreground="{StaticResource TextSecondaryBrush}" 
                                                                FontSize="11.5" 
@@ -1566,7 +1576,7 @@
                                                                TextTrimming="CharacterEllipsis" 
                                                                MaxWidth="300"/>
                                                 </Grid>
-                                            </StackPanel>
+                                            </Grid>
 
                                             <!-- Right: Action Buttons -->
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
