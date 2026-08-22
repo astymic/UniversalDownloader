@@ -1718,13 +1718,14 @@
                                              FontSize="14"
                                              Padding="16,12"
                                              VerticalContentAlignment="Center"
-                                             Foreground="{StaticResource TextSecondaryBrush}"
+                                             Foreground="#D4D4D8"
                                              CaretBrush="White"
                                              Text="Search track, artist, music name or album..."
                                              KeyDown="SearchQueryTextBox_KeyDown"
                                              GotFocus="SearchQueryTextBox_GotFocus"
                                              LostFocus="SearchQueryTextBox_LostFocus"
-                                             PreviewMouseDown="SearchQueryTextBox_PreviewMouseDown"/>
+                                             PreviewMouseDown="SearchQueryTextBox_PreviewMouseDown"
+                                             TextChanged="SearchQueryTextBox_TextChanged"/>
 
                                     <Button Grid.Column="1" 
                                             x:Name="ExecuteSearchButton"

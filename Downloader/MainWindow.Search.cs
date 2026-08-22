@@ -51,9 +51,17 @@ namespace UniversalDownloader
             if (SearchScrollViewer != null)
             {
                 SearchScrollViewer.Visibility = Visibility.Visible;
-                if (SearchQueryTextBox != null && SearchQueryTextBox.Text == "Search track, artist, music name or album...")
+                if (SearchQueryTextBox != null)
                 {
-                    SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
+                    if (string.IsNullOrWhiteSpace(SearchQueryTextBox.Text) || SearchQueryTextBox.Text == "Search track, artist, music name or album...")
+                    {
+                        SearchQueryTextBox.Text = "Search track, artist, music name or album...";
+                        SearchQueryTextBox.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216));
+                    }
+                    else
+                    {
+                        SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
+                    }
                 }
             }
         }
@@ -82,8 +90,7 @@ namespace UniversalDownloader
         {
             if (SearchQueryTextBox != null && SearchQueryTextBox.Text == "Search track, artist, music name or album...")
             {
-                SearchQueryTextBox.Text = string.Empty;
-                SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
+                SearchQueryTextBox.SelectAll();
             }
         }
 
@@ -91,10 +98,10 @@ namespace UniversalDownloader
         {
             if (SearchQueryTextBox != null)
             {
-                if (string.IsNullOrWhiteSpace(SearchQueryTextBox.Text))
+                if (string.IsNullOrWhiteSpace(SearchQueryTextBox.Text) || SearchQueryTextBox.Text == "Search track, artist, music name or album...")
                 {
                     SearchQueryTextBox.Text = "Search track, artist, music name or album...";
-                    SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
+                    SearchQueryTextBox.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216));
                 }
                 else
                 {
@@ -107,7 +114,24 @@ namespace UniversalDownloader
         {
             if (SearchQueryTextBox != null && SearchQueryTextBox.Text == "Search track, artist, music name or album...")
             {
-                SearchQueryTextBox.Text = string.Empty;
+                if (!SearchQueryTextBox.IsKeyboardFocusWithin)
+                {
+                    SearchQueryTextBox.Focus();
+                    SearchQueryTextBox.SelectAll();
+                    e.Handled = true;
+                }
+            }
+        }
+
+        private void SearchQueryTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (SearchQueryTextBox == null) return;
+            if (SearchQueryTextBox.Text == "Search track, artist, music name or album...")
+            {
+                SearchQueryTextBox.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 212, 216));
+            }
+            else if (!string.IsNullOrEmpty(SearchQueryTextBox.Text))
+            {
                 SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
             }
         }
