@@ -19,6 +19,7 @@ namespace UniversalDownloader
         private const string SettingsKeyMultiConnectionAcceleration = "MultiConnectionAcceleration";
         private const string SettingsKeyDownloadLyrics = "DownloadLyrics";
         private const string SettingsKeyFilenameTemplate = "FilenameTemplate";
+        private const string SettingsKeyLiveStreamHotkey = "LiveStreamHotkey";
 
         public bool AutoDetectClipboardEnabled { get; set; } = true;
         public bool EmbedMetadataEnabled { get; set; } = true;
@@ -26,6 +27,7 @@ namespace UniversalDownloader
         public bool MultiConnectionAccelerationEnabled { get; set; } = true;
         public bool DownloadLyricsEnabled { get; set; } = false;
         public string FilenameTemplate { get; set; } = "{title}";
+        public string LiveStreamHotkey { get; set; } = "F9";
 
         private string GetSettingsFilePath()
         {
@@ -103,6 +105,15 @@ namespace UniversalDownloader
                         }
                     }
 
+                    if (settings.TryGetValue(SettingsKeyLiveStreamHotkey, out JToken? hotkeyToken) && hotkeyToken != null)
+                    {
+                        string? hk = hotkeyToken.ToString();
+                        if (!string.IsNullOrWhiteSpace(hk))
+                        {
+                            LiveStreamHotkey = hk;
+                        }
+                    }
+
                     if (_downloadService != null)
                     {
                         _downloadService.CustomFilenameTemplate = FilenameTemplate;
@@ -161,6 +172,7 @@ namespace UniversalDownloader
             if (ConverterScrollViewer != null) ConverterScrollViewer.Visibility = Visibility.Collapsed;
             if (QueueScrollViewer != null) QueueScrollViewer.Visibility = Visibility.Collapsed;
             if (SearchScrollViewer != null) SearchScrollViewer.Visibility = Visibility.Collapsed;
+            if (LiveStreamScrollViewer != null) LiveStreamScrollViewer.Visibility = Visibility.Collapsed;
             if (SettingsScrollViewer != null) SettingsScrollViewer.Visibility = Visibility.Visible;
             if (SettingsDirectoryPathTextBox != null && !string.IsNullOrEmpty(SelectedDirectory))
             {
@@ -174,6 +186,28 @@ namespace UniversalDownloader
             if (MultiConnectionAccelerationCheckBox != null) MultiConnectionAccelerationCheckBox.IsChecked = MultiConnectionAccelerationEnabled;
             if (DownloadLyricsCheckBox != null) DownloadLyricsCheckBox.IsChecked = DownloadLyricsEnabled;
             if (FilenameTemplateTextBox != null) FilenameTemplateTextBox.Text = FilenameTemplate;
+
+            if (LiveStreamHotkeyComboBox != null)
+            {
+                foreach (ComboBoxItem item in LiveStreamHotkeyComboBox.Items)
+                {
+                    if (string.Equals(item.Tag?.ToString(), LiveStreamHotkey, StringComparison.OrdinalIgnoreCase))
+                    {
+                        LiveStreamHotkeyComboBox.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+        }
+
+        private void LiveStreamHotkeyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (LiveStreamHotkeyComboBox?.SelectedItem is ComboBoxItem item && item.Tag is string key)
+            {
+                LiveStreamHotkey = key;
+                SaveSetting(SettingsKeyLiveStreamHotkey, LiveStreamHotkey);
+                UpdateLiveStreamHotkeyDisplay();
+            }
         }
 
         private void BackToDownloader_Click(object sender, RoutedEventArgs e)

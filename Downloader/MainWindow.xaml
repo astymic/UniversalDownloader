@@ -1024,6 +1024,36 @@
                                 </StackPanel>
                             </Border>
 
+                            <!-- Hotkeys Section -->
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                                <StackPanel>
+                                    <TextBlock Text="HOTKEYS &amp; SHORTCUTS" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock Text="Live Stream / DJ Scraper Toggle" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold"/>
+                                            <TextBlock Text="Hotkey to start and stop continuous PC Audio recognition" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"/>
+                                        </StackPanel>
+                                        <ComboBox x:Name="LiveStreamHotkeyComboBox" 
+                                                  Grid.Column="1" 
+                                                  Width="140" 
+                                                  Height="36" 
+                                                  SelectionChanged="LiveStreamHotkeyComboBox_SelectionChanged">
+                                            <ComboBoxItem Content="F9 (Default)" Tag="F9" IsSelected="True"/>
+                                            <ComboBoxItem Content="F8" Tag="F8"/>
+                                            <ComboBoxItem Content="F10" Tag="F10"/>
+                                            <ComboBoxItem Content="F11" Tag="F11"/>
+                                            <ComboBoxItem Content="F12" Tag="F12"/>
+                                            <ComboBoxItem Content="Ctrl + Shift + S" Tag="Ctrl+Shift+S"/>
+                                            <ComboBoxItem Content="Ctrl + Shift + L" Tag="Ctrl+Shift+L"/>
+                                        </ComboBox>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
                             <!-- Dependencies Section -->
                             <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}">
                                 <StackPanel>
@@ -1988,6 +2018,226 @@
                     </StackPanel>
                 </ScrollViewer>
 
+                <!-- Live Stream / DJ Scraper View -->
+                <ScrollViewer x:Name="LiveStreamScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed">
+                    <StackPanel Margin="32,24,76,36" MaxWidth="1050" HorizontalAlignment="Stretch">
+                        
+                        <!-- Top Navigation Bar -->
+                        <DockPanel LastChildFill="False" Margin="0,0,0,20">
+                            <Button DockPanel.Dock="Left"
+                                    Content="← Back to Downloader" 
+                                    Style="{StaticResource SecondaryButton}" 
+                                    Padding="14,8" 
+                                    FontSize="12.5" 
+                                    Click="BackFromLiveStream_Click" 
+                                    VerticalAlignment="Center"/>
+
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="LiveStreamToggleSessionsButton" 
+                                        Content="📜 Past Sessions" 
+                                        Style="{StaticResource SecondaryButton}" 
+                                        Padding="14,8" 
+                                        FontSize="12" 
+                                        Margin="0,0,10,0"
+                                        Click="LiveStreamToggleSessionsButton_Click"/>
+                                <Button x:Name="LiveStreamDownloadAllButton" 
+                                        Content="⬇ Download All (0)" 
+                                        Style="{StaticResource PrimaryButton}" 
+                                        Padding="16,8" 
+                                        FontSize="12" 
+                                        Click="LiveStreamDownloadAllButton_Click"
+                                        IsEnabled="False"/>
+                            </StackPanel>
+                        </DockPanel>
+
+                        <!-- Header Control Card -->
+                        <Border Background="{StaticResource SurfaceBrush}" 
+                                CornerRadius="16" 
+                                Padding="24,20" 
+                                BorderThickness="1" 
+                                BorderBrush="{StaticResource BorderBrush}" 
+                                Margin="0,0,0,20">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                            <TextBlock Text="📻" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <TextBlock Text="Live Stream / DJ Scraper" FontSize="20" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Continuously recognizes and logs all songs playing on your PC in real time without duplicates." Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5"/>
+                                    </StackPanel>
+
+                                    <!-- Hotkey Badge -->
+                                    <Border Grid.Column="1" Background="#181824" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="8" Padding="12,6" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Hotkey: " Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                            <TextBlock x:Name="LiveStreamHotkeyBadgeTextBlock" Text="[F9]" Foreground="#38BDF8" FontWeight="Bold" FontSize="12"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Big Toggle Button and Status Controls -->
+                                <Border Background="#121218" CornerRadius="12" Padding="18,14" Margin="0,16,0,0" BorderBrush="#27272A" BorderThickness="1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Start / Stop Button -->
+                                        <Button Grid.Column="0" 
+                                                x:Name="LiveStreamToggleButton"
+                                                Content="🎙️ Start Listening (PC Audio)"
+                                                Style="{StaticResource PrimaryButton}"
+                                                Height="48"
+                                                Padding="22,0"
+                                                FontSize="13.5"
+                                                FontWeight="Bold"
+                                                Click="LiveStreamToggleButton_Click"/>
+
+                                        <!-- Status Info -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="20,0,20,0">
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                <Ellipse x:Name="LiveStreamStatusPulseDot" Width="10" Height="10" Fill="#71717A" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="LiveStreamStatusTextBlock" Text="⚪ Ready — Click Start Listening or press F9" FontWeight="SemiBold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                            <ProgressBar x:Name="LiveStreamAudioLevelProgressBar" Height="4" Minimum="0" Maximum="1" Value="0" Foreground="#10B981" Background="#262626"/>
+                                        </StackPanel>
+
+                                        <!-- Session Stats -->
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                            <TextBlock x:Name="LiveStreamTrackCountTextBlock" Text="0 tracks detected" FontWeight="Bold" FontSize="14" Foreground="#10B981" HorizontalAlignment="Right"/>
+                                            <TextBlock x:Name="LiveStreamSessionTimeTextBlock" Text="Session: 00:00" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Past Sessions Panel (Collapsible) -->
+                        <Border x:Name="LiveStreamSessionsBorder" Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="20" BorderThickness="1" BorderBrush="#38BDF8" Margin="0,0,0,20" Visibility="Collapsed">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="📜 Past Listening Sessions" FontSize="15" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Content="✕ Close" Style="{StaticResource SecondaryButton}" Padding="10,4" FontSize="11" Click="LiveStreamCloseSessions_Click"/>
+                                </Grid>
+                                <ItemsControl x:Name="LiveStreamSessionsItemsControl">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#16161E" CornerRadius="10" Padding="14" Margin="0,0,0,8" BorderBrush="#272732" BorderThickness="1">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0">
+                                                        <TextBlock Text="{Binding FormattedDate}" FontWeight="Bold" FontSize="13" Foreground="White"/>
+                                                        <TextBlock Text="{Binding Tracks.Count, StringFormat='{}Tracks: {0} songs'}" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                        <Button Content="📂 Load Tracks" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0" FontSize="11" Margin="0,0,8,0" Click="LiveStreamLoadPastSession_Click" Tag="{Binding}"/>
+                                                        <Button Content="⬇ Download All" Style="{StaticResource PrimaryButton}" Height="32" Padding="12,0" FontSize="11" Click="LiveStreamDownloadPastSession_Click" Tag="{Binding}"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Live Detected Tracks Real-Time Feed -->
+                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="20" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="🎵 Real-Time Detected Tracklist" FontSize="15" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Content="🗑️ Clear List" Style="{StaticResource SecondaryButton}" Padding="12,6" FontSize="11" Click="LiveStreamClearCurrentList_Click"/>
+                                </Grid>
+
+                                <!-- Empty State -->
+                                <Border x:Name="LiveStreamEmptyStateBorder" Padding="40,30" HorizontalAlignment="Center">
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="🎧" FontSize="40" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                                        <TextBlock Text="No songs detected yet" FontWeight="Bold" FontSize="15" Foreground="White" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Play music on your PC and click 'Start Listening' (or press F9)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Real-time Track List -->
+                                <ItemsControl x:Name="LiveStreamTracksItemsControl">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#16161E" CornerRadius="12" Padding="14" Margin="0,0,0,10" BorderBrush="#272732" BorderThickness="1">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <!-- Timestamp Badge -->
+                                                    <Border Grid.Column="0" Background="#242432" CornerRadius="6" Padding="8,4" VerticalAlignment="Center" Margin="0,0,14,0">
+                                                        <TextBlock Text="{Binding FormattedTime}" FontSize="11" FontWeight="Bold" Foreground="#A1A1AA"/>
+                                                    </Border>
+
+                                                    <!-- Track Info -->
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="13.5" Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding Artist}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                                                    </StackPanel>
+
+                                                    <!-- Actions -->
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
+                                                        <Button Content="⬇ Download MP3" 
+                                                                Style="{StaticResource PrimaryButton}" 
+                                                                Height="34" 
+                                                                Padding="14,0" 
+                                                                FontSize="11.5" 
+                                                                Margin="0,0,8,0"
+                                                                Click="LiveStreamTrackDownload_Click" 
+                                                                Tag="{Binding}"/>
+
+                                                        <Button Content="➕ Queue" 
+                                                                Style="{StaticResource SecondaryButton}" 
+                                                                Height="34" 
+                                                                Padding="12,0" 
+                                                                FontSize="11.5" 
+                                                                Margin="0,0,8,0"
+                                                                Click="LiveStreamTrackAddToQueue_Click" 
+                                                                Tag="{Binding}"/>
+
+                                                        <Button Content="🔍 Search" 
+                                                                Style="{StaticResource SecondaryButton}" 
+                                                                Height="34" 
+                                                                Padding="10,0" 
+                                                                FontSize="11.5" 
+                                                                Click="LiveStreamTrackSearch_Click" 
+                                                                Tag="{Binding}"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
                 <!-- Bottom Floating Media Preview Player Bar -->
                 <Border x:Name="BottomPlayerBar" 
                         VerticalAlignment="Bottom"
@@ -2195,6 +2445,37 @@
                                                 <Setter TargetName="border" Property="Effect">
                                                     <Setter.Value>
                                                         <DropShadowEffect BlurRadius="18" ShadowDepth="0" Color="#0088FF" Opacity="0.8"/>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+
+                            <!-- Live Stream / DJ Scraper Button -->
+                            <Button x:Name="LiveStreamNavButton"
+                                    Width="44"
+                                    Height="44"
+                                    Margin="0,0,0,12"
+                                    HorizontalAlignment="Center"
+                                    Click="LiveStreamNavButton_Click"
+                                    ToolTip="Live Stream / DJ Scraper (Continuous PC Audio Recognition) [F9]"
+                                    Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="border" Background="#1E1E24" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="22">
+                                            <!-- Modern Radio / Broadcast Stream SVG Icon -->
+                                            <Path Width="20" Height="20" Stretch="Uniform" Fill="#FAFAFA" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-2-8c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2zm6.24-4.24l-1.42 1.42C15.54 9.9 16 10.9 16 12s-.46 2.1-1.18 2.82l1.42 1.42C17.27 15.21 18 13.7 18 12s-.73-3.21-1.76-4.24zM7.18 9.18L5.76 7.76C4.73 8.79 4 10.3 4 12s.73 3.21 1.76 4.24l1.42-1.42C6.46 14.1 6 13.1 6 12s.46-2.1 1.18-2.82z"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="#10B981"/>
+                                                <Setter TargetName="border" Property="BorderBrush" Value="#34D399"/>
+                                                <Setter TargetName="border" Property="Effect">
+                                                    <Setter.Value>
+                                                        <DropShadowEffect BlurRadius="18" ShadowDepth="0" Color="#10B981" Opacity="0.8"/>
                                                     </Setter.Value>
                                                 </Setter>
                                             </Trigger>

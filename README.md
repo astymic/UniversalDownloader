@@ -24,7 +24,13 @@ A modern, high-performance, cross-platform desktop application (**Windows & Linu
   - **🔊 PC Audio (WASAPI Loopback, Default)**: Direct internal loopback capture of whatever music is currently playing on your computer (browser, Spotify, games, Twitch, etc.).
   - **🎤 Microphone**: Captures ambient audio from speakers or humming.
 - **Real-Time Visualizer & Auto-Search** — Live RMS volume meter, visual countdown, and automatic search retrieval upon song detection for immediate 1-click download.
-- **Right Sidebar Quick Access** — Accessible via the official Shazam button on the right navigation rail.
+
+### 📻 Live Stream & DJ Mix Scraper (Continuous PC Audio Recognition)
+- **Continuous Ambient Listening** — 1-click start/stop toggle button to passively listen to all music playing on your PC (streams, DJ sets, movies, podcasts).
+- **Configurable Global Hotkey** — Press `[F9]` (or custom key configured in Settings) from anywhere to instantly start or pause continuous listening.
+- **Smart Duplicate Suppression** — Tracks are cross-referenced in real-time so no song is added more than once, with an intelligent 25s cooldown during playback.
+- **Real-Time Feed & Session History** — Logs detected tracks with live timestamps, album art, 1-click individual downloads, and persistent history with session dates.
+- **Batch Download** — 1-click `[⬇ Download All]` to enqueue every song detected during a live stream.
 
 ### 📥 Multi-Platform Downloader
 - **YouTube & Playlists** — Video and audio downloads with customizable quality, playlist indexing, and metadata tagging.

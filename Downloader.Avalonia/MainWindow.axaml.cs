@@ -25,6 +25,8 @@ namespace UniversalDownloader.Avalonia
         private readonly FfmpegAudioCaptureService _audioCaptureService;
         private readonly ShazamRecognitionService _shazamService;
 
+        private readonly LiveStreamRecognitionService _liveStreamService;
+
         public ObservableCollection<SearchResultItem> SearchResults { get; } = new();
         public ObservableCollection<DownloadHistoryItem> HistoryItems { get; } = new();
 
@@ -51,6 +53,33 @@ namespace UniversalDownloader.Avalonia
             _searchService = new SearchService(_dependencyManager);
             _audioCaptureService = new FfmpegAudioCaptureService(_dependencyManager);
             _shazamService = new ShazamRecognitionService(_audioCaptureService);
+            _liveStreamService = new LiveStreamRecognitionService(_audioCaptureService, _shazamService);
+
+            _liveStreamService.ListeningStateChanged += isListening => Dispatcher.UIThread.Post(() =>
+            {
+                if (LiveStreamToggleButton != null)
+                {
+                    LiveStreamToggleButton.Content = isListening ? "⏹️ Stop Listening" : "🎙️ Start Listening (PC Audio)";
+                }
+                UpdateLiveStreamUI();
+            });
+
+            _liveStreamService.TrackDetected += track => Dispatcher.UIThread.Post(UpdateLiveStreamUI);
+
+            _liveStreamService.AudioLevelChanged += level => Dispatcher.UIThread.Post(() =>
+            {
+                if (LiveStreamAudioProgressBar != null && _liveStreamService.IsListening)
+                {
+                    LiveStreamAudioProgressBar.Value = Math.Min(1.0, level * 2.5);
+                }
+            });
+
+            _liveStreamService.StatusUpdated += status => Dispatcher.UIThread.Post(() =>
+            {
+                if (LiveStreamStatusTextBlock != null) LiveStreamStatusTextBlock.Text = status;
+            });
+
+            KeyDown += MainWindow_KeyDown;
 
             // Hook up cross-platform UI dispatcher for DownloadQueueManager
             DownloadQueueManager.DispatcherInvoker = action => Dispatcher.UIThread.Post(action);
@@ -60,6 +89,15 @@ namespace UniversalDownloader.Avalonia
             HistoryItemsControl.ItemsSource = _historyService.Items;
 
             Loaded += MainWindow_Loaded;
+        }
+
+        private void MainWindow_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.F9)
+            {
+                _ = _liveStreamService.ToggleListeningAsync();
+                e.Handled = true;
+            }
         }
 
         private async void MainWindow_Loaded(object? sender, RoutedEventArgs e)
@@ -84,6 +122,7 @@ namespace UniversalDownloader.Avalonia
             QueueScrollViewer.IsVisible = false;
             HistoryScrollViewer.IsVisible = false;
             SettingsScrollViewer.IsVisible = false;
+            LiveStreamScrollViewer.IsVisible = false;
         }
 
         private void NavMain_Click(object? sender, RoutedEventArgs e) { HideAllViews(); MainScrollViewer.IsVisible = true; }
@@ -91,6 +130,7 @@ namespace UniversalDownloader.Avalonia
         private void NavQueue_Click(object? sender, RoutedEventArgs e) { HideAllViews(); QueueScrollViewer.IsVisible = true; }
         private void NavHistory_Click(object? sender, RoutedEventArgs e) { _historyService.LoadHistory(); HideAllViews(); HistoryScrollViewer.IsVisible = true; }
         private void NavSettings_Click(object? sender, RoutedEventArgs e) { HideAllViews(); SettingsScrollViewer.IsVisible = true; }
+        private void NavLiveStream_Click(object? sender, RoutedEventArgs e) { HideAllViews(); LiveStreamScrollViewer.IsVisible = true; UpdateLiveStreamUI(); }
         private void NavSpotify_Click(object? sender, RoutedEventArgs e) { HideAllViews(); SearchScrollViewer.IsVisible = true; }
         private void NavShazam_Click(object? sender, RoutedEventArgs e) { HideAllViews(); SearchScrollViewer.IsVisible = true; ShazamIdentifyButton_Click(sender, e); }
         private void BackToMain_Click(object? sender, RoutedEventArgs e) { HideAllViews(); MainScrollViewer.IsVisible = true; }
@@ -359,6 +399,73 @@ namespace UniversalDownloader.Avalonia
                 }
             }
             catch { }
+        }
+        #endregion
+
+        #region Live Stream / DJ Scraper
+        private async void LiveStreamToggle_Click(object? sender, RoutedEventArgs e)
+        {
+            await _liveStreamService.ToggleListeningAsync();
+        }
+
+        private void UpdateLiveStreamUI()
+        {
+            var session = _liveStreamService.CurrentSession;
+            int count = session?.Tracks.Count ?? 0;
+
+            if (LiveStreamItemsControl != null)
+            {
+                LiveStreamItemsControl.ItemsSource = session?.Tracks;
+            }
+
+            if (LiveStreamCountTextBlock != null)
+            {
+                LiveStreamCountTextBlock.Text = $"{count} track{(count == 1 ? "" : "s")}";
+            }
+
+            if (LiveStreamDownloadAllButton != null)
+            {
+                LiveStreamDownloadAllButton.Content = $"⬇ Download All ({count})";
+                LiveStreamDownloadAllButton.IsEnabled = count > 0;
+            }
+        }
+
+        private async void LiveStreamDownloadSingle_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is LiveDetectedTrackItem track)
+            {
+                var qItem = new DownloadQueueItem
+                {
+                    Url = $"ytsearch1:{track.QueryString}",
+                    Title = track.QueryString,
+                    FormatCode = "bestaudio/best",
+                    DestinationFolder = _downloadFolder
+                };
+                _queueManager.Enqueue(qItem);
+                btn.Content = "✓ Queued";
+                btn.IsEnabled = false;
+            }
+        }
+
+        private void LiveStreamDownloadAll_Click(object? sender, RoutedEventArgs e)
+        {
+            var session = _liveStreamService.CurrentSession;
+            if (session == null || session.Tracks.Count == 0) return;
+
+            foreach (var track in session.Tracks)
+            {
+                var qItem = new DownloadQueueItem
+                {
+                    Url = $"ytsearch1:{track.QueryString}",
+                    Title = track.QueryString,
+                    FormatCode = "bestaudio/best",
+                    DestinationFolder = _downloadFolder
+                };
+                _queueManager.Enqueue(qItem);
+            }
+
+            LiveStreamDownloadAllButton.Content = $"✓ Queued ({session.Tracks.Count})";
+            LiveStreamDownloadAllButton.IsEnabled = false;
         }
         #endregion
     }
