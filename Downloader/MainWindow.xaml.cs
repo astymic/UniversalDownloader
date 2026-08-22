@@ -1907,6 +1907,35 @@ namespace UniversalDownloader
                 BottomPlayerBar.Visibility = Visibility.Collapsed;
             }
         }
+
+        private void PlayerTitleTextBlock_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            var item = _audioPreviewService.CurrentItem;
+            if (item != null && !string.IsNullOrWhiteSpace(item.Title) && PlayerTitleTextBlock != null)
+            {
+                try
+                {
+                    Clipboard.SetDataObject(item.Title, true);
+
+                    string originalText = item.Title;
+                    PlayerTitleTextBlock.Text = "✓ Copied to clipboard!";
+                    PlayerTitleTextBlock.Foreground = (Brush)FindResource("SuccessBrush");
+
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+                    timer.Tick += (s, ev) =>
+                    {
+                        PlayerTitleTextBlock.Text = originalText;
+                        PlayerTitleTextBlock.Foreground = (Brush)FindResource("TextPrimaryBrush");
+                        timer.Stop();
+                    };
+                    timer.Start();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to copy player title to clipboard: {ex.Message}");
+                }
+            }
+        }
     }
 
     public class SpotifyImportedPlaylist

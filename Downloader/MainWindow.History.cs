@@ -303,5 +303,37 @@ namespace UniversalDownloader
                 await _historyService.ClearHistoryAsync();
             }
         }
+
+        private void HistoryItemTitle_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (sender is TextBlock tb && tb.DataContext is DownloadHistoryItem item)
+            {
+                string titleToCopy = item.Title;
+                if (!string.IsNullOrWhiteSpace(titleToCopy))
+                {
+                    try
+                    {
+                        Clipboard.SetDataObject(titleToCopy, true);
+
+                        string originalText = item.Title;
+                        tb.Text = "✓ Copied to clipboard!";
+                        tb.Foreground = (Brush)FindResource("SuccessBrush");
+
+                        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+                        timer.Tick += (s, ev) =>
+                        {
+                            tb.Text = originalText;
+                            tb.Foreground = (Brush)FindResource("TextPrimaryBrush");
+                            timer.Stop();
+                        };
+                        timer.Start();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Failed to copy title to clipboard: {ex.Message}");
+                    }
+                }
+            }
+        }
     }
 }

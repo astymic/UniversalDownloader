@@ -1037,7 +1037,25 @@
 
                                             <!-- Item Info -->
                                             <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                                                <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
+                                                <TextBlock Text="{Binding Title}" 
+                                                           Foreground="{StaticResource TextPrimaryBrush}" 
+                                                           FontSize="15" 
+                                                           FontWeight="SemiBold" 
+                                                           TextTrimming="CharacterEllipsis" 
+                                                           Margin="0,0,0,4"
+                                                           Cursor="Hand"
+                                                           ToolTip="Click to copy title"
+                                                           MouseLeftButtonUp="HistoryItemTitle_MouseLeftButtonUp">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Style.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter Property="Foreground" Value="{StaticResource PrimaryHoverBrush}"/>
+                                                                </Trigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                                 <StackPanel Orientation="Horizontal">
                                                     <Border Background="#208B5CF6" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
                                                         <TextBlock Text="{Binding Platform}" Foreground="{StaticResource PrimaryHoverBrush}" FontSize="11" FontWeight="SemiBold"/>
@@ -1085,7 +1103,15 @@
 
                         <!-- Track Info -->
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                            <TextBlock x:Name="PlayerTitleTextBlock" Text="Track Title" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Name="PlayerTitleTextBlock" 
+                                       Text="Track Title" 
+                                       Foreground="{StaticResource TextPrimaryBrush}" 
+                                       FontSize="13" 
+                                       FontWeight="SemiBold" 
+                                       TextTrimming="CharacterEllipsis"
+                                       Cursor="Hand"
+                                       ToolTip="Click to copy title"
+                                       MouseLeftButtonUp="PlayerTitleTextBlock_MouseLeftButtonUp"/>
                             <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                                 <Border x:Name="PlayerPlatformBadge" Background="#208B5CF6" CornerRadius="4" Padding="5,1" Margin="0,0,6,0">
                                     <TextBlock x:Name="PlayerPlatformTextBlock" Text="Media" Foreground="{StaticResource PrimaryHoverBrush}" FontSize="10.5" FontWeight="SemiBold"/>
