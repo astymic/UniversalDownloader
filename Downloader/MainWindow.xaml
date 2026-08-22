@@ -2148,6 +2148,36 @@
                                 </Button.Template>
                             </Button>
 
+                            <!-- Shazam Song Recognition Button -->
+                            <Button x:Name="ShazamNavButton"
+                                    Width="44"
+                                    Height="44"
+                                    Margin="0,0,0,12"
+                                    HorizontalAlignment="Center"
+                                    Click="ShazamNavButton_Click"
+                                    ToolTip="Shazam Song Recognition (Listen &amp; Identify)"
+                                    Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="border" Background="#0088FF" CornerRadius="22">
+                                            <!-- Modern Shazam S / Wave SVG Icon -->
+                                            <Path Width="22" Height="22" Stretch="Uniform" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16.5c-3.03 0-5.5-2.47-5.5-5.5 0-1.02.28-1.97.77-2.79l2.09 2.09c-.23.41-.36.89-.36 1.4 0 1.52 1.23 2.75 2.75 2.75.51 0 .99-.13 1.4-.36l2.09 2.09c-.82.49-1.77.77-2.79.77zm-1-11c3.03 0 5.5 2.47 5.5 5.5 0 1.02-.28 1.97-.77 2.79l-2.09-2.09c.23-.41.36-.89.36-1.4 0-1.52-1.23-2.75-2.75-2.75-.51 0-.99.13-1.4.36L9.45 7.91c.82-.49 1.77-.77 2.79-.77z"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="#00A9FF"/>
+                                                <Setter TargetName="border" Property="Effect">
+                                                    <Setter.Value>
+                                                        <DropShadowEffect BlurRadius="18" ShadowDepth="0" Color="#0088FF" Opacity="0.8"/>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+
                             <Button x:Name="SpotifyCollapsedButton"
                                     Width="44"
                                     Height="44"

@@ -77,6 +77,24 @@ namespace UniversalDownloader
             }
         }
 
+        private void ShazamNavButton_Click(object sender, RoutedEventArgs e)
+        {
+            CollapseSpotifyDrawer();
+
+            if (MainScrollViewer != null) MainScrollViewer.Visibility = Visibility.Collapsed;
+            if (SettingsScrollViewer != null) SettingsScrollViewer.Visibility = Visibility.Collapsed;
+            if (ConverterScrollViewer != null) ConverterScrollViewer.Visibility = Visibility.Collapsed;
+            if (QueueScrollViewer != null) QueueScrollViewer.Visibility = Visibility.Collapsed;
+            if (HistoryScrollViewer != null) HistoryScrollViewer.Visibility = Visibility.Collapsed;
+
+            if (SearchScrollViewer != null)
+            {
+                SearchScrollViewer.Visibility = Visibility.Visible;
+            }
+
+            ShazamIdentifyButton_Click(sender, e);
+        }
+
         private void BackFromSearch_Click(object sender, RoutedEventArgs e)
         {
             if (SearchScrollViewer != null) SearchScrollViewer.Visibility = Visibility.Collapsed;
