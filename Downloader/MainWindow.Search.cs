@@ -23,7 +23,18 @@ namespace UniversalDownloader
 
         public ObservableCollection<SearchResultItem> SearchResults { get; } = new();
         private string _activeSearchPlatformFilter = "All";
+        private SearchMode _currentSearchMode = SearchMode.SmartMusic;
         private CancellationTokenSource? _searchCts;
+
+        private string GetDefaultPlaceholderText() =>
+            _currentSearchMode == SearchMode.SmartMusic
+                ? "Search track, artist, music name or album..."
+                : "Search YouTube videos, channels, topics...";
+
+        private bool IsPlaceholder(string? text) =>
+            string.IsNullOrWhiteSpace(text) ||
+            text == "Search track, artist, music name or album..." ||
+            text == "Search YouTube videos, channels, topics...";
 
         private void InitializeSearchBindings()
         {
@@ -69,9 +80,9 @@ namespace UniversalDownloader
             if (SearchScrollViewer != null)
             {
                 SearchScrollViewer.Visibility = Visibility.Visible;
-                if (SearchQueryTextBox != null && (string.IsNullOrWhiteSpace(SearchQueryTextBox.Text) || SearchQueryTextBox.Text == "Search track, artist, music name or album..."))
+                if (SearchQueryTextBox != null && IsPlaceholder(SearchQueryTextBox.Text))
                 {
-                    SearchQueryTextBox.Text = "Search track, artist, music name or album...";
+                    SearchQueryTextBox.Text = GetDefaultPlaceholderText();
                     SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
                 }
             }
@@ -101,6 +112,38 @@ namespace UniversalDownloader
             if (MainScrollViewer != null) MainScrollViewer.Visibility = Visibility.Visible;
         }
 
+        private async void SearchModeTab_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is RadioButton rb && rb.Tag is string modeStr)
+            {
+                _currentSearchMode = string.Equals(modeStr, "RealYouTube", StringComparison.OrdinalIgnoreCase)
+                    ? SearchMode.RealYouTube
+                    : SearchMode.SmartMusic;
+
+                // Adjust platform filter panel visibility (Music Hub supports YouTube/SoundCloud; Real YouTube is pure YouTube)
+                if (SearchPlatformFilterPanel != null)
+                {
+                    SearchPlatformFilterPanel.Visibility = (_currentSearchMode == SearchMode.SmartMusic)
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+                }
+
+                if (SearchQueryTextBox != null)
+                {
+                    if (IsPlaceholder(SearchQueryTextBox.Text))
+                    {
+                        SearchQueryTextBox.Text = GetDefaultPlaceholderText();
+                        SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
+                    }
+                    else if (!string.IsNullOrWhiteSpace(SearchQueryTextBox.Text))
+                    {
+                        // Automatically re-query in the chosen mode!
+                        await PerformSearchAsync();
+                    }
+                }
+            }
+        }
+
         private async void ExecuteSearchButton_Click(object sender, RoutedEventArgs e)
         {
             await PerformSearchAsync();
@@ -117,7 +160,7 @@ namespace UniversalDownloader
 
         private void SearchQueryTextBox_GotFocus(object sender, RoutedEventArgs e)
         {
-            if (SearchQueryTextBox != null && SearchQueryTextBox.Text == "Search track, artist, music name or album...")
+            if (SearchQueryTextBox != null && IsPlaceholder(SearchQueryTextBox.Text))
             {
                 SearchQueryTextBox.Text = string.Empty;
                 SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush");
@@ -130,7 +173,7 @@ namespace UniversalDownloader
             {
                 if (string.IsNullOrWhiteSpace(SearchQueryTextBox.Text))
                 {
-                    SearchQueryTextBox.Text = "Search track, artist, music name or album...";
+                    SearchQueryTextBox.Text = GetDefaultPlaceholderText();
                     SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
                 }
                 else
@@ -142,7 +185,7 @@ namespace UniversalDownloader
 
         private void SearchQueryTextBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (SearchQueryTextBox != null && SearchQueryTextBox.Text == "Search track, artist, music name or album...")
+            if (SearchQueryTextBox != null && IsPlaceholder(SearchQueryTextBox.Text))
             {
                 SearchQueryTextBox.Text = string.Empty;
                 SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush");
@@ -152,7 +195,7 @@ namespace UniversalDownloader
         private void SearchQueryTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (SearchQueryTextBox == null) return;
-            if (SearchQueryTextBox.Text == "Search track, artist, music name or album...")
+            if (IsPlaceholder(SearchQueryTextBox.Text))
             {
                 SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
             }
@@ -184,7 +227,7 @@ namespace UniversalDownloader
                 else if (rb == SearchFilterYouTube) _activeSearchPlatformFilter = "YouTube";
                 else if (rb == SearchFilterSoundCloud) _activeSearchPlatformFilter = "SoundCloud";
 
-                if (SearchQueryTextBox != null && !string.IsNullOrWhiteSpace(SearchQueryTextBox.Text) && SearchQueryTextBox.Text != "Search track, artist, music name or album...")
+                if (SearchQueryTextBox != null && !string.IsNullOrWhiteSpace(SearchQueryTextBox.Text) && !IsPlaceholder(SearchQueryTextBox.Text))
                 {
                     await PerformSearchAsync();
                 }
@@ -195,7 +238,7 @@ namespace UniversalDownloader
         {
             if (SearchQueryTextBox == null || _searchService == null) return;
             string query = SearchQueryTextBox.Text.Trim();
-            if (string.IsNullOrWhiteSpace(query) || query == "Search track, artist, music name or album...") return;
+            if (IsPlaceholder(query)) return;
             SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
 
             _searchCts?.Cancel();
@@ -203,13 +246,26 @@ namespace UniversalDownloader
 
             if (SearchLoadingBorder != null) SearchLoadingBorder.Visibility = Visibility.Visible;
             if (SearchEmptyStateBorder != null) SearchEmptyStateBorder.Visibility = Visibility.Collapsed;
-            if (SearchStatsTextBlock != null) SearchStatsTextBlock.Text = $"Searching '{query}'...";
+            if (SearchStatsTextBlock != null)
+            {
+                SearchStatsTextBlock.Text = (_currentSearchMode == SearchMode.RealYouTube)
+                    ? $"Searching YouTube for '{query}'..."
+                    : $"Searching '{query}'...";
+            }
 
             SearchResults.Clear();
 
             try
             {
-                var batch = await _searchService.SearchAsync(query, _activeSearchPlatformFilter, _searchCts.Token);
+                SearchResultBatch batch;
+                if (_currentSearchMode == SearchMode.RealYouTube)
+                {
+                    batch = await _searchService.SearchRealYouTubeAsync(query, _searchCts.Token);
+                }
+                else
+                {
+                    batch = await _searchService.SearchAsync(query, _activeSearchPlatformFilter, _searchCts.Token);
+                }
 
                 foreach (var item in batch.Items)
                 {
@@ -218,7 +274,11 @@ namespace UniversalDownloader
 
                 if (SearchStatsTextBlock != null)
                 {
-                    if (batch.IsClosestFallback && !string.IsNullOrWhiteSpace(batch.FallbackQuery))
+                    if (_currentSearchMode == SearchMode.RealYouTube)
+                    {
+                        SearchStatsTextBlock.Text = $"Found {SearchResults.Count} YouTube video result{(SearchResults.Count == 1 ? "" : "s")} for \"{query}\"";
+                    }
+                    else if (batch.IsClosestFallback && !string.IsNullOrWhiteSpace(batch.FallbackQuery))
                     {
                         SearchStatsTextBlock.Text = $"Showing closest results for \"{batch.FallbackQuery}\" ({SearchResults.Count} found)";
                     }

@@ -12,6 +12,12 @@ using UniversalDownloader.Models;
 
 namespace UniversalDownloader.Services
 {
+    public enum SearchMode
+    {
+        SmartMusic,
+        RealYouTube
+    }
+
     public class SearchResultBatch
     {
         public List<SearchResultItem> Items { get; set; } = new();
@@ -28,6 +34,42 @@ namespace UniversalDownloader.Services
         public SearchService(DependencyManager dependencyManager)
         {
             _dependencyManager = dependencyManager;
+        }
+
+        public async Task<SearchResultBatch> SearchRealYouTubeAsync(string query, CancellationToken cancellationToken = default)
+        {
+            var batch = new SearchResultBatch();
+            if (string.IsNullOrWhiteSpace(query)) return batch;
+            if (!_dependencyManager.IsYtDlpReady) return batch;
+
+            string cleanQuery = query.Trim();
+            string cacheKey = $"RealYouTube:{cleanQuery}";
+
+            if (_searchCache.TryGetValue(cacheKey, out var cached) && (DateTime.UtcNow - cached.CachedAt) < CacheTtl)
+            {
+                return cached.Batch;
+            }
+
+            try
+            {
+                // Direct YouTube video search with authentic ranking (top 20 results)
+                var results = await QueryYtDlpSearchAsync($"ytsearch20:{cleanQuery}", "YouTube", cancellationToken);
+                batch.Items.AddRange(results);
+                batch.IsClosestFallback = false;
+                batch.FallbackQuery = string.Empty;
+
+                if (batch.Items.Count > 0)
+                {
+                    _searchCache[cacheKey] = (DateTime.UtcNow, batch);
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Real YouTube search failed: {ex.Message}");
+            }
+
+            return batch;
         }
 
         public async Task<SearchResultBatch> SearchAsync(string query, string platformFilter = "All", CancellationToken cancellationToken = default)

@@ -1705,6 +1705,31 @@
                                 BorderBrush="{StaticResource BorderBrush}" 
                                 Margin="0,0,0,20">
                             <StackPanel>
+                                <!-- Search Mode Selection Tabs -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                    <RadioButton x:Name="SearchModeSmartMusicTab" 
+                                                 Content="🎵 Smart Music Hub" 
+                                                 GroupName="SearchModeGroup" 
+                                                 IsChecked="True" 
+                                                 Style="{StaticResource FilterChipStyle}" 
+                                                 FontSize="12.5" 
+                                                 Padding="14,7" 
+                                                 Margin="0,0,8,0" 
+                                                 Click="SearchModeTab_Click" 
+                                                 Tag="SmartMusic"
+                                                 ToolTip="Multi-source parallel music search across YouTube &amp; SoundCloud with smart fallback"/>
+
+                                    <RadioButton x:Name="SearchModeRealYouTubeTab" 
+                                                 Content="📺 Real YouTube Search" 
+                                                 GroupName="SearchModeGroup" 
+                                                 Style="{StaticResource FilterChipStyle}" 
+                                                 FontSize="12.5" 
+                                                 Padding="14,7" 
+                                                 Click="SearchModeTab_Click" 
+                                                 Tag="RealYouTube"
+                                                 ToolTip="Direct authentic YouTube video search with pure query ranking &amp; full metadata"/>
+                                </StackPanel>
+
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -1781,7 +1806,7 @@
                                 </Border>
 
                                 <!-- Filter Chips -->
-                                <WrapPanel Margin="0,14,0,0" Orientation="Horizontal">
+                                <WrapPanel x:Name="SearchPlatformFilterPanel" Margin="0,14,0,0" Orientation="Horizontal">
                                     <TextBlock Text="Source:" Foreground="#D4D4D8" FontSize="12.5" VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold"/>
                                     <RadioButton x:Name="SearchFilterAll" Content="All Sources" GroupName="SearchPlatformGroup" IsChecked="True" Style="{StaticResource FilterChipStyle}" Click="SearchFilter_Click" Margin="0,0,8,0"/>
                                     <RadioButton x:Name="SearchFilterYouTube" Content="🔴 YouTube" GroupName="SearchPlatformGroup" Style="{StaticResource FilterChipStyle}" Click="SearchFilter_Click" Margin="0,0,8,0"/>
