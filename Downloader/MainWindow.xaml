@@ -1691,14 +1691,14 @@
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock x:Name="SearchStatsTextBlock" 
                                            Text="Search across YouTube &amp; SoundCloud" 
-                                           Foreground="{StaticResource TextSecondaryBrush}" 
+                                           Foreground="#D4D4D8" 
                                            FontSize="12.5" 
                                            VerticalAlignment="Center"/>
                             </StackPanel>
                         </DockPanel>
 
                         <!-- Search Bar Header Card -->
-                        <Border Background="{StaticResource GlassGradient}" 
+                        <Border Background="{StaticResource SurfaceBrush}" 
                                 CornerRadius="16" 
                                 Padding="20,18" 
                                 BorderThickness="1" 
@@ -1723,10 +1723,10 @@
                                                  KeyDown="SearchQueryTextBox_KeyDown"
                                                  TextChanged="SearchQueryTextBox_TextChanged"/>
 
-                                        <!-- Watermark Placeholder Overlay -->
+                                        <!-- Watermark Placeholder Overlay with High Legibility -->
                                         <TextBlock x:Name="SearchPlaceholderTextBlock" 
                                                    Text="Search track, artist, music name or album..." 
-                                                   Foreground="{StaticResource TextSecondaryBrush}" 
+                                                   Foreground="#D4D4D8" 
                                                    FontSize="14.5" 
                                                    VerticalAlignment="Center" 
                                                    Margin="18,0,0,0" 
@@ -1745,7 +1745,7 @@
 
                                 <!-- Filter Chips -->
                                 <WrapPanel Margin="0,14,0,0" Orientation="Horizontal">
-                                    <TextBlock Text="Source:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Source:" Foreground="#D4D4D8" FontSize="12.5" VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold"/>
                                     <RadioButton x:Name="SearchFilterAll" Content="All Sources" GroupName="SearchPlatformGroup" IsChecked="True" Style="{StaticResource FilterChipStyle}" Click="SearchFilter_Click" Margin="0,0,8,0"/>
                                     <RadioButton x:Name="SearchFilterYouTube" Content="🔴 YouTube" GroupName="SearchPlatformGroup" Style="{StaticResource FilterChipStyle}" Click="SearchFilter_Click" Margin="0,0,8,0"/>
                                     <RadioButton x:Name="SearchFilterSoundCloud" Content="🟠 SoundCloud" GroupName="SearchPlatformGroup" Style="{StaticResource FilterChipStyle}" Click="SearchFilter_Click" Margin="0,0,8,0"/>
@@ -1762,13 +1762,13 @@
                                 Visibility="Collapsed">
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <ProgressBar IsIndeterminate="True" Style="{StaticResource ModernProgressBar}" Width="260" Margin="0,0,0,10"/>
-                                <TextBlock x:Name="SearchLoadingTextBlock" Text="Searching YouTube &amp; SoundCloud..." Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="SearchLoadingTextBlock" Text="Searching YouTube &amp; SoundCloud..." Foreground="#D4D4D8" FontSize="13" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
                         <!-- Empty / Initial Hint State -->
                         <Border x:Name="SearchEmptyStateBorder" 
-                                Background="{StaticResource GlassGradient}" 
+                                Background="{StaticResource SurfaceBrush}" 
                                 CornerRadius="16" 
                                 Padding="40" 
                                 BorderThickness="1" 
@@ -1778,7 +1778,7 @@
                             <StackPanel HorizontalAlignment="Center">
                                 <TextBlock Text="🎵" FontSize="42" HorizontalAlignment="Center" Margin="0,0,0,12"/>
                                 <TextBlock Text="Search Any Song, Artist or Video" Foreground="{StaticResource TextPrimaryBrush}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,6"/>
-                                <TextBlock Text="Find music across YouTube &amp; SoundCloud instantly without opening a browser." Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" Margin="0,0,0,16"/>
+                                <TextBlock Text="Find music across YouTube &amp; SoundCloud instantly without opening a browser." Foreground="#D4D4D8" FontSize="13" HorizontalAlignment="Center" Margin="0,0,0,16"/>
                                 
                                 <!-- Quick Search Tags -->
                                 <WrapPanel HorizontalAlignment="Center" Orientation="Horizontal">
