@@ -1772,8 +1772,8 @@
 
                                         <!-- Audio Source Toggle -->
                                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                                            <RadioButton x:Name="ShazamSourceMic" Content="🎤 Mic" GroupName="ShazamSourceGroup" IsChecked="True" Style="{StaticResource FilterChipStyle}" Margin="0,0,6,0"/>
-                                            <RadioButton x:Name="ShazamSourceSystem" Content="🔊 PC Audio" GroupName="ShazamSourceGroup" Style="{StaticResource FilterChipStyle}"/>
+                                            <RadioButton x:Name="ShazamSourceSystem" Content="🔊 PC Audio" GroupName="ShazamSourceGroup" IsChecked="True" Style="{StaticResource FilterChipStyle}" Margin="0,0,6,0"/>
+                                            <RadioButton x:Name="ShazamSourceMic" Content="🎤 Mic" GroupName="ShazamSourceGroup" Style="{StaticResource FilterChipStyle}"/>
                                         </StackPanel>
 
                                         <Button Grid.Column="3" Content="✖ Cancel" Style="{StaticResource SecondaryButton}" Height="30" Padding="10,0" FontSize="11" Click="ShazamCancel_Click"/>

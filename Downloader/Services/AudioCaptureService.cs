@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,17 +9,17 @@ namespace UniversalDownloader.Services
 {
     public enum AudioCaptureSource
     {
-        Microphone,
-        SystemAudio
+        SystemAudio,
+        Microphone
     }
 
     public class AudioCaptureService
     {
         public event Action<float>? AudioLevelChanged;
 
-        public async Task<byte[]> CaptureAudioAsync(int durationSeconds = 5, AudioCaptureSource source = AudioCaptureSource.Microphone, CancellationToken cancellationToken = default)
+        public async Task<byte[]> CaptureAudioAsync(int durationSeconds = 5, AudioCaptureSource source = AudioCaptureSource.SystemAudio, CancellationToken cancellationToken = default)
         {
-            var memoryStream = new MemoryStream();
+            var rawCapturedStream = new MemoryStream();
             IWaveIn? waveIn = null;
 
             try
@@ -33,12 +32,13 @@ namespace UniversalDownloader.Services
                 {
                     waveIn = new WaveInEvent
                     {
-                        WaveFormat = new WaveFormat(16000, 16, 1),
+                        WaveFormat = new WaveFormat(44100, 16, 1),
                         BufferMilliseconds = 50
                     };
                 }
 
-                var rawCapturedStream = new MemoryStream();
+                var format = waveIn.WaveFormat;
+                bool isFloat32 = format.Encoding == WaveFormatEncoding.IeeeFloat && format.BitsPerSample == 32;
 
                 waveIn.DataAvailable += (s, e) =>
                 {
@@ -46,21 +46,32 @@ namespace UniversalDownloader.Services
                     {
                         rawCapturedStream.Write(e.Buffer, 0, e.BytesRecorded);
 
-                        // Calculate RMS level for UI waveform animation
                         float max = 0;
-                        for (int i = 0; i < e.BytesRecorded; i += 2)
+                        if (isFloat32)
                         {
-                            short sample = (short)((e.Buffer[i + 1] << 8) | e.Buffer[i]);
-                            float sample32 = Math.Abs(sample / 32768f);
-                            if (sample32 > max) max = sample32;
+                            for (int i = 0; i < e.BytesRecorded - 3; i += 4)
+                            {
+                                float sample = BitConverter.ToSingle(e.Buffer, i);
+                                float abs = Math.Abs(sample);
+                                if (abs > max) max = abs;
+                            }
+                            AudioLevelChanged?.Invoke(Math.Min(1.0f, max * 2.0f));
                         }
-                        AudioLevelChanged?.Invoke(Math.Min(1.0f, max * 2.5f));
+                        else
+                        {
+                            for (int i = 0; i < e.BytesRecorded - 1; i += 2)
+                            {
+                                short sample = (short)((e.Buffer[i + 1] << 8) | e.Buffer[i]);
+                                float abs = Math.Abs(sample / 32768f);
+                                if (abs > max) max = abs;
+                            }
+                            AudioLevelChanged?.Invoke(Math.Min(1.0f, max * 2.5f));
+                        }
                     }
                 };
 
                 waveIn.StartRecording();
 
-                // Record for requested duration (e.g. 5 seconds)
                 int totalMs = durationSeconds * 1000;
                 int elapsed = 0;
                 while (elapsed < totalMs && !cancellationToken.IsCancellationRequested)
@@ -71,9 +82,18 @@ namespace UniversalDownloader.Services
 
                 waveIn.StopRecording();
 
-                // Convert captured audio to 16kHz 16-bit Mono PCM
+                if (rawCapturedStream.Length == 0)
+                {
+                    return Array.Empty<byte>();
+                }
+
                 rawCapturedStream.Position = 0;
-                return ConvertTo16kHzMonoPcm(rawCapturedStream, waveIn.WaveFormat);
+                return ConvertTo16kHzMonoPcm(rawCapturedStream, format);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Audio capture error: {ex.Message}");
+                throw;
             }
             finally
             {
@@ -87,11 +107,9 @@ namespace UniversalDownloader.Services
 
             using (var rawProvider = new RawSourceWaveStream(inputAudioStream, inputFormat))
             {
-                var targetFormat = new WaveFormat(16000, 16, 1);
-
                 ISampleProvider sampleProvider = rawProvider.ToSampleProvider();
 
-                // Downmix to mono if stereo/multichannel
+                // Downmix to mono if multi-channel
                 if (inputFormat.Channels > 1)
                 {
                     sampleProvider = sampleProvider.ToMono();
