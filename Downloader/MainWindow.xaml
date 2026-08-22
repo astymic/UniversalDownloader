@@ -1776,7 +1776,7 @@
                                             <RadioButton x:Name="ShazamSourceSystem" Content="🔊 PC Audio" GroupName="ShazamSourceGroup" Style="{StaticResource FilterChipStyle}"/>
                                         </StackPanel>
 
-                                        <Button Grid.Column="3" Content="✖ Cancel" Style="{StaticResource SecondaryButtonStyle}" Height="30" Padding="10,0" FontSize="11" Click="ShazamCancel_Click"/>
+                                        <Button Grid.Column="3" Content="✖ Cancel" Style="{StaticResource SecondaryButton}" Height="30" Padding="10,0" FontSize="11" Click="ShazamCancel_Click"/>
                                     </Grid>
                                 </Border>
 
