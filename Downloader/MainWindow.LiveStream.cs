@@ -263,6 +263,37 @@ namespace UniversalDownloader
             }
         }
 
+        private void LiveStreamTogglePastSessionExpand_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is LiveStreamSession session)
+            {
+                session.IsExpanded = !session.IsExpanded;
+            }
+        }
+
+        private void LiveStreamSessionHeader_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            // If the user clicked directly on a button within the header, don't toggle
+            if (e.OriginalSource is DependencyObject dep && FindParent<Button>(dep) != null)
+                return;
+
+            if (sender is FrameworkElement elem && elem.Tag is LiveStreamSession session)
+            {
+                session.IsExpanded = !session.IsExpanded;
+            }
+        }
+
+        private static T? FindParent<T>(DependencyObject child) where T : DependencyObject
+        {
+            DependencyObject? parent = VisualTreeHelper.GetParent(child);
+            while (parent != null)
+            {
+                if (parent is T typedParent) return typedParent;
+                parent = VisualTreeHelper.GetParent(parent);
+            }
+            return null;
+        }
+
         private void LiveStreamLoadPastSession_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is LiveStreamSession pastSession)

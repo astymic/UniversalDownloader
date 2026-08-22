@@ -55,6 +55,22 @@ namespace UniversalDownloader.Models
             }
         }
 
+        private bool _isExpanded;
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set
+            {
+                _isExpanded = value;
+                OnPropertyChanged(nameof(IsExpanded));
+                OnPropertyChanged(nameof(ExpandToggleIcon));
+                OnPropertyChanged(nameof(ExpandToggleText));
+            }
+        }
+
+        public string ExpandToggleIcon => _isExpanded ? "▲" : "▼";
+        public string ExpandToggleText => _isExpanded ? "▲ Hide Tracks" : "▼ View Tracks";
+
         public ObservableCollection<LiveDetectedTrackItem> Tracks { get; set; } = new();
 
         public event PropertyChangedEventHandler? PropertyChanged;

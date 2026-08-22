@@ -2134,21 +2134,86 @@
                                 <ItemsControl x:Name="LiveStreamSessionsItemsControl">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="#16161E" CornerRadius="10" Padding="14" Margin="0,0,0,8" BorderBrush="#272732" BorderThickness="1">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel Grid.Column="0">
-                                                        <TextBlock Text="{Binding FormattedDate}" FontWeight="Bold" FontSize="13" Foreground="White"/>
-                                                        <TextBlock Text="{Binding Tracks.Count, StringFormat='{}Tracks: {0} songs'}" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
-                                                    </StackPanel>
-                                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                                        <Button Content="📂 Load Tracks" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0" FontSize="11" Margin="0,0,8,0" Click="LiveStreamLoadPastSession_Click" Tag="{Binding}"/>
-                                                        <Button Content="⬇ Download All" Style="{StaticResource ModernButton}" Height="32" Padding="12,0" FontSize="11" Click="LiveStreamDownloadPastSession_Click" Tag="{Binding}"/>
-                                                    </StackPanel>
-                                                </Grid>
+                                            <Border Background="#16161E" CornerRadius="12" Padding="14" Margin="0,0,0,10" BorderBrush="#272732" BorderThickness="1">
+                                                <StackPanel>
+                                                    <!-- Session Header Row (Clickable) -->
+                                                    <Grid Cursor="Hand" MouseLeftButtonUp="LiveStreamSessionHeader_MouseLeftButtonUp" Tag="{Binding}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding ExpandToggleIcon}" FontSize="11" Foreground="#38BDF8" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                                <TextBlock Text="{Binding FormattedDate}" FontWeight="Bold" FontSize="13.5" Foreground="White"/>
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding Tracks.Count, StringFormat='{}Tracks: {0} songs detected'}" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="18,2,0,0"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Button Content="{Binding ExpandToggleText}" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0" FontSize="11" Margin="0,0,8,0" Click="LiveStreamTogglePastSessionExpand_Click" Tag="{Binding}"/>
+                                                            <Button Content="📂 Load Tracks" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0" FontSize="11" Margin="0,0,8,0" Click="LiveStreamLoadPastSession_Click" Tag="{Binding}"/>
+                                                            <Button Content="⬇ Download All" Style="{StaticResource ModernButton}" Height="32" Padding="12,0" FontSize="11" Click="LiveStreamDownloadPastSession_Click" Tag="{Binding}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+
+                                                    <!-- Dropdown Individual Tracks Accordion -->
+                                                    <Border Margin="0,12,0,0" Padding="12,12,12,4" Background="#111116" CornerRadius="8" BorderBrush="#20202C" BorderThickness="1"
+                                                            Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisConverter}}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="🎵 Songs in this session:" FontSize="11.5" FontWeight="SemiBold" Foreground="#A1A1AA" Margin="4,0,0,8"/>
+                                                            <ItemsControl ItemsSource="{Binding Tracks}">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <Border Background="#1A1A24" CornerRadius="8" Padding="10,8" Margin="0,0,0,6" BorderBrush="#2A2A38" BorderThickness="1">
+                                                                            <Grid>
+                                                                                <Grid.ColumnDefinitions>
+                                                                                    <ColumnDefinition Width="Auto"/>
+                                                                                    <ColumnDefinition Width="*"/>
+                                                                                    <ColumnDefinition Width="Auto"/>
+                                                                                </Grid.ColumnDefinitions>
+                                                                                <!-- Time badge -->
+                                                                                <Border Grid.Column="0" Background="#242432" CornerRadius="4" Padding="6,2" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                                                    <TextBlock Text="{Binding FormattedTime}" FontSize="10.5" FontWeight="Bold" Foreground="#A1A1AA"/>
+                                                                                </Border>
+                                                                                <!-- Song Title & Artist -->
+                                                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                                    <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="12.5" Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                                                                    <TextBlock Text="{Binding Artist}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                                                                </StackPanel>
+                                                                                <!-- Actions for this single song -->
+                                                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                                                                                    <Button Content="⬇ Download MP3" 
+                                                                                            Style="{StaticResource ModernButton}" 
+                                                                                            Height="28" 
+                                                                                            Padding="10,0" 
+                                                                                            FontSize="11" 
+                                                                                            Margin="0,0,6,0"
+                                                                                            Click="LiveStreamTrackDownload_Click" 
+                                                                                            Tag="{Binding}"/>
+                                                                                    <Button Content="➕ Queue" 
+                                                                                            Style="{StaticResource SecondaryButton}" 
+                                                                                            Height="28" 
+                                                                                            Padding="8,0" 
+                                                                                            FontSize="11" 
+                                                                                            Margin="0,0,6,0"
+                                                                                            Click="LiveStreamTrackAddToQueue_Click" 
+                                                                                            Tag="{Binding}"/>
+                                                                                    <Button Content="🔍 Search" 
+                                                                                            Style="{StaticResource SecondaryButton}" 
+                                                                                            Height="28" 
+                                                                                            Padding="8,0" 
+                                                                                            FontSize="11" 
+                                                                                            Click="LiveStreamTrackSearch_Click" 
+                                                                                            Tag="{Binding}"/>
+                                                                                </StackPanel>
+                                                                            </Grid>
+                                                                        </Border>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </StackPanel>
                                             </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
