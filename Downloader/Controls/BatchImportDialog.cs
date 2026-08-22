@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -46,14 +46,6 @@ namespace UniversalDownloader.Controls
             FontFamily = new FontFamily("Inter, Segoe UI, Arial");
 
             ResizeMode = ResizeMode.NoResize;
-            WindowChrome.SetWindowChrome(this, new WindowChrome
-            {
-                CaptionHeight = 44,
-                CornerRadius = new CornerRadius(16),
-                GlassFrameThickness = new Thickness(0),
-                UseAeroCaptionButtons = false
-            });
-
             Content = BuildUi(defaultFolder);
         }
 
@@ -105,20 +97,7 @@ namespace UniversalDownloader.Controls
                 VerticalAlignment = VerticalAlignment.Center
             });
 
-            var closeButton = new Button
-            {
-                Content = "✕",
-                Width = 32,
-                Height = 32,
-                FontSize = 12,
-                Foreground = new SolidColorBrush(Color.FromRgb(161, 161, 170)),
-                Background = Brushes.Transparent,
-                BorderThickness = new Thickness(0),
-                Cursor = Cursors.Hand,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(0, 0, 12, 0)
-            };
-            closeButton.Click += (s, e) => Close();
+            var closeButton = CreateCloseButton();
 
             titleBar.Children.Add(titleStack);
             titleBar.Children.Add(closeButton);
@@ -312,6 +291,50 @@ namespace UniversalDownloader.Controls
 
             rootBorder.Child = mainGrid;
             return rootBorder;
+        }
+
+        private Button CreateCloseButton()
+        {
+            string xaml = @"
+            <Button xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation""
+                    xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml""
+                    Width=""32""
+                    Height=""32""
+                    Cursor=""Hand""
+                    HorizontalAlignment=""Right""
+                    Margin=""0,0,12,0"">
+                <Button.Style>
+                    <Style TargetType=""Button"">
+                        <Setter Property=""Template"">
+                            <Setter.Value>
+                                <ControlTemplate TargetType=""Button"">
+                                    <Border x:Name=""bg"" Background=""Transparent"" CornerRadius=""16"">
+                                        <TextBlock Text=""✕"" 
+                                                   FontSize=""13"" 
+                                                   HorizontalAlignment=""Center"" 
+                                                   VerticalAlignment=""Center"" 
+                                                   Foreground=""#A1A1AA"" 
+                                                   x:Name=""txt""/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property=""IsMouseOver"" Value=""True"">
+                                            <Setter TargetName=""bg"" Property=""Background"" Value=""#27272A""/>
+                                            <Setter TargetName=""txt"" Property=""Foreground"" Value=""#EF4444""/>
+                                        </Trigger>
+                                        <Trigger Property=""IsPressed"" Value=""True"">
+                                            <Setter TargetName=""bg"" Property=""Background"" Value=""#3F3F46""/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Button.Style>
+            </Button>";
+
+            var btn = (Button)XamlReader.Parse(xaml);
+            btn.Click += (s, e) => Close();
+            return btn;
         }
 
         private Button CreateQueueButton()
