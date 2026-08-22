@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -199,6 +199,57 @@ namespace UniversalDownloader
                     IsAudio = item.IsAudioOnly
                 });
             }
+        }
+
+        private void AddToQueueButton_Click(object sender, RoutedEventArgs e)
+        {
+            EnqueueCurrentMainUrl();
+        }
+
+        public void EnqueueCurrentMainUrl()
+        {
+            string url = UrlTextBox?.Text?.Trim() ?? "";
+            if (string.IsNullOrWhiteSpace(url) || url == "Paste URL here...") return;
+
+            string targetFolder = SelectedDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+            
+            bool isSpotify = _downloadService.IsSpotifyLink(url);
+            bool isSoundCloud = _downloadService.IsSoundCloudLink(url);
+
+            var selectedQuality = YouTubeQualityComboBox?.SelectedItem as YouTubeQualityItem;
+            string formatCode = selectedQuality?.FormatCode ?? (isSpotify || isSoundCloud ? "bestaudio/best" : "bestvideo+bestaudio/best");
+            bool isAudioOnly = selectedQuality?.IsAudioOnly ?? (isSpotify || isSoundCloud);
+            string audioFormat = selectedQuality?.AudioFormat ?? (isSpotify ? "mp3" : "mp3");
+
+            string title = !string.IsNullOrWhiteSpace(_currentItemTitle) && _currentItemTitle != "Paste URL here..."
+                ? _currentItemTitle
+                : (isSpotify ? "Spotify Track (Resolving title...)" : "Media Item (Resolving title...)");
+
+            var queueItem = new DownloadQueueItem
+            {
+                Url = url,
+                Title = title,
+                DestinationFolder = targetFolder,
+                IsAudioOnly = isAudioOnly,
+                AudioFormat = audioFormat,
+                FormatCode = formatCode,
+                Status = QueueItemStatus.Queued,
+                StatusText = isSpotify ? "Queued (Spotify Audio)" : "Queued"
+            };
+            queueItem.UpdatePlatformFromUrl();
+
+            _queueManager.Enqueue(queueItem);
+
+            // Reset main window inputs
+            if (UrlTextBox != null)
+            {
+                UrlTextBox.Text = "Paste URL here...";
+                UrlTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
+            }
+            if (DownloadButton != null) DownloadButton.IsEnabled = false;
+            if (AddToQueueButton != null) AddToQueueButton.IsEnabled = false;
+
+            ShowQueueView();
         }
     }
 }

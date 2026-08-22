@@ -263,5 +263,28 @@ namespace UniversalDownloader
             if (_downloadService != null) _downloadService.CustomFilenameTemplate = "{title}";
             SaveSetting(SettingsKeyFilenameTemplate, "{title}");
         }
+
+        private async void UpdateYtDlp_Click(object sender, RoutedEventArgs e)
+        {
+            if (SettingsYtDlpStatus != null)
+            {
+                SettingsYtDlpStatus.Text = "Checking for updates...";
+            }
+            try
+            {
+                await _dependencyManager.InitializeDependenciesAsync();
+                if (SettingsYtDlpStatus != null)
+                {
+                    SettingsYtDlpStatus.Text = "Ready (Updated)";
+                }
+            }
+            catch (Exception ex)
+            {
+                if (SettingsYtDlpStatus != null)
+                {
+                    SettingsYtDlpStatus.Text = $"Update failed: {ex.Message}";
+                }
+            }
+        }
     }
 }

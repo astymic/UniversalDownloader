@@ -35,11 +35,64 @@ namespace UniversalDownloader.Services
         {
             Application.Current?.Dispatcher?.Invoke(() =>
             {
+                item.UpdatePlatformFromUrl();
                 _items.Add(item);
                 QueueChanged?.Invoke();
             });
 
+            ResolveItemTitleAsync(item);
             _ = ProcessQueueAsync();
+        }
+
+        public void EnqueueRange(System.Collections.Generic.IEnumerable<DownloadQueueItem> items)
+        {
+            Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                foreach (var item in items)
+                {
+                    item.UpdatePlatformFromUrl();
+                    _items.Add(item);
+                    ResolveItemTitleAsync(item);
+                }
+                QueueChanged?.Invoke();
+            });
+
+            _ = ProcessQueueAsync();
+        }
+
+        private void ResolveItemTitleAsync(DownloadQueueItem item)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    if (_downloadService.IsSpotifyLink(item.Url))
+                    {
+                        var meta = await _downloadService.GetSpotifyMetadataAsync(item.Url);
+                        if (meta != null && !string.IsNullOrWhiteSpace(meta.Title))
+                        {
+                            string beautifulTitle = $"{meta.Artist} - {meta.Title}".Trim();
+                            Application.Current?.Dispatcher?.Invoke(() =>
+                            {
+                                item.Title = beautifulTitle;
+                                item.Platform = "Spotify";
+                            });
+                        }
+                    }
+                    else
+                    {
+                        string? title = await _downloadService.GetTitleWithYtDlpAsync(item.Url);
+                        if (!string.IsNullOrWhiteSpace(title))
+                        {
+                            Application.Current?.Dispatcher?.Invoke(() =>
+                            {
+                                item.Title = title;
+                            });
+                        }
+                    }
+                }
+                catch { }
+            });
         }
 
         public void Cancel(string itemId)
@@ -83,6 +136,7 @@ namespace UniversalDownloader.Services
                 item.Progress = 0;
                 item.ErrorMessage = null;
                 QueueChanged?.Invoke();
+                ResolveItemTitleAsync(item);
                 _ = ProcessQueueAsync();
             }
         }
@@ -157,10 +211,10 @@ namespace UniversalDownloader.Services
 
                             void OnFile(string path, string url)
                             {
-                                if (url == nextItem.Url || string.IsNullOrWhiteSpace(nextItem.DownloadedFilePath))
+                                if (url == nextItem.Url || string.IsNullOrWhiteSpace(nextItem.DownloadedFilePath) || url.StartsWith("ytsearch1:", StringComparison.OrdinalIgnoreCase))
                                 {
                                     nextItem.DownloadedFilePath = path;
-                                    if (nextItem.Title.StartsWith("Batch Item #") && File.Exists(path))
+                                    if ((nextItem.Title.Contains("Resolving title") || nextItem.Title.StartsWith("Media Item #")) && File.Exists(path))
                                     {
                                         nextItem.Title = Path.GetFileNameWithoutExtension(path);
                                     }
@@ -172,15 +226,38 @@ namespace UniversalDownloader.Services
 
                             try
                             {
+                                bool isSpotify = _downloadService.IsSpotifyLink(nextItem.Url);
+                                string downloadUrl = nextItem.Url;
+                                string? overrideTitle = null;
+
+                                if (isSpotify)
+                                {
+                                    if (nextItem.Title.Contains("Resolving title") || nextItem.Title.StartsWith("Spotify Track #"))
+                                    {
+                                        var meta = await _downloadService.GetSpotifyMetadataAsync(nextItem.Url);
+                                        if (meta != null && !string.IsNullOrWhiteSpace(meta.Title))
+                                        {
+                                            nextItem.Title = $"{meta.Artist} - {meta.Title}".Trim();
+                                        }
+                                    }
+
+                                    string cleanTitle = nextItem.Title.Replace("\"", "").Replace("'", "");
+                                    downloadUrl = $"ytsearch1:{cleanTitle}";
+                                    overrideTitle = nextItem.Title;
+                                    nextItem.IsAudioOnly = true;
+                                    nextItem.AudioFormat = "mp3";
+                                }
+
                                 bool success = await _downloadService.DownloadWithYtDlpAsync(
-                                    nextItem.Url,
-                                    nextItem.FormatCode,
+                                    downloadUrl,
+                                    nextItem.IsAudioOnly ? "bestaudio/best" : nextItem.FormatCode,
                                     tempDir,
                                     nextItem.DestinationFolder,
                                     nextItem.IsAudioOnly,
                                     nextItem.AudioFormat,
                                     false, 0, 0,
-                                    cts.Token);
+                                    cts.Token,
+                                    overrideTitle);
 
                                 if (success)
                                 {

@@ -456,6 +456,10 @@ namespace UniversalDownloader
                         TrimmingSection.Visibility = Visibility.Collapsed;
                     }
                     DownloadButton.IsEnabled = canDownloadAction && youtubeSpecificConditionsMet;
+                    if (AddToQueueButton != null)
+                    {
+                        AddToQueueButton.IsEnabled = canDownloadAction && youtubeSpecificConditionsMet;
+                    }
                 }
 
                 if (YouTubeQualityComboBox != null)

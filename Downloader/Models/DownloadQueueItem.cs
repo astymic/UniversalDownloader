@@ -18,6 +18,7 @@ namespace UniversalDownloader.Models
         private string _id = Guid.NewGuid().ToString("N");
         private string _title = "Loading...";
         private string _url = string.Empty;
+        private string _platform = "Media";
         private string _formatCode = "best";
         private bool _isAudioOnly;
         private string _audioFormat = "mp3";
@@ -43,8 +44,52 @@ namespace UniversalDownloader.Models
         public string Url
         {
             get => _url;
-            set { _url = value; OnPropertyChanged(); }
+            set 
+            { 
+                _url = value; 
+                OnPropertyChanged(); 
+                UpdatePlatformFromUrl();
+            }
         }
+
+        public string Platform
+        {
+            get => _platform;
+            set 
+            { 
+                _platform = value; 
+                OnPropertyChanged(); 
+                OnPropertyChanged(nameof(PlatformBadgeText));
+                OnPropertyChanged(nameof(PlatformBadgeBg));
+                OnPropertyChanged(nameof(PlatformBadgeFg));
+            }
+        }
+
+        public string PlatformBadgeText => Platform switch
+        {
+            "Spotify" => "Spotify",
+            "YouTube" => "YouTube",
+            "TikTok" => "TikTok",
+            "SoundCloud" => "SoundCloud",
+            "Instagram" => "Instagram",
+            _ => IsAudioOnly ? AudioFormat.ToUpper() : "VIDEO"
+        };
+
+        public string PlatformBadgeBg => Platform switch
+        {
+            "Spotify" => "#1DB954",
+            "YouTube" => "#FF0000",
+            "TikTok" => "#111115",
+            "SoundCloud" => "#FF5500",
+            "Instagram" => "#E1306C",
+            _ => "#8B5CF6"
+        };
+
+        public string PlatformBadgeFg => Platform switch
+        {
+            "TikTok" => "#00F2FE",
+            _ => "#FFFFFF"
+        };
 
         public string FormatCode
         {
@@ -124,6 +169,38 @@ namespace UniversalDownloader.Models
         {
             get => _downloadedFilePath;
             set { _downloadedFilePath = value; OnPropertyChanged(); }
+        }
+
+        public void UpdatePlatformFromUrl()
+        {
+            if (string.IsNullOrWhiteSpace(_url)) return;
+            string u = _url.ToLowerInvariant();
+            if (u.Contains("spotify.com") || u.StartsWith("spotify:"))
+            {
+                Platform = "Spotify";
+                IsAudioOnly = true;
+            }
+            else if (u.Contains("youtube.com") || u.Contains("youtu.be"))
+            {
+                Platform = "YouTube";
+            }
+            else if (u.Contains("tiktok.com"))
+            {
+                Platform = "TikTok";
+            }
+            else if (u.Contains("soundcloud.com"))
+            {
+                Platform = "SoundCloud";
+                IsAudioOnly = true;
+            }
+            else if (u.Contains("instagram.com"))
+            {
+                Platform = "Instagram";
+            }
+            else
+            {
+                Platform = "Media";
+            }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

@@ -696,7 +696,7 @@
             <Grid Grid.Row="1">
                 <!-- Main Downloader View -->
                 <ScrollViewer x:Name="MainScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Visible">
-                    <StackPanel Margin="40,20,40,40" MaxWidth="680">
+                    <StackPanel Margin="32,20,76,40" MaxWidth="680">
                         
                         <!-- Header -->
                         <TextBlock Text="Download Everything." 
@@ -890,9 +890,11 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <Button x:Name="DownloadButton" Grid.Column="0" Style="{StaticResource ModernButton}" Content="Start Download" Click="DownloadButton_Click" IsEnabled="False" Width="200" Height="46"/>
-                            <Button x:Name="CancelDownloadButton" Grid.Column="1" Style="{StaticResource MinimalistCancelButton}" Click="CancelDownloadButton_Click" Visibility="Collapsed" Margin="12,0,0,0" Height="46" Width="46"/>
+                            <Button x:Name="DownloadButton" Grid.Column="0" Style="{StaticResource ModernButton}" Content="Start Download" Click="DownloadButton_Click" IsEnabled="False" Width="180" Height="46" Margin="0,0,10,0"/>
+                            <Button x:Name="AddToQueueButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="➕ Add to Queue" Click="AddToQueueButton_Click" IsEnabled="False" Width="150" Height="46"/>
+                            <Button x:Name="CancelDownloadButton" Grid.Column="2" Style="{StaticResource MinimalistCancelButton}" Click="CancelDownloadButton_Click" Visibility="Collapsed" Margin="10,0,0,0" Height="46" Width="46"/>
                         </Grid>
 
                         <!-- Status Display -->
@@ -943,78 +945,120 @@
                                    FontWeight="Bold" 
                                    Foreground="{StaticResource TextPrimaryBrush}" 
                                    Margin="0,0,0,32"/>
+                        <StackPanel>
+                            <!-- General Settings -->
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                                <StackPanel>
+                                    <TextBlock Text="GENERAL PREFERENCES" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
+                                    
+                                    <!-- Auto Detect Clipboard CheckBox -->
+                                    <CheckBox x:Name="AutoDetectClipboardCheckBox" Style="{StaticResource ModernCheckBox}" Content="Auto-detect media links from clipboard" Margin="0,0,0,12" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed"/>
+                                    
+                                    <!-- Embed Metadata CheckBox -->
+                                    <CheckBox x:Name="EmbedMetadataCheckBox" Style="{StaticResource ModernCheckBox}" Content="Embed metadata / tags into media files (YouTube, Spotify)" Margin="0,0,0,12" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed"/>
+                                    
+                                    <!-- Download Subtitles CheckBox -->
+                                    <CheckBox x:Name="DownloadSubtitlesCheckBox" Style="{StaticResource ModernCheckBox}" Content="Auto-download subtitles when available" Margin="0,0,0,12" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed"/>
+                                    
+                                    <!-- Multi-Connection Acceleration CheckBox -->
+                                    <CheckBox x:Name="MultiConnectionAccelerationCheckBox" Style="{StaticResource ModernCheckBox}" Content="Enable multi-connection download acceleration (aria2c)" Margin="0,0,0,12" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed"/>
 
-                        <!-- Download Location Settings -->
-                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
-                            <StackPanel>
-                                <TextBlock Text="SAVE LOCATION" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="SettingsDirectoryPathTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" IsReadOnly="True" Text="Select folder..." Margin="0,0,16,0"/>
-                                    <Button x:Name="SettingsBrowseButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Browse" Click="BrowseButton_Click" Padding="24,12"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
+                                    <!-- Download Spotify Synced Lyrics CheckBox -->
+                                    <CheckBox x:Name="DownloadLyricsCheckBox" Style="{StaticResource ModernCheckBox}" Content="Fetch &amp; embed synchronized lyrics (.lrc / ID3) for Spotify tracks" Margin="0,0,0,12" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed"/>
 
-                        <!-- General / Clipboard Settings -->
-                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
-                            <StackPanel>
-                                <TextBlock Text="CLIPBOARD &amp; NOTIFICATIONS" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
-                                <CheckBox x:Name="AutoDetectClipboardCheckBox" Style="{StaticResource ModernCheckBox}" Content="Auto-detect supported media links copied to clipboard" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,14" IsChecked="True"/>
-                                <CheckBox x:Name="MinimizeToTrayCheckBox" Style="{StaticResource ModernCheckBox}" Content="Minimize to System Tray when closing the window" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,4"/>
-                            </StackPanel>
-                        </Border>
+                                    <!-- Minimize to Tray CheckBox -->
+                                    <CheckBox x:Name="MinimizeToTrayCheckBox" Style="{StaticResource ModernCheckBox}" Content="Minimize to system tray on close" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed"/>
+                                </StackPanel>
+                            </Border>
 
-                        <!-- Media Quality & Metadata Settings -->
-                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
-                            <StackPanel>
-                                <TextBlock Text="MEDIA TAGS &amp; ENRICHMENT" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
-                                <CheckBox x:Name="EmbedMetadataCheckBox" Style="{StaticResource ModernCheckBox}" Content="Embed ID3 tags (Artist, Title, Album) &amp; album art into audio files" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,14" IsChecked="True"/>
-                                <CheckBox x:Name="DownloadLyricsCheckBox" Style="{StaticResource ModernCheckBox}" Content="Download synced lyrics (.lrc companion file) for music tracks" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,14" IsChecked="True"/>
-                                <CheckBox x:Name="DownloadSubtitlesCheckBox" Style="{StaticResource ModernCheckBox}" Content="Download subtitles/captions with video when available" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,4"/>
-                            </StackPanel>
-                        </Border>
+                            <!-- Default Save Location -->
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                                <StackPanel>
+                                    <TextBlock Text="DEFAULT SAVE LOCATION" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="SettingsDirectoryPathTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" IsReadOnly="True" Text="Select folder..." Margin="0,0,16,0"/>
+                                        <Button Style="{StaticResource SecondaryButton}" Content="Browse" Click="BrowseButton_Click" Padding="24,12"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
 
-                        <!-- Custom Filename Pattern Builder -->
-                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="CUSTOM FILENAME TEMPLATE" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
-                                    <Button Grid.Column="1" Content="Reset Default" Style="{StaticResource SecondaryButton}" Padding="10,3" FontSize="11" Click="ResetTemplate_Click" ToolTip="Reset to default"/>
-                                </Grid>
-                                <TextBox x:Name="FilenameTemplateTextBox" Style="{StaticResource ModernTextBox}" Text="{}{title}" TextChanged="FilenameTemplateTextBox_TextChanged" Margin="0,0,0,12"/>
-                                <TextBlock Text="Click variable tokens to insert into filename template:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" Margin="0,0,0,8"/>
-                                <WrapPanel Orientation="Horizontal">
-                                    <Button Content="{}{title}" Style="{StaticResource SecondaryButton}" Tag="{}{title}" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert track or video title"/>
-                                    <Button Content="{}{artist}" Style="{StaticResource SecondaryButton}" Tag="{}{artist}" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert artist or channel name"/>
-                                    <Button Content="{}{platform}" Style="{StaticResource SecondaryButton}" Tag="{}{platform}" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert platform name (YouTube, Spotify, etc.)"/>
-                                    <Button Content="{}{quality}" Style="{StaticResource SecondaryButton}" Tag="{}{quality}" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert quality label (1080p, 320k, etc.)"/>
-                                    <Button Content="{}{upload_date}" Style="{StaticResource SecondaryButton}" Tag="{}{upload_date}" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert current date (YYYY-MM-DD)"/>
-                                </WrapPanel>
-                            </StackPanel>
-                        </Border>
+                            <!-- Custom Filename Template -->
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                                <StackPanel>
+                                    <TextBlock Text="CUSTOM FILENAME TEMPLATE" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,8"/>
+                                    <TextBlock Text="Customize how downloaded files are named using placeholders:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,12"/>
+                                    
+                                    <!-- Template Input Field -->
+                                    <TextBox x:Name="FilenameTemplateTextBox" 
+                                             Style="{StaticResource ModernTextBox}" 
+                                             Text="%(title)s.%(ext)s" 
+                                             TextChanged="FilenameTemplateTextBox_TextChanged"
+                                             Margin="0,0,0,12"/>
 
-                        <!-- Network & Acceleration Settings -->
-                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
-                            <StackPanel>
-                                <TextBlock Text="NETWORK &amp; ACCELERATION" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
-                                <CheckBox x:Name="MultiConnectionAccelerationCheckBox" Style="{StaticResource ModernCheckBox}" Content="Multi-connection segmented download acceleration" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,4" IsChecked="True"/>
-                                <TextBlock Text="Downloads files using concurrent chunks for maximum transfer speed. Disable if your network restricts multiple parallel connections." Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Margin="28,4,0,0"/>
-                            </StackPanel>
-                        </Border>
+                                    <!-- Available Variable Chips -->
+                                    <WrapPanel Margin="0,0,0,12">
+                                        <Button Content="%(title)s" Style="{StaticResource SecondaryButton}" Tag="%(title)s" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert video/track title"/>
+                                        <Button Content="%(uploader)s" Style="{StaticResource SecondaryButton}" Tag="%(uploader)s" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert channel or artist name"/>
+                                        <Button Content="%(resolution)s" Style="{StaticResource SecondaryButton}" Tag="%(resolution)s" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert resolution (e.g. 1080p)"/>
+                                        <Button Content="%(upload_date)s" Style="{StaticResource SecondaryButton}" Tag="%(upload_date)s" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert upload date (YYYYMMDD)"/>
+                                        <Button Content="%(id)s" Style="{StaticResource SecondaryButton}" Tag="%(id)s" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert media ID"/>
+                                        <Button Content="{}{platform}" Style="{StaticResource SecondaryButton}" Tag="{}{platform}" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert platform name (YouTube, Spotify, etc.)"/>
+                                    </WrapPanel>
+
+                                    <!-- Live Preview -->
+                                    <Border Background="#121214" CornerRadius="8" Padding="12,10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Preview:  " Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="FilenameTemplatePreview" Grid.Column="1" Text="Never Gonna Give You Up.mp4" Foreground="{StaticResource PrimaryHoverBrush}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Dependencies Section -->
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}">
+                                <StackPanel>
+                                    <TextBlock Text="DEPENDENCIES &amp; TOOLS" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
+                                    
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock Text="yt-dlp core engine" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold"/>
+                                            <TextBlock x:Name="SettingsYtDlpStatus" Text="Ready (Latest)" Foreground="{StaticResource SuccessBrush}" FontSize="11"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Update Engine" Click="UpdateYtDlp_Click" Padding="14,6" FontSize="11"/>
+                                    </Grid>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock Text="FFmpeg &amp; FFprobe" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold"/>
+                                            <TextBlock x:Name="SettingsFfmpegStatus" Text="Ready (Offline)" Foreground="{StaticResource SuccessBrush}" FontSize="11"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- Download History View -->
+                <!-- History View -->
                 <ScrollViewer x:Name="HistoryScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed">
-                    <StackPanel Margin="40,20,40,90" MaxWidth="760">
+                    <StackPanel Margin="32,20,76,90" MaxWidth="780">
                         <!-- Top Bar: Back & Clear History -->
                         <Grid Margin="0,0,0,20">
                             <Grid.ColumnDefinitions>
@@ -1031,11 +1075,17 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Download History" 
+                            <TextBlock Text="Download History" 
                                        FontSize="32" 
                                        FontWeight="Bold" 
-                                       Foreground="{StaticResource TextPrimaryBrush}"/>
-                            <TextBlock x:Name="HistoryMatchCountTextBlock" Grid.Column="1" Text="0 downloads" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Bottom" Margin="0,0,4,4"/>
+                                       Foreground="{StaticResource TextPrimaryBrush}" 
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="HistoryMatchCountTextBlock" 
+                                       Grid.Column="1" 
+                                       Text="0 items" 
+                                       Foreground="{StaticResource TextSecondaryBrush}" 
+                                       FontSize="13" 
+                                       VerticalAlignment="Center"/>
                         </Grid>
 
                         <!-- Search Box -->
@@ -1363,49 +1413,45 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- Download Queue View (Full-Page Overlay / View) -->
+                <!-- Download Queue View (Full-Page Responsive View) -->
                 <ScrollViewer x:Name="QueueScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed">
-                    <StackPanel Margin="48,36,48,48" MaxWidth="880" HorizontalAlignment="Stretch">
+                    <StackPanel Margin="32,24,76,36" MaxWidth="900" HorizontalAlignment="Stretch">
                         
-                        <!-- Top Navigation Bar -->
-                        <Grid Margin="0,0,0,24">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <Button Grid.Column="0" 
+                        <!-- Top Responsive Navigation Bar -->
+                        <DockPanel LastChildFill="False" Margin="0,0,0,20">
+                            <Button DockPanel.Dock="Left"
                                     Content="← Back to Downloader" 
                                     Style="{StaticResource SecondaryButton}" 
                                     Padding="14,8" 
                                     FontSize="12.5" 
                                     Click="BackFromQueue_Click" 
-                                    HorizontalAlignment="Left"/>
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,12,6"/>
 
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <WrapPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                 <Button Content="📋 Batch Import" 
                                         Style="{StaticResource SecondaryButton}" 
                                         Padding="12,8" 
                                         FontSize="12" 
-                                        Margin="0,0,8,0"
+                                        Margin="0,0,8,6"
                                         Click="BatchImportFromQueue_Click"
                                         ToolTip="Import more links into the queue"/>
                                 <Button Content="🧹 Clear Finished" 
                                         Style="{StaticResource SecondaryButton}" 
                                         Padding="12,8" 
                                         FontSize="12" 
-                                        Margin="0,0,8,0"
+                                        Margin="0,0,8,6"
                                         Click="ClearCompletedQueue_Click"
                                         ToolTip="Remove completed, failed and canceled items from list"/>
                                 <Button Content="⏹ Cancel All" 
                                         Style="{StaticResource MinimalistCancelButton}" 
                                         Padding="12,8" 
                                         FontSize="12" 
+                                        Margin="0,0,0,6"
                                         Click="CancelAllQueue_Click"
                                         ToolTip="Cancel all pending and active downloads"/>
-                            </StackPanel>
-                        </Grid>
+                            </WrapPanel>
+                        </DockPanel>
 
                         <!-- Header & Summary Card -->
                         <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="16" Padding="28,24" Margin="0,0,0,20">
@@ -1471,22 +1517,22 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
 
-                                            <!-- Left Status / Type Badge -->
+                                            <!-- Left Status / Platform Badge -->
                                             <Border Grid.Column="0" 
-                                                    Background="#208B5CF6" 
-                                                    BorderBrush="#408B5CF6" 
-                                                    BorderThickness="1" 
+                                                    Background="{Binding PlatformBadgeBg}" 
                                                     CornerRadius="8" 
-                                                    Width="44" 
-                                                    Height="44" 
+                                                    Width="52" 
+                                                    Height="38" 
                                                     Margin="0,0,14,0" 
                                                     VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding AudioFormat, StringFormat='{}{0}'}" 
-                                                           Foreground="{StaticResource PrimaryHoverBrush}" 
-                                                           FontSize="11" 
+                                                <TextBlock Text="{Binding PlatformBadgeText}" 
+                                                           Foreground="{Binding PlatformBadgeFg}" 
+                                                           FontSize="10" 
                                                            FontWeight="Bold" 
+                                                           TextTrimming="CharacterEllipsis"
                                                            HorizontalAlignment="Center" 
-                                                           VerticalAlignment="Center"/>
+                                                           VerticalAlignment="Center"
+                                                           Padding="2,0"/>
                                             </Border>
 
                                             <!-- Center: Title, Progress, Status -->
@@ -1511,13 +1557,14 @@
                                                     <TextBlock Text="{Binding StatusText}" 
                                                                Foreground="{StaticResource TextSecondaryBrush}" 
                                                                FontSize="11.5" 
-                                                               HorizontalAlignment="Left"/>
+                                                               HorizontalAlignment="Left"
+                                                               TextTrimming="CharacterEllipsis"/>
                                                     <TextBlock Text="{Binding Url}" 
                                                                Foreground="#71717A" 
                                                                FontSize="11" 
                                                                HorizontalAlignment="Right" 
                                                                TextTrimming="CharacterEllipsis" 
-                                                               MaxWidth="320"/>
+                                                               MaxWidth="300"/>
                                                 </Grid>
                                             </StackPanel>
 

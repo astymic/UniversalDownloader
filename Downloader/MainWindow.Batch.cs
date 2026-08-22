@@ -15,11 +15,7 @@ namespace UniversalDownloader
 
                 if (confirmed && items.Count > 0)
                 {
-                    foreach (var item in items)
-                    {
-                        _queueManager.Enqueue(item);
-                    }
-
+                    _queueManager.EnqueueRange(items);
                     ShowQueueView();
                 }
             }

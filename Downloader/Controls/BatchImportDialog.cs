@@ -666,17 +666,30 @@ namespace UniversalDownloader.Controls
             foreach (var url in urls)
             {
                 i++;
-                ResultItems.Add(new DownloadQueueItem
+                bool isSpotify = url.Contains("spotify.com", StringComparison.OrdinalIgnoreCase) || url.StartsWith("spotify:", StringComparison.OrdinalIgnoreCase);
+                bool isSoundCloud = url.Contains("soundcloud.com", StringComparison.OrdinalIgnoreCase);
+                
+                bool itemAudioOnly = isAudioOnly || isSpotify || isSoundCloud;
+                string itemAudioFormat = itemAudioOnly ? (isSpotify ? "mp3" : audioFormat) : audioFormat;
+                string itemFormatCode = isSpotify ? "bestaudio/best" : (isSoundCloud ? "bestaudio/best" : formatCode);
+
+                string initialTitle = isSpotify 
+                    ? $"Spotify Track #{i} (Resolving title...)" 
+                    : (url.Contains("youtu") ? $"YouTube Video #{i} (Resolving title...)" : $"Media Item #{i} (Resolving title...)");
+
+                var queueItem = new DownloadQueueItem
                 {
                     Url = url,
-                    Title = $"Batch Item #{i}",
+                    Title = initialTitle,
                     DestinationFolder = folder,
-                    IsAudioOnly = isAudioOnly,
-                    AudioFormat = audioFormat,
-                    FormatCode = formatCode,
+                    IsAudioOnly = itemAudioOnly,
+                    AudioFormat = itemAudioFormat,
+                    FormatCode = itemFormatCode,
                     Status = QueueItemStatus.Queued,
-                    StatusText = "Queued"
-                });
+                    StatusText = isSpotify ? "Queued (Spotify Audio)" : "Queued"
+                };
+                queueItem.UpdatePlatformFromUrl();
+                ResultItems.Add(queueItem);
             }
 
             Confirmed = true;
