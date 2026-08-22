@@ -1,15 +1,22 @@
 # Universal Downloader
 
-A modern, high-performance, self-contained Windows desktop application (WPF / .NET) for searching, identifying, downloading, converting, and queuing media files from YouTube, Spotify, SoundCloud, Google Drive, direct links, and over 1,000+ supported sites.
+A modern, high-performance, cross-platform desktop application (**Windows & Linux**) for searching, identifying, downloading, converting, and queuing media files from YouTube, Spotify, SoundCloud, TikTok, Instagram, Twitter/X, and over 1,000+ supported sites.
+
+---
+
+## 🐧 Cross-Platform & Linux Support
+- **Universal Linux Binary**: Standalone, self-contained single-file executable for Ubuntu, Debian, Fedora, Arch Linux, Manjaro, SteamOS, and generic Linux x64 distributions.
+- **Arch Linux PKGBUILD**: Included `PKGBUILD` and `.desktop` launcher for fast Arch Linux (`makepkg -si`) installation.
+- **Hardware-Accelerated UI**: Built with Avalonia UI (SkiaSharp) for silky smooth 60/120/144Hz performance on both X11 and Wayland.
 
 ---
 
 ## 🌟 Key Features
 
-### 🔍 Music & Video Search Hub
-- **Integrated Multi-Source Search** — Search for tracks, artists, albums, or videos across YouTube and SoundCloud simultaneously without leaving the app.
-- **Parallel Query Acceleration** — Dual-source asynchronous execution with in-memory TTL caching for instant repeat lookups.
-- **Direct Format & Quality Selector** — Choose resolutions (4K, 1440p, 1080p, 720p, 480p, 360p) or audio formats (MP3 / Best Audio) per search result with 1-click Download or Add to Queue.
+### 🔍 Dual-Mode Search Hub
+- **🎵 Smart Music Hub (Default)** — Multi-source parallel search across YouTube & SoundCloud with intelligent subword/closest-match fallback.
+- **📺 Real YouTube Search** — Authentic YouTube search results matching YouTube.com's live ranking with full video metadata.
+- **⚡ Instant 0ms Tab Switching** — Both engines query simultaneously in parallel in the background, allowing instant switching between modes.
 
 ### 🎙️ Shazam & Audio Song Recognition ("Listen & Identify")
 - **Instant 5-Second Acoustic Fingerprinting** — Identifies playing songs using STFT spectral landmark peak extraction and Shazam's acoustic database (100M+ songs).

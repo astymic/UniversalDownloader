@@ -1,0 +1,1717 @@
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Net.Http;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Globalization;
+using System.Collections.Generic;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+namespace UniversalDownloader.Services
+{
+    public class DownloadProgressArgs : EventArgs
+    {
+        public string? StatusMessage { get; set; }
+        public string? Filename { get; set; }
+        public double Percentage { get; set; }
+        public bool IsIndeterminate { get; set; }
+    }
+
+    public partial class DownloadService
+    {
+        private readonly HttpClient _httpClient;
+        private readonly DependencyManager _dependencyManager;
+        private readonly TikTokExtractor _tikTokExtractor;
+
+        public event EventHandler<DownloadProgressArgs>? ProgressChanged;
+        public event Action<string, string>? FileDownloaded;
+
+        public DownloadService(DependencyManager dependencyManager)
+        {
+            _dependencyManager = dependencyManager;
+            _tikTokExtractor = new TikTokExtractor();
+            _httpClient = new HttpClient();
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+            _httpClient.Timeout = TimeSpan.FromMinutes(10);
+        }
+
+        public string? ProgressPrefix { get; set; }
+        public bool EnableMultiConnectionAcceleration { get; set; } = true;
+        public string CustomFilenameTemplate { get; set; } = "{title}";
+
+        public string ConvertTemplateToYtDlp(string template)
+        {
+            if (string.IsNullOrWhiteSpace(template)) return "%(title)s.%(ext)s";
+            string res = template
+                .Replace("{title}", "%(title)s")
+                .Replace("{artist}", "%(artist,uploader)s")
+                .Replace("{platform}", "%(extractor)s")
+                .Replace("{quality}", "%(resolution,format_note)s")
+                .Replace("{upload_date}", "%(upload_date)s");
+
+            if (!res.EndsWith(".%(ext)s", StringComparison.OrdinalIgnoreCase))
+            {
+                res += ".%(ext)s";
+            }
+            return res;
+        }
+
+        private void ReportProgress(string status, string? filename = null, double percentage = 0, bool isIndeterminate = false)
+        {
+            string finalStatus = string.IsNullOrEmpty(ProgressPrefix) ? status : $"{ProgressPrefix} {status}";
+            ProgressChanged?.Invoke(this, new DownloadProgressArgs
+            {
+                StatusMessage = finalStatus,
+                Filename = filename,
+                Percentage = percentage,
+                IsIndeterminate = isIndeterminate
+            });
+        }
+
+        public bool IsYouTubeLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"(youtube\.com\/(watch\?v=|embed\/|shorts\/)|youtu\.be\/)", RegexOptions.IgnoreCase);
+        }
+
+        public bool IsInstagramLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"(instagram\.com|instagr\.am)\/", RegexOptions.IgnoreCase);
+        }
+
+        public bool IsTikTokLink(string url) => TikTokExtractor.IsTikTokUrl(url);
+
+        public bool IsTwitterLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"(twitter\.com|x\.com)\/", RegexOptions.IgnoreCase);
+        }
+
+        public bool IsRedditLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"(reddit\.com|redd\.it)\/", RegexOptions.IgnoreCase);
+        }
+
+        public bool IsSocialVideoLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"(tiktok\.com|douyin\.com|twitter\.com|x\.com|facebook\.com|fb\.watch|vimeo\.com|reddit\.com|redd\.it|twitch\.tv|pinterest\.com)\/", RegexOptions.IgnoreCase);
+        }
+
+        public bool IsYouTubePlaylistLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            // Only match pure playlist pages, NOT single videos that happen to have ?list= context
+            return Regex.IsMatch(url, @"youtube\.com\/playlist\?list=", RegexOptions.IgnoreCase);
+        }
+
+        public bool IsGoogleDriveLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"drive\.google\.com/(file/d/|open\?id=|uc\?id=)", RegexOptions.IgnoreCase);
+        }
+
+        public bool IsSpotifyLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"open\.spotify\.com/(track|album|playlist)/", RegexOptions.IgnoreCase);
+        }
+
+        public bool IsSoundCloudLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"soundcloud\.com/", RegexOptions.IgnoreCase);
+        }
+
+        public bool IsKnownAudioPlatformLink(string url)
+        {
+            return IsSpotifyLink(url) || IsSoundCloudLink(url);
+        }
+
+        public string CleanUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return url;
+            string clean = url.Trim();
+            if (IsInstagramLink(clean))
+            {
+                int qIdx = clean.IndexOf('?');
+                if (qIdx > 0)
+                {
+                    clean = clean.Substring(0, qIdx);
+                }
+                clean = Regex.Replace(clean, @"/reels/", "/reel/", RegexOptions.IgnoreCase);
+            }
+            return clean;
+        }
+
+        public async Task<string?> GetTitleWithYtDlpAsync(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return null;
+            url = CleanUrl(url);
+
+            // 1. Fast, high-accuracy YouTube title resolution via oEmbed
+            if (IsYouTubeLink(url))
+            {
+                try
+                {
+                    string oembedUrl = $"https://www.youtube.com/oembed?url={Uri.EscapeDataString(url)}&format=json";
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                    using var client = new HttpClient();
+                    var response = await client.GetAsync(oembedUrl, cts.Token);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string json = await response.Content.ReadAsStringAsync(cts.Token);
+                        if (!string.IsNullOrWhiteSpace(json))
+                        {
+                            var jo = JObject.Parse(json);
+                            string? oembedTitle = jo["title"]?.ToString();
+                            if (!string.IsNullOrWhiteSpace(oembedTitle))
+                            {
+                                return System.Net.WebUtility.HtmlDecode(oembedTitle.Trim());
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // 2. Spotify metadata resolution
+            if (IsSpotifyLink(url))
+            {
+                try
+                {
+                    var meta = await GetSpotifyMetadataAsync(url);
+                    if (meta != null && !string.IsNullOrWhiteSpace(meta.Title))
+                    {
+                        return $"{meta.Artist} - {meta.Title}".Trim();
+                    }
+                }
+                catch { }
+            }
+
+            if (!_dependencyManager.IsYtDlpReady) return null;
+
+            // 3. Robust yt-dlp print title fallback
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = _dependencyManager.YtDlpExecutablePath,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = System.Text.Encoding.UTF8
+                };
+                psi.ArgumentList.Add("--print");
+                psi.ArgumentList.Add("%(title)s");
+                psi.ArgumentList.Add("--no-playlist");
+                psi.ArgumentList.Add("--no-warnings");
+                psi.ArgumentList.Add("--ignore-config");
+                psi.ArgumentList.Add("--skip-download");
+                psi.ArgumentList.Add("--extractor-args");
+                psi.ArgumentList.Add("youtube:player_client=android,ios,mweb,web");
+                psi.ArgumentList.Add(url);
+                psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+
+                using (Process process = Process.Start(psi))
+                {
+                    string titleOutput = await process.StandardOutput.ReadToEndAsync();
+                    await process.WaitForExitAsync();
+                    if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(titleOutput))
+                    {
+                        var lines = titleOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var line in lines)
+                        {
+                            string cleaned = line.Trim();
+                            if (!string.IsNullOrWhiteSpace(cleaned) && 
+                                !cleaned.StartsWith("WARNING", StringComparison.OrdinalIgnoreCase) && 
+                                !cleaned.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase))
+                            {
+                                return System.Net.WebUtility.HtmlDecode(cleaned);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error fetching title: {ex.Message}");
+            }
+            return null;
+        }
+
+        public async Task<(string? Title, string? FormatsJson)> GetYouTubeInfoAsync(string url)
+        {
+            if (!_dependencyManager.IsYtDlpReady) return (null, null);
+            url = CleanUrl(url);
+
+            try
+            {
+                var result = await RunYtDlpJsonAsync(url, null);
+                if (result.Success && !string.IsNullOrWhiteSpace(result.FormatsJson))
+                {
+                    return ("Success", result.FormatsJson);
+                }
+
+                if (IsInstagramLink(url))
+                {
+                    // Return fast so UI populates fallback qualities immediately without 30s delays
+                    return ("Success", null);
+                }
+
+                throw new Exception(result.ErrorMessage ?? "yt-dlp returned empty info. Video might be unavailable.");
+            }
+            catch (Exception ex)
+            {
+                if (IsInstagramLink(url))
+                {
+                    return ("Success", null);
+                }
+                throw new Exception($"Error getting video info: {ex.Message}");
+            }
+        }
+
+        private async Task<(bool Success, string? FormatsJson, string? ErrorMessage)> RunYtDlpJsonAsync(string url, string? cookiesFromBrowser)
+        {
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = _dependencyManager.YtDlpExecutablePath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = System.Text.Encoding.UTF8,
+                StandardErrorEncoding = System.Text.Encoding.UTF8
+            };
+
+            psi.ArgumentList.Add("-J");
+            psi.ArgumentList.Add("--no-warnings");
+            psi.ArgumentList.Add("--ignore-config");
+            psi.ArgumentList.Add("--no-playlist");
+            psi.ArgumentList.Add("--retries");
+            psi.ArgumentList.Add("5");
+
+            if (!string.IsNullOrWhiteSpace(cookiesFromBrowser))
+            {
+                psi.ArgumentList.Add("--cookies-from-browser");
+                psi.ArgumentList.Add(cookiesFromBrowser);
+            }
+
+            psi.ArgumentList.Add(url);
+            psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+
+            using (Process process = Process.Start(psi)!)
+            {
+                string jsonOutput = await process.StandardOutput.ReadToEndAsync();
+                string errorOutput = await process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(jsonOutput))
+                {
+                    return (true, jsonOutput, null);
+                }
+
+                string firstErrorLine = (errorOutput.Split('\n')[0])?.Trim();
+                return (false, null, string.IsNullOrWhiteSpace(firstErrorLine) ? "yt-dlp process failed." : firstErrorLine);
+            }
+        }
+
+        /// <summary>
+        /// Fetches playlist metadata using yt-dlp --flat-playlist -J.
+        /// Returns the raw JSON string containing playlist title and entries.
+        /// </summary>
+        public async Task<string?> GetPlaylistInfoAsync(string url)
+        {
+            if (!_dependencyManager.IsYtDlpReady) return null;
+
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = _dependencyManager.YtDlpExecutablePath,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = System.Text.Encoding.UTF8,
+                    StandardErrorEncoding = System.Text.Encoding.UTF8
+                };
+                psi.ArgumentList.Add("--flat-playlist");
+                psi.ArgumentList.Add("-J");
+                psi.ArgumentList.Add("--no-warnings");
+                psi.ArgumentList.Add("--ignore-config");
+                psi.ArgumentList.Add(url);
+                psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+
+                using (Process process = Process.Start(psi))
+                {
+                    string jsonOutput = await process.StandardOutput.ReadToEndAsync();
+                    await process.WaitForExitAsync();
+
+                    if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(jsonOutput))
+                    {
+                        return null;
+                    }
+                    return jsonOutput;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error fetching playlist info: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task DownloadDirectFileAsync(string url, string tempDownloadFolder, string finalDestinationFolder, CancellationToken cancellationToken, Dictionary<string, string>? customHeaders = null, string? overrideFileName = null)
+        {
+            CleanDirectory(tempDownloadFolder);
+
+            string tempFileName = "unknown_file.dat";
+            string? tempFilePath = null;
+
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+                {
+                    request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+                    if (customHeaders != null)
+                    {
+                        foreach (var kvp in customHeaders)
+                        {
+                            request.Headers.TryAddWithoutValidation(kvp.Key, kvp.Value);
+                        }
+                    }
+
+                    using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        response.EnsureSuccessStatusCode();
+
+                        tempFileName = !string.IsNullOrWhiteSpace(overrideFileName) ? overrideFileName : GetFileNameFromHeaders(response, url);
+                        tempFilePath = Path.Combine(tempDownloadFolder, tempFileName);
+                        
+                        ReportProgress("Downloading...", tempFileName, 0, true);
+
+                        long? totalBytes = response.Content.Headers.ContentLength;
+                        int lastPercentage = -1;
+
+                        using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+                        using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
+                        {
+                            byte[] buffer = new byte[81920]; int bytesRead; long totalBytesRead = 0;
+
+                            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                await fileStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                                totalBytesRead += bytesRead;
+                                
+                                if (totalBytes.HasValue && totalBytes.Value > 0)
+                                {
+                                    double percentage = (double)totalBytesRead / totalBytes.Value * 100;
+                                    if ((int)percentage != lastPercentage)
+                                    {
+                                        ReportProgress($"Downloading: {percentage:F1}% of {Utilities.FormatBytesOutput(totalBytes.Value)}", tempFileName, percentage, false);
+                                        lastPercentage = (int)percentage;
+                                    }
+                                }
+                                else
+                                {
+                                    ReportProgress($"Downloading ({Utilities.FormatBytesOutput(totalBytesRead)})...", tempFileName, 0, true);
+                                }
+                            }
+                        }
+
+                        CopyToFinalDestinationAndClean(tempDownloadFolder, finalDestinationFolder, url);
+                        ReportProgress($"Download complete — saved as '{tempFileName}'", tempFileName, 100, false);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                if (tempFilePath != null && File.Exists(tempFilePath))
+                {
+                    try { File.Delete(tempFilePath); } catch { }
+                }
+                throw;
+            }
+            catch (Exception ex)
+            {
+                if (tempFilePath != null && File.Exists(tempFilePath))
+                {
+                    try { File.Delete(tempFilePath); } catch { }
+                }
+                throw new Exception($"Download Error: {ex.Message}");
+            }
+        }
+
+        public string GetFileNameFromHeaders(HttpResponseMessage response, string url)
+        {
+            string? fileName = null;
+            if (response.Content.Headers.ContentDisposition != null)
+            {
+                fileName = response.Content.Headers.ContentDisposition.FileNameStar;
+                if (string.IsNullOrWhiteSpace(fileName)) { fileName = response.Content.Headers.ContentDisposition.FileName; }
+            }
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                if (Uri.TryCreate(url, UriKind.Absolute, out Uri uri))
+                {
+                    string pathFileName = Path.GetFileName(uri.LocalPath);
+                    if (!string.IsNullOrWhiteSpace(pathFileName) && (pathFileName.Contains(".") || !string.IsNullOrEmpty(Path.GetExtension(pathFileName))))
+                    {
+                        fileName = pathFileName;
+                    }
+                }
+            }
+            fileName = Utilities.SanitizeFileName(Uri.UnescapeDataString(fileName ?? ""));
+            if (string.IsNullOrWhiteSpace(fileName) || string.IsNullOrWhiteSpace(Path.GetExtension(fileName)))
+            {
+                string extension = Utilities.GetExtensionFromMimeType(response.Content.Headers.ContentType?.MediaType);
+                string baseName = (string.IsNullOrWhiteSpace(fileName) || fileName == "downloaded_file")
+                                  ? (IsGoogleDriveLink(url) ? "gdrive_download" : "downloaded_file")
+                                  : Path.GetFileNameWithoutExtension(fileName);
+                fileName = baseName + extension;
+            }
+            return string.IsNullOrWhiteSpace(fileName) ? "unknown_file.dat" : Utilities.SanitizeFileName(fileName);
+        }
+
+        public async Task<bool> DownloadWithYtDlpAsync(string url, string? formatSelection, string tempDownloadFolder, string finalDestinationFolder, bool extractAudio, string audioFormat, bool useTrimming, double trimStartSeconds, double trimEndSeconds, CancellationToken cancellationToken, string? overrideFileName = null, IProgress<DownloadProgressArgs>? progressCallback = null)
+        {
+            if (!_dependencyManager.IsYtDlpReady)
+            {
+                throw new Exception("yt-dlp is not available.");
+            }
+
+            url = CleanUrl(url);
+
+            // If it's a Spotify / search query, prepare multi-attempt search queries
+            if (url.StartsWith("ytsearch", StringComparison.OrdinalIgnoreCase))
+            {
+                var searchQueries = new List<string> { url };
+                foreach (var fallback in GenerateFallbackSearchQueries(url))
+                {
+                    if (!searchQueries.Contains(fallback))
+                    {
+                        searchQueries.Add(fallback);
+                    }
+                }
+
+                Exception? lastSearchEx = null;
+                foreach (var query in searchQueries)
+                {
+                    try
+                    {
+                        return await ExecuteYtDlpDownloadAsync(query, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, null, progressCallback);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastSearchEx = ex;
+                        Debug.WriteLine($"Search attempt '{query}' failed: {ex.Message}");
+                    }
+                }
+
+                throw lastSearchEx ?? new Exception("No search results found on YouTube.");
+            }
+
+            // Direct TikTok no-watermark extraction
+            if (IsTikTokLink(url) && !useTrimming)
+            {
+                try
+                {
+                    var mediaInfo = await _tikTokExtractor.ExtractTikTokMediaAsync(url);
+                    if (mediaInfo != null)
+                    {
+                        string? targetUrl = extractAudio && !string.IsNullOrWhiteSpace(mediaInfo.DirectAudioUrl)
+                            ? mediaInfo.DirectAudioUrl
+                            : mediaInfo.DirectVideoUrl;
+
+                        if (!string.IsNullOrWhiteSpace(targetUrl))
+                        {
+                            string title = !string.IsNullOrWhiteSpace(overrideFileName) ? overrideFileName : (mediaInfo.Title ?? "TikTok Video");
+                            string ext = extractAudio ? (audioFormat ?? "mp3") : "mp4";
+                            string cleanName = Utilities.SanitizeFileName(title);
+                            if (!cleanName.EndsWith("." + ext, StringComparison.OrdinalIgnoreCase)) cleanName += "." + ext;
+
+                            await DownloadDirectFileAsync(targetUrl, tempDownloadFolder, finalDestinationFolder, cancellationToken, null, cleanName);
+                            return true;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Direct TikTok download fallback failed: {ex.Message}");
+                }
+            }
+
+            try
+            {
+                return await ExecuteYtDlpDownloadAsync(url, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, null);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                if (IsInstagramLink(url))
+                {
+                    // Attempt 1: Fast direct HTTP extraction fallback (SnapSave / SaveIG API)
+                    var (directMediaUrl, referer) = await TryExtractInstagramDirectUrlAsync(url);
+                    if (!string.IsNullOrWhiteSpace(directMediaUrl))
+                    {
+                        try
+                        {
+                            var headers = new Dictionary<string, string>();
+                            if (!string.IsNullOrWhiteSpace(referer))
+                            {
+                                headers["Referer"] = referer;
+                            }
+                            await DownloadDirectFileAsync(directMediaUrl, tempDownloadFolder, finalDestinationFolder, cancellationToken, headers);
+                            return true;
+                        }
+                        catch (Exception directEx)
+                        {
+                            Debug.WriteLine($"Direct Instagram download fallback failed: {directEx.Message}");
+                        }
+                    }
+
+                    // Attempt 2: Browser cookies fallback
+                    string[] browsers = new[] { "chrome", "edge", "firefox", "brave", "opera", "vivaldi" };
+                    foreach (var browser in browsers)
+                    {
+                        try
+                        {
+                            return await ExecuteYtDlpDownloadAsync(url, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, browser);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch { /* best effort */ }
+                    }
+
+                    throw new Exception("Instagram requires login for this video. Log in to Instagram in your browser (Chrome/Edge/Firefox) or verify the link.");
+                }
+
+                // For YouTube and other platform links: Attempt browser cookies fallback if unauthenticated client throttled or blocked
+                string[] browserList = new[] { "chrome", "edge", "firefox", "brave", "opera", "vivaldi" };
+                foreach (var browser in browserList)
+                {
+                    try
+                    {
+                        return await ExecuteYtDlpDownloadAsync(url, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, browser);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch { /* best effort */ }
+                }
+
+                // If specific format failed, retry with robust unified format "best" / "bestaudio"
+                try
+                {
+                    string fallbackFormat = extractAudio ? "bestaudio/best" : "best";
+                    return await ExecuteYtDlpDownloadAsync(url, fallbackFormat, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, null);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch { /* best effort */ }
+
+                throw;
+            }
+        }
+
+        private static IEnumerable<string> GenerateFallbackSearchQueries(string originalQuery)
+        {
+            if (!originalQuery.StartsWith("ytsearch", StringComparison.OrdinalIgnoreCase))
+            {
+                yield break;
+            }
+
+            int colonIdx = originalQuery.IndexOf(':');
+            if (colonIdx < 0 || colonIdx >= originalQuery.Length - 1)
+            {
+                yield break;
+            }
+
+            string prefix = originalQuery.Substring(0, colonIdx + 1);
+            string text = originalQuery.Substring(colonIdx + 1).Trim();
+
+            // Clean 1: Strip special punctuation, emojis, quotes, symbols
+            string clean = Regex.Replace(text, @"[^\w\s\-\.\,\(\)\[\]]", " ", RegexOptions.Compiled);
+            clean = Regex.Replace(clean, @"\s+", " ").Trim();
+
+            if (!string.Equals(clean, text, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(clean))
+            {
+                yield return $"{prefix}{clean}";
+            }
+
+            // Clean 2: If contains " - ", split primary artist and clean title
+            if (text.Contains(" - "))
+            {
+                var parts = text.Split(new[] { " - " }, 2, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 2)
+                {
+                    string rawArtist = parts[0].Trim();
+                    string rawTitle = parts[1].Trim();
+
+                    // Extract primary artist before comma, &, feat, ft.
+                    string primaryArtist = Regex.Split(rawArtist, @",|&|\bfeat\.?|\bft\.?", RegexOptions.IgnoreCase)[0].Trim();
+
+                    // Clean title removing (feat. ...), [Official ...], etc.
+                    string cleanTitle = Regex.Replace(rawTitle, @"\((?:feat\.?|ft\.?|official|video|audio|lyrics|extended|prod\.?).*?\)", "", RegexOptions.IgnoreCase);
+                    cleanTitle = Regex.Replace(cleanTitle, @"\[(?:feat\.?|ft\.?|official|video|audio|lyrics|extended|prod\.?).*?\]", "", RegexOptions.IgnoreCase);
+                    cleanTitle = Regex.Replace(cleanTitle, @"[^\w\s\-]", " ", RegexOptions.Compiled);
+                    cleanTitle = Regex.Replace(cleanTitle, @"\s+", " ").Trim();
+
+                    if (!string.IsNullOrWhiteSpace(primaryArtist) && !string.IsNullOrWhiteSpace(cleanTitle))
+                    {
+                        yield return $"{prefix}{primaryArtist} {cleanTitle}";
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(cleanTitle) && cleanTitle.Length > 2)
+                    {
+                        yield return $"{prefix}{cleanTitle}";
+                    }
+                }
+            }
+        }
+
+        public async Task<(string? DirectUrl, string? Referer)> TryExtractInstagramDirectUrlAsync(string instagramUrl)
+        {
+            string cleanUrl = CleanUrl(instagramUrl).Replace("/reels/", "/reel/");
+
+            // Provider 1: SnapSave (snapsave.app) with JS Unpacker
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, "https://snapsave.app/action.php");
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+                request.Headers.Add("Origin", "https://snapsave.app");
+                request.Headers.Add("Referer", "https://snapsave.app/");
+                request.Content = new FormUrlEncodedContent(new[]
+                {
+                    new KeyValuePair<string, string>("url", cleanUrl)
+                });
+
+                using (var response = await _httpClient.SendAsync(request))
+                {
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string jsText = await response.Content.ReadAsStringAsync();
+                        string? html = DecodeSnapSaveJs(jsText);
+                        if (string.IsNullOrWhiteSpace(html)) html = jsText;
+
+                        var match = Regex.Match(html, @"href=\\?""(https://[^""\\]*rapidcdn\.app[^""\\]*)\\?""", RegexOptions.IgnoreCase);
+                        if (!match.Success) match = Regex.Match(html, @"href=\\?""(https://[^""\\]+\.mp4[^""\\]*)\\?""", RegexOptions.IgnoreCase);
+                        if (!match.Success) match = Regex.Match(html, @"href=\\?""(https://[^""\\]*cdninstagram[^""\\]*)\\?""", RegexOptions.IgnoreCase);
+                        if (!match.Success) match = Regex.Match(html, @"href=\\?""(https://[^""\\]+)\\?""", RegexOptions.IgnoreCase);
+
+                        if (match.Success)
+                        {
+                            string link = System.Net.WebUtility.HtmlDecode(match.Groups[1].Value);
+                            return (link, "https://snapsave.app/");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"SnapSave extraction error: {ex.Message}");
+            }
+
+            // Provider 2: SaveIG (saveig.app)
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, "https://saveig.app/api/ajaxSearch");
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+                request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+                request.Headers.Add("Origin", "https://saveig.app");
+                request.Headers.Add("Referer", "https://saveig.app/");
+                request.Content = new FormUrlEncodedContent(new[]
+                {
+                    new KeyValuePair<string, string>("q", cleanUrl),
+                    new KeyValuePair<string, string>("t", "media"),
+                    new KeyValuePair<string, string>("lang", "en")
+                });
+
+                using (var response = await _httpClient.SendAsync(request))
+                {
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string json = await response.Content.ReadAsStringAsync();
+                        var obj = Newtonsoft.Json.Linq.JObject.Parse(json);
+                        string? htmlData = obj["data"]?.ToString();
+                        if (!string.IsNullOrWhiteSpace(htmlData))
+                        {
+                            var match = Regex.Match(htmlData, @"href=""([^""]*download\.php[^""]*)""", RegexOptions.IgnoreCase);
+                            if (!match.Success) match = Regex.Match(htmlData, @"href=""([^""]+\.mp4[^""]*)""", RegexOptions.IgnoreCase);
+                            if (!match.Success) match = Regex.Match(htmlData, @"href=""([^""]*cdninstagram[^""]*)""", RegexOptions.IgnoreCase);
+
+                            if (match.Success)
+                            {
+                                string link = match.Groups[1].Value;
+                                if (link.StartsWith("/")) link = "https://saveig.app" + link;
+                                return (link, "https://saveig.app/");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"SaveIG extraction error: {ex.Message}");
+            }
+
+            return (null, null);
+        }
+
+        private static string? DecodeSnapSaveJs(string jsText)
+        {
+            try
+            {
+                var m = Regex.Match(jsText, @"\}\s*\(\s*""([^""]*)""\s*,\s*(\d+)\s*,\s*""([^""]*)""\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)");
+                if (!m.Success) return null;
+
+                string h = m.Groups[1].Value;
+                int u = int.Parse(m.Groups[2].Value);
+                string n = m.Groups[3].Value;
+                int t = int.Parse(m.Groups[4].Value);
+                int e = int.Parse(m.Groups[5].Value);
+
+                char delim = n[e];
+                var sb = new System.Text.StringBuilder();
+
+                string[] tokens = h.Split(delim);
+                foreach (string rawS in tokens)
+                {
+                    if (string.IsNullOrEmpty(rawS)) continue;
+
+                    long val = 0;
+                    long multiplier = 1;
+
+                    for (int idx = rawS.Length - 1; idx >= 0; idx--)
+                    {
+                        int pos = n.IndexOf(rawS[idx]);
+                        if (pos >= 0)
+                        {
+                            val += pos * multiplier;
+                        }
+                        multiplier *= e;
+                    }
+
+                    long decodedVal = val - t;
+                    sb.Append((char)decodedVal);
+                }
+
+                return sb.ToString();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"SnapSave JS decode error: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task<bool> ExecuteYtDlpDownloadAsync(string url, string? formatSelection, string tempDownloadFolder, string finalDestinationFolder, bool extractAudio, string audioFormat, bool useTrimming, double trimStartSeconds, double trimEndSeconds, CancellationToken cancellationToken, string? overrideFileName, string? cookiesFromBrowser, IProgress<DownloadProgressArgs>? progressCallback = null)
+        {
+            CleanDirectory(tempDownloadFolder);
+
+            // Apply filename template (defaults to {title} -> %(title)s.%(ext)s)
+            string baseFileNameTemplate = ConvertTemplateToYtDlp(CustomFilenameTemplate);
+            if (IsKnownAudioPlatformLink(url) && extractAudio && (string.IsNullOrWhiteSpace(CustomFilenameTemplate) || CustomFilenameTemplate == "{title}"))
+            {
+                baseFileNameTemplate = "%(artist)s - %(title)s.%(ext)s";
+            }
+            string outputTemplate = Path.Combine(tempDownloadFolder, baseFileNameTemplate);
+
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = _dependencyManager.YtDlpExecutablePath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = System.Text.Encoding.UTF8,
+                StandardErrorEncoding = System.Text.Encoding.UTF8
+            };
+
+            psi.ArgumentList.Add("-o");
+            psi.ArgumentList.Add(outputTemplate);
+
+            if (extractAudio)
+            {
+                psi.ArgumentList.Add("--extract-audio");
+                psi.ArgumentList.Add("--audio-format");
+                psi.ArgumentList.Add(audioFormat);
+                psi.ArgumentList.Add("--audio-quality");
+                psi.ArgumentList.Add("0");
+                psi.ArgumentList.Add("-f");
+                psi.ArgumentList.Add(string.IsNullOrWhiteSpace(formatSelection) ? "bestaudio/best" : formatSelection);
+            }
+            else
+            {
+                psi.ArgumentList.Add("-f");
+                psi.ArgumentList.Add(formatSelection ?? "bestvideo+bestaudio/best");
+                psi.ArgumentList.Add("--merge-output-format");
+                psi.ArgumentList.Add("mp4");
+            }
+
+            psi.ArgumentList.Add("--no-playlist");
+            psi.ArgumentList.Add("--progress");
+            psi.ArgumentList.Add("--newline");
+            psi.ArgumentList.Add("--no-warnings");
+            psi.ArgumentList.Add("--ignore-config");
+            psi.ArgumentList.Add("--retries");
+            psi.ArgumentList.Add("10");
+            psi.ArgumentList.Add("--fragment-retries");
+            psi.ArgumentList.Add("10");
+            psi.ArgumentList.Add("--file-access-retries");
+            psi.ArgumentList.Add("5");
+            psi.ArgumentList.Add("--extractor-args");
+            psi.ArgumentList.Add("youtube:player_client=android,web");
+
+            if (EnableMultiConnectionAcceleration)
+            {
+                psi.ArgumentList.Add("--concurrent-fragments");
+                psi.ArgumentList.Add("4");
+            }
+
+            if (!string.IsNullOrWhiteSpace(cookiesFromBrowser))
+            {
+                psi.ArgumentList.Add("--cookies-from-browser");
+                psi.ArgumentList.Add(cookiesFromBrowser);
+            }
+
+            string ffmpegDir = AppContext.BaseDirectory;
+            if (File.Exists(Path.Combine(ffmpegDir, "ffmpeg.exe")) || _dependencyManager.IsFfmpegReady)
+            {
+                psi.ArgumentList.Add("--ffmpeg-location");
+                psi.ArgumentList.Add(ffmpegDir);
+            }
+
+            psi.ArgumentList.Add(url);
+            psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+
+            bool progressStarted = false;
+            double lastPercentage = 0;
+            var stderrOutput = new System.Text.StringBuilder();
+
+            using (Process process = new Process { StartInfo = psi, EnableRaisingEvents = true })
+            {
+                process.OutputDataReceived += (s, e) =>
+                {
+                    if (e.Data != null)
+                    {
+                        ParseYtDlpProgress(e.Data, ref progressStarted, ref lastPercentage, progressCallback);
+                    }
+                };
+                
+                process.ErrorDataReceived += (s, e) =>
+                {
+                    if (e.Data != null)
+                    {
+                        stderrOutput.AppendLine(e.Data);
+                        if (useTrimming && e.Data.Contains("time="))
+                        {
+                            ParseFfmpegProgress(e.Data, trimStartSeconds, trimEndSeconds, ref lastPercentage);
+                        }
+                        else if (!e.Data.Contains("[debug]") && !useTrimming)
+                        {
+                            Debug.WriteLine($"yt-dlp stderr: {e.Data}");
+                        }
+                    }
+                };
+
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                try
+                {
+                    await process.WaitForExitAsync(cancellationToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    if (!process.HasExited) process.Kill(true);
+                    CleanDirectory(tempDownloadFolder);
+                    throw new OperationCanceledException();
+                }
+                catch (Exception)
+                {
+                    if (!process.HasExited) process.Kill(true);
+                    CleanDirectory(tempDownloadFolder);
+                    throw;
+                }
+
+                if (process.ExitCode == 0)
+                {
+                    string[] downloadedFiles = Directory.GetFiles(tempDownloadFolder);
+                    if (downloadedFiles.Length > 0)
+                    {
+                        string downloadedFile = downloadedFiles[0];
+                        string extension = Path.GetExtension(downloadedFile);
+                        
+                        if (!string.IsNullOrWhiteSpace(overrideFileName))
+                        {
+                            string sanitized = Utilities.SanitizeFileName(overrideFileName);
+                            string newFileName = sanitized;
+                            if (!newFileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+                            {
+                                newFileName += extension;
+                            }
+                            string newFilePath = Path.Combine(tempDownloadFolder, newFileName);
+                            try
+                            {
+                                if (string.Compare(downloadedFile, newFilePath, StringComparison.OrdinalIgnoreCase) != 0)
+                                {
+                                    if (File.Exists(newFilePath))
+                                    {
+                                        File.Delete(newFilePath);
+                                    }
+                                    File.Move(downloadedFile, newFilePath);
+                                }
+                                downloadedFile = newFilePath;
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"Failed to rename downloaded file to override name: {ex.Message}");
+                            }
+                        }
+
+                        if (useTrimming && trimEndSeconds > trimStartSeconds)
+                        {
+                            await TrimLocalVideoAsync(downloadedFile, finalDestinationFolder, extractAudio, audioFormat, trimStartSeconds, trimEndSeconds, cancellationToken);
+                        }
+                        else
+                        {
+                            CopyToFinalDestinationAndClean(tempDownloadFolder, finalDestinationFolder, url);
+                        }
+                    }
+                    else
+                    {
+                        throw new Exception("No downloaded files found in the temporary folder.");
+                    }
+                }
+                else
+                {
+                    CleanDirectory(tempDownloadFolder);
+                    string errorMsg = stderrOutput.ToString();
+                    var errorLines = errorMsg.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                                           .Where(line => line.ToLower().Contains("error") || line.ToLower().Contains("failed"))
+                                           .Take(3)
+                                           .ToArray();
+                    string details = errorLines.Length > 0 ? string.Join("; ", errorLines) : "Unknown error";
+                    throw new Exception($"yt-dlp failed (exit code {process.ExitCode}): {details}");
+                }
+
+                return process.ExitCode == 0;
+            }
+        }
+
+        private void CleanDirectory(string path)
+        {
+            try
+            {
+                if (Directory.Exists(path))
+                {
+                    foreach (var file in Directory.GetFiles(path))
+                    {
+                        try { File.Delete(file); } catch { }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void CopyToFinalDestinationAndClean(string tempDownloadFolder, string finalDestinationFolder, string sourceUrl = "")
+        {
+            if (!Directory.Exists(finalDestinationFolder))
+            {
+                Directory.CreateDirectory(finalDestinationFolder);
+            }
+
+            string[] files = Directory.GetFiles(tempDownloadFolder);
+            foreach (var sourceFile in files)
+            {
+                string fileName = Path.GetFileName(sourceFile);
+                string destFile = Path.Combine(finalDestinationFolder, fileName);
+                
+                ReportProgress("Copying to destination...", fileName, 100, true);
+                File.Copy(sourceFile, destFile, true);
+                
+                try { File.Delete(sourceFile); } catch { }
+
+                try
+                {
+                    FileDownloaded?.Invoke(destFile, sourceUrl);
+                }
+                catch { }
+            }
+        }
+
+        public async Task<SpotifyMetadata?> GetSpotifyMetadataAsync(string url)
+        {
+            var match = Regex.Match(url, @"/track/([a-zA-Z0-9]+)", RegexOptions.IgnoreCase);
+            if (!match.Success) return null;
+            string trackId = match.Groups[1].Value;
+
+            string? oEmbedTitle = null;
+            string? oEmbedArtist = null;
+
+            // Layer 1: oEmbed Endpoint
+            try
+            {
+                string oEmbedUrl = $"https://open.spotify.com/oembed?url={Uri.EscapeDataString(url)}";
+                using (var request = new HttpRequestMessage(HttpMethod.Get, oEmbedUrl))
+                {
+                    request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string jsonStr = await response.Content.ReadAsStringAsync();
+                            var jObj = JObject.Parse(jsonStr);
+                            oEmbedTitle = jObj["title"]?.ToString()?.Trim();
+                            oEmbedArtist = jObj["author_name"]?.ToString()?.Trim();
+
+                            if (!string.IsNullOrWhiteSpace(oEmbedTitle))
+                            {
+                                if (string.IsNullOrWhiteSpace(oEmbedArtist))
+                                {
+                                    if (oEmbedTitle.Contains(" - "))
+                                    {
+                                        var parts = oEmbedTitle.Split(new[] { " - " }, StringSplitOptions.RemoveEmptyEntries);
+                                        if (parts.Length >= 2)
+                                        {
+                                            oEmbedArtist = parts[0].Trim();
+                                            oEmbedTitle = parts[1].Trim();
+                                        }
+                                    }
+                                    else if (oEmbedTitle.Contains(" by "))
+                                    {
+                                        var parts = oEmbedTitle.Split(new[] { " by " }, StringSplitOptions.RemoveEmptyEntries);
+                                        if (parts.Length >= 2)
+                                        {
+                                            oEmbedTitle = parts[0].Trim();
+                                            oEmbedArtist = parts[1].Trim();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Layer 1 (oEmbed) failed: {ex.Message}");
+            }
+
+            // Layer 2: initialState base64 parsing (from main track page)
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+                {
+                    request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+                    request.Headers.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string html = await response.Content.ReadAsStringAsync();
+                            var scriptMatch = Regex.Match(html, @"<script\s+id=""initialState""\s+type=""text/plain""[^>]*>(.*?)</script>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                            if (scriptMatch.Success)
+                            {
+                                string base64 = scriptMatch.Groups[1].Value.Trim();
+                                byte[] bytes = Convert.FromBase64String(base64);
+                                string jsonStr = System.Text.Encoding.UTF8.GetString(bytes);
+                                var jObj = JObject.Parse(jsonStr);
+
+                                // Find trackEntity at entities.items["spotify:track:{trackId}"]
+                                string entityKey = $"spotify:track:{trackId}";
+                                var trackEntity = jObj["entities"]?["items"]?[entityKey];
+                                if (trackEntity != null)
+                                {
+                                    string? title = trackEntity["name"]?.ToString()?.Trim();
+                                    
+                                    // Primary artist
+                                    string? primaryArtist = trackEntity["firstArtist"]?["items"]?[0]?["profile"]?["name"]?.ToString()?.Trim();
+                                    
+                                    // Other artists
+                                    var otherArtistsList = new List<string>();
+                                    var otherArtistsArray = trackEntity["otherArtists"]?["items"] as JArray;
+                                    if (otherArtistsArray != null)
+                                    {
+                                        foreach (var artistItem in otherArtistsArray)
+                                        {
+                                            string? name = artistItem["profile"]?["name"]?.ToString()?.Trim();
+                                            if (!string.IsNullOrWhiteSpace(name))
+                                            {
+                                                otherArtistsList.Add(name);
+                                            }
+                                        }
+                                    }
+
+                                    if (!string.IsNullOrWhiteSpace(title))
+                                    {
+                                        string artistStr = primaryArtist ?? "Unknown Artist";
+                                        if (otherArtistsList.Count > 0)
+                                        {
+                                            artistStr = $"{artistStr}, {string.Join(", ", otherArtistsList)}";
+                                        }
+
+                                        return new SpotifyMetadata
+                                        {
+                                            Title = title,
+                                            Artist = artistStr,
+                                            TrackId = trackId
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Layer 2 (initialState) failed: {ex.Message}");
+            }
+
+            // Layer 3: Embed Widget Scraper (__NEXT_DATA__)
+            try
+            {
+                string embedUrl = $"https://open.spotify.com/embed/track/{trackId}";
+                using (var request = new HttpRequestMessage(HttpMethod.Get, embedUrl))
+                {
+                    request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string html = await response.Content.ReadAsStringAsync();
+                            var jsonMatch = Regex.Match(html, @"<script\s+id=""__NEXT_DATA__""\s+type=""application/json""[^>]*>(.*?)</script>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                            if (jsonMatch.Success)
+                            {
+                                string jsonStr = jsonMatch.Groups[1].Value.Trim();
+                                var jObj = JObject.Parse(jsonStr);
+                                var pageProps = jObj["props"]?["pageProps"];
+                                if (pageProps != null)
+                                {
+                                    var entity = pageProps["state"]?["data"]?["entity"] ?? pageProps["state"]?["entity"];
+                                    string? title = entity?["name"]?.ToString() ?? entity?["title"]?.ToString() ?? pageProps["name"]?.ToString() ?? pageProps["title"]?.ToString();
+                                    
+                                    string? artist = null;
+                                    var artistsArray = (entity?["artists"] ?? pageProps["artists"]) as JArray;
+                                    if (artistsArray != null && artistsArray.Count > 0)
+                                    {
+                                        var artistNames = new List<string>();
+                                        foreach (var art in artistsArray)
+                                        {
+                                            string? name = art?["name"]?.ToString()?.Trim();
+                                            if (!string.IsNullOrWhiteSpace(name)) artistNames.Add(name);
+                                        }
+                                        if (artistNames.Count > 0) artist = string.Join(", ", artistNames);
+                                    }
+                                    
+                                    artist = artist ?? entity?["subtitle"]?.ToString() ?? entity?["author_name"]?.ToString() ?? pageProps["author_name"]?.ToString();
+
+                                    if (!string.IsNullOrWhiteSpace(title))
+                                    {
+                                        return new SpotifyMetadata
+                                        {
+                                            Title = title.Trim(),
+                                            Artist = !string.IsNullOrWhiteSpace(artist) ? artist.Trim() : "Unknown Artist",
+                                            TrackId = trackId
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Layer 3 (Embed Widget) failed: {ex.Message}");
+            }
+
+            // Layer 4: HTML title / description meta tags on main track page
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+                {
+                    request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+                    request.Headers.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string html = await response.Content.ReadAsStringAsync();
+                            var titleMatch = Regex.Match(html, @"<title[^>]*>(.*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                            var ogTitleMatch = Regex.Match(html, @"<meta\s+property=""og:title""\s+content=""([^""]+)""", RegexOptions.IgnoreCase);
+                            var ogDescMatch = Regex.Match(html, @"<meta\s+property=""og:description""\s+content=""([^""]+)""", RegexOptions.IgnoreCase);
+                            
+                            string? scrapedTitle = null;
+                            if (ogTitleMatch.Success) scrapedTitle = System.Net.WebUtility.HtmlDecode(ogTitleMatch.Groups[1].Value.Trim());
+                            else if (titleMatch.Success) scrapedTitle = System.Net.WebUtility.HtmlDecode(titleMatch.Groups[1].Value.Trim());
+
+                            if (!string.IsNullOrWhiteSpace(scrapedTitle))
+                            {
+                                // Remove general Spotify postfixes if present in title
+                                if (scrapedTitle.EndsWith(" | Spotify", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    scrapedTitle = scrapedTitle.Substring(0, scrapedTitle.Length - " | Spotify".Length).Trim();
+                                }
+
+                                string artist = "Unknown Artist";
+                                if (ogDescMatch.Success)
+                                {
+                                    string ogDesc = System.Net.WebUtility.HtmlDecode(ogDescMatch.Groups[1].Value.Trim());
+                                    var songDotMatch = Regex.Match(ogDesc, @"Song\s+·\s+(.+?)\s+·\s+\d{4}", RegexOptions.IgnoreCase);
+                                    var byMatch = Regex.Match(ogDesc, @"Song by\s+(.+?)(?:\s+on\s+|\s+·|\s*$)", RegexOptions.IgnoreCase);
+                                    if (songDotMatch.Success) artist = songDotMatch.Groups[1].Value;
+                                    else if (byMatch.Success) artist = byMatch.Groups[1].Value;
+                                    else
+                                    {
+                                        var parts = ogDesc.Split(new[] { " · ", " - " }, StringSplitOptions.RemoveEmptyEntries);
+                                        if (parts.Length > 0) artist = parts[0];
+                                    }
+                                }
+
+                                // Check if title regex matches the English style "scrapedTitle - song and lyrics by artist | Spotify"
+                                // or Russian style "scrapedTitle - песня и текст от artist | Spotify"
+                                var songByMatch = Regex.Match(scrapedTitle, @"^(?<title>.*?) - song (?:and lyrics )?by (?<artist>.*?)$", RegexOptions.IgnoreCase);
+                                if (songByMatch.Success)
+                                {
+                                    scrapedTitle = songByMatch.Groups["title"].Value.Trim();
+                                    artist = songByMatch.Groups["artist"].Value.Trim();
+                                }
+
+                                return new SpotifyMetadata
+                                {
+                                    Title = scrapedTitle,
+                                    Artist = artist,
+                                    TrackId = trackId
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Layer 4 failed: {ex.Message}");
+            }
+
+            // Layer 5 Fallback: oEmbed
+            if (!string.IsNullOrWhiteSpace(oEmbedTitle))
+            {
+                return new SpotifyMetadata
+                {
+                    Title = oEmbedTitle,
+                    Artist = !string.IsNullOrWhiteSpace(oEmbedArtist) ? oEmbedArtist : "Unknown Artist",
+                    TrackId = trackId
+                };
+            }
+
+            return null;
+        }
+
+        public class SpotifyMetadata
+        {
+            public string Title { get; set; } = "";
+            public string Artist { get; set; } = "";
+            public string TrackId { get; set; } = "";
+        }
+
+        public class SpotifyPlaylistMetadata
+        {
+            public string Name { get; set; } = "";
+            public string Type { get; set; } = ""; // "playlist" or "album"
+            public List<SpotifyTrack> Tracks { get; set; } = new List<SpotifyTrack>();
+        }
+
+        public class SpotifyTrack
+        {
+            public string Title { get; set; } = "";
+            public string Artist { get; set; } = "";
+            public string Uri { get; set; } = "";
+        }
+
+        public bool IsSpotifyPlaylistOrAlbumLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"open\.spotify\.com/(playlist|album)/", RegexOptions.IgnoreCase);
+        }
+
+        public async Task<string?> GetSpotifyDeveloperTokenAsync(string clientId, string clientSecret)
+        {
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Post, "https://accounts.spotify.com/api/token"))
+                {
+                    var keyValues = new List<KeyValuePair<string, string>>
+                    {
+                        new KeyValuePair<string, string>("grant_type", "client_credentials")
+                    };
+                    request.Content = new FormUrlEncodedContent(keyValues);
+                    
+                    string credentials = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}"));
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+                    
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string json = await response.Content.ReadAsStringAsync();
+                            var jObj = JObject.Parse(json);
+                            return jObj["access_token"]?.ToString();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to get developer token: {ex.Message}");
+            }
+            return null;
+        }
+
+
+
+        public async Task<SpotifyPlaylistMetadata?> GetSpotifyPlaylistMetadataFromScrapingAsync(string type, string id)
+        {
+            string embedUrl = $"https://open.spotify.com/embed/{type}/{id}";
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, embedUrl))
+                {
+                    request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string html = await response.Content.ReadAsStringAsync();
+                            var match = Regex.Match(html, @"<script\s+id=""__NEXT_DATA__""\s+type=""application/json""[^>]*>(.*?)</script>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                            if (match.Success)
+                            {
+                                string jsonStr = match.Groups[1].Value.Trim();
+                                var jObj = JObject.Parse(jsonStr);
+                                var pageProps = jObj["props"]?["pageProps"];
+                                var entity = pageProps?["state"]?["data"]?["entity"] ?? pageProps?["state"]?["entity"];
+                                
+                                string name = entity?["name"]?.ToString() ?? entity?["title"]?.ToString() ?? pageProps?["name"]?.ToString() ?? pageProps?["title"]?.ToString() ?? (type == "playlist" ? "Spotify Playlist" : "Spotify Album");
+                                
+                                var metadata = new SpotifyPlaylistMetadata
+                                {
+                                    Name = name,
+                                    Type = type,
+                                    Tracks = new List<SpotifyTrack>()
+                                };
+
+                                var trackList = entity?["trackList"] as JArray;
+                                if (trackList != null)
+                                {
+                                    foreach (var item in trackList)
+                                    {
+                                        string? trackTitle = item["title"]?.ToString();
+                                        string? trackArtist = item["subtitle"]?.ToString() ?? item["artist"]?.ToString();
+                                        string? trackUri = item["uri"]?.ToString();
+                                        
+                                        if (!string.IsNullOrEmpty(trackTitle))
+                                        {
+                                            metadata.Tracks.Add(new SpotifyTrack
+                                            {
+                                                Title = trackTitle,
+                                                Artist = string.IsNullOrEmpty(trackArtist) ? "Unknown Artist" : trackArtist,
+                                                Uri = trackUri ?? ""
+                                            });
+                                        }
+                                    }
+                                }
+                                
+                                return metadata;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Spotify playlist scraping failed: {ex.Message}");
+            }
+            return null;
+        }
+
+        public async Task<SpotifyPlaylistMetadata?> GetSpotifyPlaylistMetadataAsync(string url, string? userToken, string? clientId, string? clientSecret)
+        {
+            var match = Regex.Match(url, @"open\.spotify\.com/(playlist|album)/([a-zA-Z0-9]+)", RegexOptions.IgnoreCase);
+            if (!match.Success) return null;
+
+            string type = match.Groups[1].Value.ToLower();
+            string id = match.Groups[2].Value;
+
+            string? token = null;
+
+            // 1. Try User Account Token if valid
+            if (!string.IsNullOrEmpty(userToken))
+            {
+                token = userToken;
+            }
+            // 2. Try Developer Client Credentials Flow
+            else if (!string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(clientSecret))
+            {
+                token = await GetSpotifyDeveloperTokenAsync(clientId, clientSecret);
+            }
+
+            // 3. If token is available, use API Mode
+            if (!string.IsNullOrEmpty(token))
+            {
+                try
+                {
+                    string name = type == "playlist" ? "Spotify Playlist" : "Spotify Album";
+                    using (var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.spotify.com/v1/{type}s/{id}"))
+                    {
+                        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                        using (var response = await _httpClient.SendAsync(request))
+                        {
+                            string body = await response.Content.ReadAsStringAsync();
+                            Debug.WriteLine($"[Spotify {type}] GET /{type}s/{id}: HTTP {(int)response.StatusCode}, Body={body.Substring(0, Math.Min(300, body.Length))}");
+                            if (response.IsSuccessStatusCode)
+                            {
+                                var jObj = JObject.Parse(body);
+                                name = jObj["name"]?.ToString() ?? name;
+                            }
+                            else
+                            {
+                                // Token is invalid, expired, or insufficient scope — fall through to scraping
+                                Debug.WriteLine($"[Spotify] Playlist metadata fetch failed: {body}. Falling back to scraping.");
+                                return await GetSpotifyPlaylistMetadataFromScrapingAsync(type, id);
+                            }
+                        }
+                    }
+
+                    var metadata = new SpotifyPlaylistMetadata
+                    {
+                        Name = name,
+                        Type = type,
+                        Tracks = new List<SpotifyTrack>()
+                    };
+
+                    int offset = 0;
+                    int limit = (type == "playlist") ? 100 : 50;
+                    bool hasMore = true;
+
+                    while (hasMore)
+                    {
+                        string tracksUrl = $"https://api.spotify.com/v1/{type}s/{id}/tracks?offset={offset}&limit={limit}";
+                        using (var request = new HttpRequestMessage(HttpMethod.Get, tracksUrl))
+                        {
+                            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                            using (var response = await _httpClient.SendAsync(request))
+                            {
+                                if (!response.IsSuccessStatusCode)
+                                {
+                                    string errBody = await response.Content.ReadAsStringAsync();
+                                    Debug.WriteLine($"[Spotify tracks] HTTP {(int)response.StatusCode}: {errBody}. Falling back to scraping.");
+                                    return await GetSpotifyPlaylistMetadataFromScrapingAsync(type, id);
+                                }
+
+                                var jObj = JObject.Parse(await response.Content.ReadAsStringAsync());
+                                var items = jObj["items"] as JArray;
+                                if (items == null || items.Count == 0)
+                                {
+                                    hasMore = false;
+                                    break;
+                                }
+
+                                foreach (var item in items)
+                                {
+                                    string title = "";
+                                    string artist = "";
+                                    string trackUri = "";
+
+                                    if (type == "playlist")
+                                    {
+                                        var trackObj = item["track"];
+                                        if (trackObj != null)
+                                        {
+                                            title = trackObj["name"]?.ToString() ?? "";
+                                            trackUri = trackObj["uri"]?.ToString() ?? "";
+                                            var artistsList = new List<string>();
+                                            var artistsArr = trackObj["artists"] as JArray;
+                                            if (artistsArr != null)
+                                            {
+                                                foreach (var art in artistsArr)
+                                                {
+                                                    string? aName = art["name"]?.ToString();
+                                                    if (!string.IsNullOrEmpty(aName)) artistsList.Add(aName);
+                                                }
+                                            }
+                                            artist = string.Join(", ", artistsList);
+                                        }
+                                    }
+                                    else // album
+                                    {
+                                        title = item["name"]?.ToString() ?? "";
+                                        trackUri = item["uri"]?.ToString() ?? "";
+                                        var artistsList = new List<string>();
+                                        var artistsArr = item["artists"] as JArray;
+                                        if (artistsArr != null)
+                                        {
+                                            foreach (var art in artistsArr)
+                                            {
+                                                string? aName = art["name"]?.ToString();
+                                                if (!string.IsNullOrEmpty(aName)) artistsList.Add(aName);
+                                            }
+                                        }
+                                        artist = string.Join(", ", artistsList);
+                                    }
+
+                                    if (!string.IsNullOrEmpty(title))
+                                    {
+                                        metadata.Tracks.Add(new SpotifyTrack
+                                        {
+                                            Title = title,
+                                            Artist = string.IsNullOrEmpty(artist) ? "Unknown Artist" : artist,
+                                            Uri = trackUri
+                                        });
+                                    }
+                                }
+
+                                offset += items.Count;
+                                hasMore = jObj["next"] != null && jObj["next"].Type != JTokenType.Null;
+                            }
+                        }
+                    }
+
+                    return metadata;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Spotify API retrieval failed: {ex.Message}. Falling back to scraping.");
+                }
+            }
+
+            // 4. Fallback to scraping
+            return await GetSpotifyPlaylistMetadataFromScrapingAsync(type, id);
+        }
+
+
+        private void ParseFfmpegProgress(string line, double trimStartSeconds, double trimEndSeconds, ref double lastPercentage)
+        {
+            var match = Regex.Match(line, @"time=(?<time>\d{2}:\d{2}:\d{2}\.\d+)");
+            if (match.Success)
+            {
+                if (TimeSpan.TryParse(match.Groups["time"].Value, out TimeSpan currentTime))
+                {
+                    double currentSeconds = currentTime.TotalSeconds;
+                    double totalSeconds = trimEndSeconds - trimStartSeconds;
+                    
+                    if (totalSeconds > 0)
+                    {
+                        double percentage = (currentSeconds / totalSeconds) * 100;
+                        percentage = Math.Min(100, Math.Max(0, percentage));
+                        
+                        var sizeMatch = Regex.Match(line, @"size=\s*(?<size>\d+[a-zA-Z]+)");
+                        var speedMatch = Regex.Match(line, @"speed=\s*(?<speed>[\d\.]+x)");
+                        
+                        string extraInfo = "";
+                        if (sizeMatch.Success) extraInfo += $" ({sizeMatch.Groups["size"].Value})";
+                        if (speedMatch.Success) extraInfo += $" Speed: {speedMatch.Groups["speed"].Value}";
+                        
+                        if (Math.Abs(percentage - lastPercentage) >= 0.1 || percentage >= 100)
+                        {
+                            var timeSpanCurrent = TimeSpan.FromSeconds(currentSeconds);
+                            var timeSpanTotal = TimeSpan.FromSeconds(totalSeconds);
+                            string currentStr = timeSpanCurrent.ToString(@"mm\:ss");
+                            string totalStr = timeSpanTotal.ToString(@"mm\:ss");
+                            
+                            ReportProgress($"Downloading part: {percentage:F1}% ({currentStr} / {totalStr}){extraInfo}", null, percentage, false);
+                            lastPercentage = percentage;
+                        }
+                    }
+                }
+            }
+        }
+
+        private void ParseYtDlpProgress(string line, ref bool progressStarted, ref double lastPercentage, IProgress<DownloadProgressArgs>? progressCallback = null)
+        {
+            if (string.IsNullOrWhiteSpace(line)) return;
+
+            void EmitProgress(string msg, string? fn, double pct, bool ind)
+            {
+                var args = new DownloadProgressArgs
+                {
+                    StatusMessage = msg,
+                    Filename = fn,
+                    Percentage = pct,
+                    IsIndeterminate = ind
+                };
+                if (progressCallback != null)
+                {
+                    progressCallback.Report(args);
+                }
+                else
+                {
+                    ProgressChanged?.Invoke(this, args);
+                }
+            }
+
+            string dlLabel = "[download]";
+            if (line.StartsWith(dlLabel))
+            {
+                string dlContent = line.Substring(dlLabel.Length).Trim();
+                if (dlContent.StartsWith("Destination:"))
+                {
+                    EmitProgress("Downloading...", null, 0, true);
+                }
+                else if (dlContent.Contains("has already been downloaded"))
+                {
+                    EmitProgress("File already downloaded.", null, 100, false);
+                }
+                else
+                {
+                    var match = Regex.Match(dlContent, @"(?<percent>[\d\.]+)%\s+of(?:\s+~)?\s*(?<size>[\d\.]+[\w]+)(?:\s+at\s+(?<speed>[\d\.]+[\w]+/s))?(?:\s+ETA\s+(?<eta>[\d:]+))?");
+                    if (match.Success)
+                    {
+                        if (double.TryParse(match.Groups["percent"].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double percent))
+                        {
+                            if (percent != lastPercentage)
+                            {
+                                string sizeStr = match.Groups["size"].Value;
+                                string speedStr = match.Groups["speed"].Success ? match.Groups["speed"].Value : "N/A";
+                                string etaStr = match.Groups["eta"].Success ? match.Groups["eta"].Value : "N/A";
+                                EmitProgress($"Downloading: {percent:F1}% of {sizeStr} ({speedStr}) ETA: {etaStr}", null, percent, false);
+                                lastPercentage = percent;
+                            }
+                        }
+                    }
+                }
+            }
+            else if (line.StartsWith("[ExtractAudio]"))
+            {
+                EmitProgress("Extracting audio...", null, 100, true);
+            }
+            else if (line.StartsWith("[Merger]"))
+            {
+                EmitProgress("Merging streams...", null, 100, true);
+            }
+        }
+    }
+}

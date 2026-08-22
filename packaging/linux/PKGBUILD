@@ -1,0 +1,29 @@
+# Maintainer: astymic <astymic@users.noreply.github.com>
+pkgname=universal-downloader-bin
+pkgver=1.0.2
+pkgrel=1
+pkgdesc="Fast, multi-source media and music downloader for YouTube, Spotify, SoundCloud, TikTok, and Instagram"
+arch=('x86_64')
+url="https://github.com/astymic/UniversalDownloader"
+license=('MIT')
+depends=('ffmpeg' 'yt-dlp' 'fontconfig' 'libx11' 'libice' 'libsm' 'libxext')
+optdepends=(
+    'aria2: multi-connection accelerated downloading'
+)
+provides=('universal-downloader')
+conflicts=('universal-downloader')
+source=("https://github.com/astymic/UniversalDownloader/releases/download/v${pkgver}/UniversalDownloader-linux-x64.tar.gz"
+        "universal-downloader.desktop")
+sha256sums=('SKIP' 'SKIP')
+
+package() {
+    install -dm755 "${pkgdir}/usr/lib/universal-downloader"
+    install -dm755 "${pkgdir}/usr/bin"
+    install -dm755 "${pkgdir}/usr/share/applications"
+
+    cp -a "${srcdir}/publish-linux/"* "${pkgdir}/usr/lib/universal-downloader/" || cp -a "${srcdir}/"* "${pkgdir}/usr/lib/universal-downloader/"
+    chmod +x "${pkgdir}/usr/lib/universal-downloader/Universal Downloader"
+
+    ln -s "/usr/lib/universal-downloader/Universal Downloader" "${pkgdir}/usr/bin/universal-downloader"
+    install -Dm644 "${srcdir}/universal-downloader.desktop" "${pkgdir}/usr/share/applications/universal-downloader.desktop"
+}

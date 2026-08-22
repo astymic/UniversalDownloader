@@ -10,9 +10,9 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  build-windows:
+    name: Build Windows Executable
     runs-on: windows-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -22,34 +22,85 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Publish Single-File Executable
+      - name: Publish Windows Executable
         run: |
-          dotnet publish "Downloader/Universal Downloader.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/
+          dotnet publish "Downloader/Universal Downloader.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish-win/
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-binary
+          path: publish-win/*.exe
+
+  build-linux:
+    name: Build Linux Executable & Arch Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish Linux Executable
+        run: |
+          dotnet publish "Downloader.Avalonia/Downloader.Avalonia.csproj" -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o publish-linux/
+          chmod +x "publish-linux/Universal Downloader"
+          tar -czvf UniversalDownloader-linux-x64.tar.gz -C publish-linux .
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-binary
+          path: |
+            UniversalDownloader-linux-x64.tar.gz
+            packaging/linux/PKGBUILD
+            packaging/linux/universal-downloader.desktop
+
+  create-release:
+    name: Publish GitHub Release
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-binary
+          path: release-assets/
+
+      - name: Download Linux Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-binary
+          path: release-assets/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "Universal Downloader ${{ github.ref_name }} — Official Release"
-          files: publish/*.exe
+          name: "Universal Downloader ${{ github.ref_name }} — Official Cross-Platform Release"
+          files: release-assets/*
           body: |
             ## 🚀 Universal Downloader ${{ github.ref_name }}
 
-            A modern, fast, and feature-rich media downloader, converter, and audio identification workstation for Windows.
+            A modern, fast, multi-platform media downloader, converter, and audio identification workstation for **Windows** and **Linux**.
 
             ### ✨ Key Features:
-            * 🔍 **Unified Search Hub** — Search and download music & videos across YouTube & SoundCloud simultaneously.
-            * 🎙️ **Shazam Song Recognition** — Instant 5-second acoustic identification from PC Audio or Microphone with live visualizer.
-            * 📥 **Multi-Platform Downloader** — High-speed downloads from YouTube, Spotify CSV, SoundCloud, Google Drive, and 1,000+ sites.
-            * 📋 **Download Queue Manager** — Batch downloading with pause/resume, retry support, and live queue badges.
+            * 🔍 **Dual-Mode Search Hub** — Smart Multi-Source Hub (YouTube & SoundCloud) alongside authentic **Real YouTube Search** with instant 0ms switching.
+            * 🎙️ **Shazam Song Recognition** — Instant 5-second acoustic identification from system audio or microphone.
+            * 📥 **Multi-Platform Downloader** — High-speed downloads from YouTube, Spotify playlists, SoundCloud, TikTok, Instagram, Twitter/X, and 1,000+ sites.
+            * 📋 **Download Queue Manager** — Batch downloading with pause/resume, retry support, and live queue progress.
             * 🔄 **Built-in Media Converter** — Fast FFmpeg conversion between MP4, MKV, MP3, AAC, FLAC, WAV, and OGG.
-            * 📜 **History & Metadata** — Automatic ID3 tag embedding, album art, and optional synchronized `.lrc` lyrics.
+            * 🐧 **Native Linux Support** — Cross-platform hardware-accelerated interface with dark glassmorphism and Arch Linux PKGBUILD.
             * ⚡ **Zero Setup** — `yt-dlp`, `ffmpeg`, and `aria2c` dependencies are automatically managed in the background.
 
             ---
 
-            ### 📦 Quick Start:
-            1. Download **`Universal Downloader.exe`** from the **Assets** section below.
-            2. Run the application directly (self-contained, no installation or external .NET runtime needed).
+            ### 📦 Downloads:
+            * 🪟 **Windows**: Download `Universal Downloader.exe`
+            * 🐧 **Linux (Generic / Ubuntu / Debian / Fedora)**: Download `UniversalDownloader-linux-x64.tar.gz`
+            * 🏹 **Arch Linux / Manjaro**: Use the included `PKGBUILD` (`makepkg -si`)
           generate_release_notes: false
           draft: false
           prerelease: false

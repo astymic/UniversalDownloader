@@ -17,6 +17,10 @@ obj/
 x64/
 x86/
 [Bb]uild/
+publish/
+publish-linux/
+publish-win/
+release-assets/
 
 # NuGet
 *.nupkg

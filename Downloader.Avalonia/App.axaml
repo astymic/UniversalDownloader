@@ -1,0 +1,80 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="UniversalDownloader.Avalonia.App"
+             RequestedThemeVariant="Dark">
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://AsyncImageLoader.Avalonia/AdvancedImage.axaml" />
+
+        <!-- Base Window / Controls Styles -->
+        <Style Selector="TextBlock">
+            <Setter Property="Foreground" Value="#E4E4E7"/>
+            <Setter Property="FontFamily" Value="{StaticResource InterFont}"/>
+        </Style>
+
+        <!-- Primary Button Style -->
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="#6366F1"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="16,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#4F46E5"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+
+        <!-- Secondary Button Style -->
+        <Style Selector="Button.secondary">
+            <Setter Property="Background" Value="#1E1E24"/>
+            <Setter Property="Foreground" Value="#D4D4D8"/>
+            <Setter Property="BorderBrush" Value="#2E2E38"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.secondary:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#282832"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#6366F1"/>
+        </Style>
+
+        <!-- Modern Filter Chip RadioButton Style -->
+        <Style Selector="RadioButton.chip">
+            <Setter Property="Background" Value="#18181B"/>
+            <Setter Property="Foreground" Value="#A1A1AA"/>
+            <Setter Property="BorderBrush" Value="#27272A"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="RadioButton.chip:checked /template/ ContentPresenter">
+            <Setter Property="Background" Value="#6366F1"/>
+            <Setter Property="BorderBrush" Value="#818CF8"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+    </Application.Styles>
+
+    <Application.Resources>
+        <SolidColorBrush x:Key="BackgroundBrush" Color="#0B0B0E"/>
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#121218"/>
+        <SolidColorBrush x:Key="SurfaceCardBrush" Color="#181822"/>
+        <SolidColorBrush x:Key="PrimaryBrush" Color="#6366F1"/>
+        <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#4F46E5"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="#27272A"/>
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="TextSecondaryBrush" Color="#A1A1AA"/>
+    </Application.Resources>
+</Application>

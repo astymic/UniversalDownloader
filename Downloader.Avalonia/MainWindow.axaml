@@ -1,0 +1,278 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
+        xmlns:models="clr-namespace:UniversalDownloader.Models;assembly=Downloader.Core"
+        mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="750"
+        x:Class="UniversalDownloader.Avalonia.MainWindow"
+        Title="Universal Downloader"
+        Width="1120" Height="760"
+        MinWidth="900" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundBrush}">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="68"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- MAIN CONTENT AREA -->
+        <Grid Grid.Column="0">
+            <!-- MAIN VIEW (Downloader) -->
+            <ScrollViewer x:Name="MainScrollViewer" IsVisible="True" Margin="24,20,12,20">
+                <StackPanel Spacing="18">
+                    <!-- Header -->
+                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="24,20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="14">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                                    <TextBlock Text="⚡" FontSize="24" VerticalAlignment="Center"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Universal Downloader" FontSize="20" FontWeight="Bold" Foreground="White"/>
+                                        <TextBlock Text="Fast, Multi-Source Media &amp; Music Downloader" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" x:Name="StatusBadgeTextBlock" Text="Ready" Foreground="#10B981" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <!-- URL Input Grid -->
+                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                <TextBox x:Name="UrlTextBox" Grid.Column="0" Watermark="Paste YouTube, Spotify, SoundCloud, TikTok, Instagram, Twitter/X, or direct URL..." Height="46" FontSize="13" CornerRadius="10" VerticalContentAlignment="Center" KeyDown="UrlTextBox_KeyDown"/>
+                                <Button x:Name="PasteButton" Grid.Column="1" Classes="secondary" Content="📋 Paste" Height="46" Margin="10,0,0,0" Click="PasteButton_Click"/>
+                                <Button x:Name="StartDownloadButton" Grid.Column="2" Classes="primary" Content="⬇ Download" Height="46" Margin="10,0,0,0" Click="StartDownloadButton_Click"/>
+                            </Grid>
+
+                            <!-- Controls Row -->
+                            <WrapPanel Orientation="Horizontal">
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,0" VerticalAlignment="Center">
+                                    <TextBlock Text="Format:" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <ComboBox x:Name="FormatComboBox" SelectedIndex="0" Height="36" Width="170">
+                                        <ComboBoxItem Content="🎬 Best Video (MP4)"/>
+                                        <ComboBoxItem Content="🎵 Best Audio (MP3)"/>
+                                        <ComboBoxItem Content="🎵 High Quality (FLAC)"/>
+                                        <ComboBoxItem Content="🎵 High Quality (M4A)"/>
+                                        <ComboBoxItem Content="🎬 1080p Full HD"/>
+                                        <ComboBoxItem Content="🎬 720p HD"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,0" VerticalAlignment="Center">
+                                    <CheckBox x:Name="EnableTrimCheckBox" Content="✂ Trim Clip" IsCheckedChanged="EnableTrimCheckBox_CheckedChanged"/>
+                                    <TextBox x:Name="TrimStartTextBox" Watermark="00:00:00" Width="85" Height="34" IsVisible="False"/>
+                                    <TextBlock Text="to" VerticalAlignment="Center" IsVisible="{Binding #TrimStartTextBox.IsVisible}"/>
+                                    <TextBox x:Name="TrimEndTextBox" Watermark="00:01:30" Width="85" Height="34" IsVisible="{Binding #TrimStartTextBox.IsVisible}"/>
+                                </StackPanel>
+
+                                <Button x:Name="AddToQueueButton" Classes="secondary" Content="➕ Add to Queue" Height="36" Click="AddToQueueButton_Click"/>
+                            </WrapPanel>
+
+                            <!-- Live Progress Area -->
+                            <Border x:Name="ProgressBorder" Background="#181822" CornerRadius="12" Padding="16,12" IsVisible="False">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock x:Name="ProgressStatusTextBlock" Text="Downloading..." FontWeight="SemiBold" FontSize="13" Foreground="#818CF8"/>
+                                        <TextBlock Grid.Column="1" x:Name="ProgressPercentTextBlock" Text="0%" FontWeight="Bold" FontSize="13" Foreground="White"/>
+                                    </Grid>
+                                    <ProgressBar x:Name="DownloadProgressBar" Height="8" Minimum="0" Maximum="100" Value="0" Foreground="#6366F1" Background="#262630" CornerRadius="4"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Quick Discovery Cards -->
+                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="🚀 Quick Actions &amp; Discovery" FontWeight="Bold" FontSize="15" Foreground="White"/>
+                            <Grid ColumnDefinitions="*,*,*">
+                                <Button Grid.Column="0" Classes="secondary" Margin="0,0,8,0" Height="70" Click="NavSearch_Click">
+                                    <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                        <TextBlock Text="🔍 Search Hub" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="YouTube &amp; SoundCloud search" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Grid.Column="1" Classes="secondary" Margin="4,0,4,0" Height="70" Click="NavSpotify_Click">
+                                    <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                        <TextBlock Text="🟢 Spotify Batch" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Import CSV or Playlists" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Grid.Column="2" Classes="secondary" Margin="8,0,0,0" Height="70" Click="NavQueue_Click">
+                                    <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                        <TextBlock Text="📋 Queue Manager" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="View active &amp; pending downloads" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- SEARCH HUB VIEW -->
+            <ScrollViewer x:Name="SearchScrollViewer" IsVisible="False" Margin="24,20,12,20">
+                <StackPanel Spacing="16">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="🔍 Multi-Source Search Hub" FontSize="20" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="Search music tracks or full YouTube video search with instant 0ms tab switching" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="secondary" Content="✖ Close" Click="BackToMain_Click"/>
+                    </Grid>
+
+                    <!-- Search Header Card -->
+                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="20,18" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="14">
+                            <!-- Mode Selection Tabs -->
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <RadioButton x:Name="SearchModeSmartMusicTab" Classes="chip" Content="🎵 Smart Music Hub" IsChecked="True" Click="SearchModeTab_Click" Tag="SmartMusic"/>
+                                <RadioButton x:Name="SearchModeRealYouTubeTab" Classes="chip" Content="📺 Real YouTube Search" Click="SearchModeTab_Click" Tag="RealYouTube"/>
+                            </StackPanel>
+
+                            <!-- Input Grid -->
+                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                <TextBox x:Name="SearchQueryTextBox" Grid.Column="0" Watermark="Search track, artist, music name or album..." Height="46" FontSize="13" CornerRadius="10" VerticalContentAlignment="Center" KeyDown="SearchQueryTextBox_KeyDown"/>
+                                <Button x:Name="ShazamIdentifyButton" Grid.Column="1" Classes="secondary" Content="🎙️ Shazam (5s)" Height="46" Margin="10,0,0,0" Click="ShazamIdentifyButton_Click"/>
+                                <Button x:Name="ExecuteSearchButton" Grid.Column="2" Classes="primary" Content="🔍 Search" Height="46" Margin="10,0,0,0" Click="ExecuteSearchButton_Click"/>
+                            </Grid>
+
+                            <!-- Source filter -->
+                            <StackPanel x:Name="SearchPlatformFilterPanel" Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="Source:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"/>
+                                <RadioButton x:Name="SearchFilterAll" Classes="chip" Content="All Sources" IsChecked="True" Click="SearchFilter_Click" Tag="All"/>
+                                <RadioButton x:Name="SearchFilterYouTube" Classes="chip" Content="🔴 YouTube" Click="SearchFilter_Click" Tag="YouTube"/>
+                                <RadioButton x:Name="SearchFilterSoundCloud" Classes="chip" Content="🟠 SoundCloud" Click="SearchFilter_Click" Tag="SoundCloud"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock x:Name="SearchStatsTextBlock" Text="" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"/>
+
+                    <!-- Search Results -->
+                    <ItemsControl x:Name="SearchResultsItemsControl">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="models:SearchResultItem">
+                                <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="14" Margin="0,0,0,10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                    <Grid ColumnDefinitions="90,*,Auto">
+                                        <Image Grid.Column="0" asyncImageLoader:ImageLoader.Source="{Binding ThumbnailUrl}" Width="80" Height="50" Stretch="UniformToFill"/>
+                                        <StackPanel Grid.Column="1" Margin="12,0,12,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding ArtistOrChannel}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding DurationString}" FontSize="11" Foreground="#818CF8"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Button Classes="primary" Content="⬇ Download" Click="SearchItemDownload_Click" Tag="{Binding}"/>
+                                            <Button Classes="secondary" Content="➕ Queue" Click="SearchItemAddToQueue_Click" Tag="{Binding}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- QUEUE VIEW -->
+            <ScrollViewer x:Name="QueueScrollViewer" IsVisible="False" Margin="24,20,12,20">
+                <StackPanel Spacing="16">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <TextBlock Grid.Column="0" Text="📋 Download Queue Manager" FontSize="20" FontWeight="Bold" Foreground="White"/>
+                        <Button Grid.Column="1" Classes="secondary" Content="🗑️ Clear Finished" Margin="0,0,8,0" Click="QueueClearFinished_Click"/>
+                        <Button Grid.Column="2" Classes="secondary" Content="✖ Close" Click="BackToMain_Click"/>
+                    </Grid>
+
+                    <ItemsControl x:Name="QueueItemsControl">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="models:DownloadQueueItem">
+                                <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="14" Margin="0,0,0,10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Grid.Column="0" Spacing="6">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                            <ProgressBar Value="{Binding Progress}" Maximum="100" Height="6" CornerRadius="3" Foreground="#6366F1" Background="#262630"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Classes="secondary" Content="✖ Cancel" Margin="12,0,0,0" VerticalAlignment="Center" Click="QueueCancelItem_Click" Tag="{Binding}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- HISTORY VIEW -->
+            <ScrollViewer x:Name="HistoryScrollViewer" IsVisible="False" Margin="24,20,12,20">
+                <StackPanel Spacing="16">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="📜 Download History" FontSize="20" FontWeight="Bold" Foreground="White"/>
+                        <Button Grid.Column="1" Classes="secondary" Content="✖ Close" Click="BackToMain_Click"/>
+                    </Grid>
+
+                    <ItemsControl x:Name="HistoryItemsControl">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="models:DownloadHistoryItem">
+                                <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="14" Margin="0,0,0,10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Grid.Column="0" Spacing="4">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="{Binding FilePath}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Classes="secondary" Content="📂 Open Folder" Click="HistoryOpenFolder_Click" Tag="{Binding}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- SETTINGS VIEW -->
+            <ScrollViewer x:Name="SettingsScrollViewer" IsVisible="False" Margin="24,20,12,20">
+                <StackPanel Spacing="16">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="⚙️ Application Settings" FontSize="20" FontWeight="Bold" Foreground="White"/>
+                        <Button Grid.Column="1" Classes="secondary" Content="✖ Close" Click="BackToMain_Click"/>
+                    </Grid>
+
+                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="📁 Download Directory" FontWeight="Bold" FontSize="14"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBox x:Name="DownloadPathTextBox" Grid.Column="0" IsReadOnly="True" Height="40" CornerRadius="8"/>
+                                <Button Grid.Column="1" Classes="secondary" Content="Browse..." Margin="8,0,0,0" Height="40" Click="BrowseDownloadPath_Click"/>
+                            </Grid>
+
+                            <CheckBox x:Name="DownloadLyricsCheckBox" Content="📝 Auto-download companion .lrc lyrics file (Off by default)"/>
+                            <CheckBox x:Name="AutoUpdateDependenciesCheckBox" Content="🔄 Auto-update yt-dlp on startup" IsChecked="True"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- RIGHT NAVIGATION RAIL -->
+        <Border Grid.Column="1" Background="#0E0E14" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,0,0,0">
+            <StackPanel VerticalAlignment="Center" Spacing="16" HorizontalAlignment="Center">
+                <Button Classes="secondary" Width="46" Height="46" ToolTip.Tip="Main Downloader" Click="NavMain_Click">
+                    <TextBlock Text="⚡" FontSize="18" HorizontalAlignment="Center"/>
+                </Button>
+                <Button Classes="secondary" Width="46" Height="46" ToolTip.Tip="Search Hub" Click="NavSearch_Click">
+                    <TextBlock Text="🔍" FontSize="18" HorizontalAlignment="Center"/>
+                </Button>
+                <Button Classes="secondary" Width="46" Height="46" ToolTip.Tip="Shazam Song Recognition" Click="NavShazam_Click">
+                    <TextBlock Text="🎙️" FontSize="18" HorizontalAlignment="Center"/>
+                </Button>
+                <Button Classes="secondary" Width="46" Height="46" ToolTip.Tip="Queue Manager" Click="NavQueue_Click">
+                    <TextBlock Text="📋" FontSize="18" HorizontalAlignment="Center"/>
+                </Button>
+                <Button Classes="secondary" Width="46" Height="46" ToolTip.Tip="Download History" Click="NavHistory_Click">
+                    <TextBlock Text="📜" FontSize="18" HorizontalAlignment="Center"/>
+                </Button>
+                <Button Classes="secondary" Width="46" Height="46" ToolTip.Tip="Settings" Click="NavSettings_Click">
+                    <TextBlock Text="⚙️" FontSize="18" HorizontalAlignment="Center"/>
+                </Button>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
