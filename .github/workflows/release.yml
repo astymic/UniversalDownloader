@@ -29,10 +29,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "Universal Downloader v1.0.0 — Official Release"
-          files: publish/Universal Downloader.exe
+          name: "Universal Downloader ${{ github.ref_name }} — Official Release"
+          files: publish/*.exe
           body: |
-            ## 🚀 Universal Downloader v1.0.0
+            ## 🚀 Universal Downloader ${{ github.ref_name }}
 
             A modern, fast, and feature-rich media downloader, converter, and audio identification workstation for Windows.
 
