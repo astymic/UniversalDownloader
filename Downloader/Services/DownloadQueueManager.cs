@@ -66,29 +66,20 @@ namespace UniversalDownloader.Services
             {
                 try
                 {
-                    if (_downloadService.IsSpotifyLink(item.Url))
+                    string? title = await _downloadService.GetTitleWithYtDlpAsync(item.Url);
+                    if (!string.IsNullOrWhiteSpace(title) && title.Trim().Length > 1)
                     {
-                        var meta = await _downloadService.GetSpotifyMetadataAsync(item.Url);
-                        if (meta != null && !string.IsNullOrWhiteSpace(meta.Title))
+                        Application.Current?.Dispatcher?.Invoke(() =>
                         {
-                            string beautifulTitle = $"{meta.Artist} - {meta.Title}".Trim();
-                            Application.Current?.Dispatcher?.Invoke(() =>
-                            {
-                                item.Title = beautifulTitle;
-                                item.Platform = "Spotify";
-                            });
-                        }
+                            item.Title = title.Trim();
+                        });
                     }
-                    else
+                    else if (item.Title.Contains("Resolving title"))
                     {
-                        string? title = await _downloadService.GetTitleWithYtDlpAsync(item.Url);
-                        if (!string.IsNullOrWhiteSpace(title))
+                        Application.Current?.Dispatcher?.Invoke(() =>
                         {
-                            Application.Current?.Dispatcher?.Invoke(() =>
-                            {
-                                item.Title = title;
-                            });
-                        }
+                            item.Title = item.Platform == "Spotify" ? "Spotify Track" : "Media Item";
+                        });
                     }
                 }
                 catch { }
@@ -200,54 +191,58 @@ namespace UniversalDownloader.Services
                             string tempDir = Path.Combine(Path.GetTempPath(), "UD_Queue_" + Guid.NewGuid().ToString("N"));
                             Directory.CreateDirectory(tempDir);
 
+                            // Capture existing files in destination directory before downloading
+                            var existingFiles = Directory.Exists(nextItem.DestinationFolder)
+                                ? new System.Collections.Generic.HashSet<string>(Directory.GetFiles(nextItem.DestinationFolder))
+                                : new System.Collections.Generic.HashSet<string>();
+
+                            bool isSpotify = _downloadService.IsSpotifyLink(nextItem.Url);
+                            string downloadUrl = nextItem.Url;
+                            string? overrideTitle = null;
+
+                            if (isSpotify)
+                            {
+                                if (nextItem.Title.Contains("Resolving title") || nextItem.Title.StartsWith("Spotify Track #") || nextItem.Title == "Spotify Track")
+                                {
+                                    var meta = await _downloadService.GetSpotifyMetadataAsync(nextItem.Url);
+                                    if (meta != null && !string.IsNullOrWhiteSpace(meta.Title))
+                                    {
+                                        nextItem.Title = $"{meta.Artist} - {meta.Title}".Trim();
+                                    }
+                                }
+
+                                string cleanTitle = nextItem.Title.Replace("\"", "").Replace("'", "");
+                                downloadUrl = $"ytsearch1:{cleanTitle}";
+                                overrideTitle = nextItem.Title;
+                                nextItem.IsAudioOnly = true;
+                                nextItem.AudioFormat = "mp3";
+                            }
+                            else if (nextItem.Title.Contains("Resolving title") || nextItem.Title.StartsWith("YouTube Video #") || nextItem.Title.StartsWith("Media Item #"))
+                            {
+                                string? resolved = await _downloadService.GetTitleWithYtDlpAsync(nextItem.Url);
+                                if (!string.IsNullOrWhiteSpace(resolved) && resolved.Trim().Length > 1)
+                                {
+                                    nextItem.Title = resolved.Trim();
+                                }
+                            }
+
                             void OnProgress(object? sender, DownloadProgressArgs args)
                             {
-                                nextItem.Progress = args.Percentage;
+                                // Only process progress if percentage is realistic
+                                if (args.Percentage > 0)
+                                {
+                                    nextItem.Progress = args.Percentage;
+                                }
                                 if (!string.IsNullOrWhiteSpace(args.StatusMessage))
                                 {
                                     nextItem.StatusText = args.StatusMessage;
                                 }
                             }
 
-                            void OnFile(string path, string url)
-                            {
-                                if (url == nextItem.Url || string.IsNullOrWhiteSpace(nextItem.DownloadedFilePath) || url.StartsWith("ytsearch1:", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    nextItem.DownloadedFilePath = path;
-                                    if ((nextItem.Title.Contains("Resolving title") || nextItem.Title.StartsWith("Media Item #")) && File.Exists(path))
-                                    {
-                                        nextItem.Title = Path.GetFileNameWithoutExtension(path);
-                                    }
-                                }
-                            }
-
                             _downloadService.ProgressChanged += OnProgress;
-                            _downloadService.FileDownloaded += OnFile;
 
                             try
                             {
-                                bool isSpotify = _downloadService.IsSpotifyLink(nextItem.Url);
-                                string downloadUrl = nextItem.Url;
-                                string? overrideTitle = null;
-
-                                if (isSpotify)
-                                {
-                                    if (nextItem.Title.Contains("Resolving title") || nextItem.Title.StartsWith("Spotify Track #"))
-                                    {
-                                        var meta = await _downloadService.GetSpotifyMetadataAsync(nextItem.Url);
-                                        if (meta != null && !string.IsNullOrWhiteSpace(meta.Title))
-                                        {
-                                            nextItem.Title = $"{meta.Artist} - {meta.Title}".Trim();
-                                        }
-                                    }
-
-                                    string cleanTitle = nextItem.Title.Replace("\"", "").Replace("'", "");
-                                    downloadUrl = $"ytsearch1:{cleanTitle}";
-                                    overrideTitle = nextItem.Title;
-                                    nextItem.IsAudioOnly = true;
-                                    nextItem.AudioFormat = "mp3";
-                                }
-
                                 bool success = await _downloadService.DownloadWithYtDlpAsync(
                                     downloadUrl,
                                     nextItem.IsAudioOnly ? "bestaudio/best" : nextItem.FormatCode,
@@ -264,6 +259,26 @@ namespace UniversalDownloader.Services
                                     nextItem.Status = QueueItemStatus.Completed;
                                     nextItem.StatusText = "Completed";
                                     nextItem.Progress = 100;
+
+                                    // Detect the newly created file in destination folder
+                                    if (Directory.Exists(nextItem.DestinationFolder))
+                                    {
+                                        var currentFiles = Directory.GetFiles(nextItem.DestinationFolder);
+                                        var newFile = currentFiles.FirstOrDefault(f => !existingFiles.Contains(f));
+                                        if (newFile != null)
+                                        {
+                                            nextItem.DownloadedFilePath = newFile;
+                                            if ((nextItem.Title.Contains("Resolving title") || nextItem.Title.StartsWith("Media Item") || nextItem.Title.Length <= 1) && File.Exists(newFile))
+                                            {
+                                                string fileName = Path.GetFileNameWithoutExtension(newFile);
+                                                if (fileName.Length > 1)
+                                                {
+                                                    nextItem.Title = fileName;
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     ItemCompleted?.Invoke(nextItem);
                                 }
                                 else
@@ -276,7 +291,6 @@ namespace UniversalDownloader.Services
                             finally
                             {
                                 _downloadService.ProgressChanged -= OnProgress;
-                                _downloadService.FileDownloaded -= OnFile;
                             }
                         }
                         catch (OperationCanceledException)

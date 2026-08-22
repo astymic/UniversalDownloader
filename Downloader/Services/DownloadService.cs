@@ -151,22 +151,69 @@ namespace UniversalDownloader.Services
 
         public async Task<string?> GetTitleWithYtDlpAsync(string url)
         {
-            if (!_dependencyManager.IsYtDlpReady) return null;
+            if (string.IsNullOrWhiteSpace(url)) return null;
             url = CleanUrl(url);
 
+            // 1. Fast, high-accuracy YouTube title resolution via oEmbed
+            if (IsYouTubeLink(url))
+            {
+                try
+                {
+                    string oembedUrl = $"https://www.youtube.com/oembed?url={Uri.EscapeDataString(url)}&format=json";
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                    using var client = new HttpClient();
+                    var response = await client.GetAsync(oembedUrl, cts.Token);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string json = await response.Content.ReadAsStringAsync(cts.Token);
+                        if (!string.IsNullOrWhiteSpace(json))
+                        {
+                            var jo = JObject.Parse(json);
+                            string? oembedTitle = jo["title"]?.ToString();
+                            if (!string.IsNullOrWhiteSpace(oembedTitle))
+                            {
+                                return System.Net.WebUtility.HtmlDecode(oembedTitle.Trim());
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // 2. Spotify metadata resolution
+            if (IsSpotifyLink(url))
+            {
+                try
+                {
+                    var meta = await GetSpotifyMetadataAsync(url);
+                    if (meta != null && !string.IsNullOrWhiteSpace(meta.Title))
+                    {
+                        return $"{meta.Artist} - {meta.Title}".Trim();
+                    }
+                }
+                catch { }
+            }
+
+            if (!_dependencyManager.IsYtDlpReady) return null;
+
+            // 3. Robust yt-dlp print title fallback
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
                     FileName = _dependencyManager.YtDlpExecutablePath,
                     RedirectStandardOutput = true,
+                    RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     StandardOutputEncoding = System.Text.Encoding.UTF8
                 };
-                psi.ArgumentList.Add("--get-title");
+                psi.ArgumentList.Add("--print");
+                psi.ArgumentList.Add("%(title)s");
+                psi.ArgumentList.Add("--no-playlist");
                 psi.ArgumentList.Add("--no-warnings");
                 psi.ArgumentList.Add("--ignore-config");
+                psi.ArgumentList.Add("--skip-download");
                 psi.ArgumentList.Add("--extractor-args");
                 psi.ArgumentList.Add("youtube:player_client=android,ios,mweb,web");
                 psi.ArgumentList.Add(url);
@@ -178,7 +225,17 @@ namespace UniversalDownloader.Services
                     await process.WaitForExitAsync();
                     if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(titleOutput))
                     {
-                        return Utilities.SanitizeFileName(titleOutput.Trim());
+                        var lines = titleOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var line in lines)
+                        {
+                            string cleaned = line.Trim();
+                            if (!string.IsNullOrWhiteSpace(cleaned) && 
+                                !cleaned.StartsWith("WARNING", StringComparison.OrdinalIgnoreCase) && 
+                                !cleaned.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase))
+                            {
+                                return System.Net.WebUtility.HtmlDecode(Utilities.SanitizeFileName(cleaned));
+                            }
+                        }
                     }
                 }
             }
