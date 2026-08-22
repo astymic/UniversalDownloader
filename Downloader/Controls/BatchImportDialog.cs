@@ -435,51 +435,63 @@ namespace UniversalDownloader.Controls
                 <ComboBox.Template>
                     <ControlTemplate TargetType=""ComboBox"">
                         <Grid>
-                            <Border x:Name=""MainBorder"" 
-                                    Background=""#18181B"" 
-                                    BorderBrush=""#3F3F46"" 
-                                    BorderThickness=""1"" 
-                                    CornerRadius=""8"">
-                                <Grid Margin=""10,4,8,4"">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width=""*""/>
-                                        <ColumnDefinition Width=""Auto""/>
-                                    </Grid.ColumnDefinitions>
-                                    <ContentPresenter Grid.Column=""0"" 
-                                                      IsHitTestVisible=""False"" 
-                                                      Content=""{TemplateBinding SelectionBoxItem}"" 
+                            <ToggleButton x:Name=""ToggleButton""
+                                          Focusable=""False""
+                                          IsChecked=""{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}""
+                                          ClickMode=""Press""
+                                          Cursor=""Hand""
+                                          HorizontalAlignment=""Stretch""
+                                          VerticalAlignment=""Stretch"">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType=""ToggleButton"">
+                                        <Border x:Name=""MainBorder"" 
+                                                Background=""#18181B"" 
+                                                BorderBrush=""#3F3F46"" 
+                                                BorderThickness=""1"" 
+                                                CornerRadius=""8"">
+                                            <Grid Margin=""12,0,10,0"">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width=""*""/>
+                                                    <ColumnDefinition Width=""Auto""/>
+                                                </Grid.ColumnDefinitions>
+                                                <Path x:Name=""Arrow"" 
+                                                      Grid.Column=""1""
+                                                      Data=""M7,10L12,15L17,10"" 
+                                                      Stroke=""#A1A1AA"" 
+                                                      StrokeThickness=""1.8"" 
+                                                      HorizontalAlignment=""Center"" 
                                                       VerticalAlignment=""Center"" 
-                                                      HorizontalAlignment=""Left""
-                                                      TextBlock.Foreground=""#FAFAFA""/>
-                                    <ToggleButton Grid.Column=""1"" 
-                                                  Focusable=""False"" 
-                                                  IsChecked=""{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"" 
-                                                  ClickMode=""Press"" 
-                                                  Width=""24"" 
-                                                  Background=""Transparent""
-                                                  BorderThickness=""0""
-                                                  Cursor=""Hand"">
-                                        <ToggleButton.Template>
-                                            <ControlTemplate TargetType=""ToggleButton"">
-                                                <Border Background=""Transparent"">
-                                                    <Path x:Name=""Arrow"" Data=""M7,10L12,15L17,10"" Stroke=""#A1A1AA"" StrokeThickness=""1.8"" HorizontalAlignment=""Center"" VerticalAlignment=""Center"" Stretch=""None""/>
-                                                </Border>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property=""IsMouseOver"" Value=""True"">
-                                                        <Setter TargetName=""Arrow"" Property=""Stroke"" Value=""#8B5CF6""/>
-                                                    </Trigger>
-                                                    <Trigger Property=""IsChecked"" Value=""True"">
-                                                        <Setter TargetName=""Arrow"" Property=""Stroke"" Value=""#8B5CF6""/>
-                                                        <Setter TargetName=""Arrow"" Property=""Data"" Value=""M7,15L12,10L17,15""/>
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </ToggleButton.Template>
-                                    </ToggleButton>
-                                </Grid>
-                            </Border>
+                                                      Stretch=""None""/>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property=""IsMouseOver"" Value=""True"">
+                                                <Setter TargetName=""MainBorder"" Property=""BorderBrush"" Value=""#8B5CF6""/>
+                                                <Setter TargetName=""Arrow"" Property=""Stroke"" Value=""#8B5CF6""/>
+                                            </Trigger>
+                                            <Trigger Property=""IsChecked"" Value=""True"">
+                                                <Setter TargetName=""MainBorder"" Property=""BorderBrush"" Value=""#8B5CF6""/>
+                                                <Setter TargetName=""Arrow"" Property=""Stroke"" Value=""#8B5CF6""/>
+                                                <Setter TargetName=""Arrow"" Property=""Data"" Value=""M7,15L12,10L17,15""/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+
+                            <Grid Margin=""12,0,32,0"" IsHitTestVisible=""False"" VerticalAlignment=""Center"">
+                                <ContentPresenter Grid.Column=""0"" 
+                                                  IsHitTestVisible=""False"" 
+                                                  Content=""{TemplateBinding SelectionBoxItem}"" 
+                                                  ContentTemplate=""{TemplateBinding SelectionBoxItemTemplate}""
+                                                  ContentTemplateSelector=""{TemplateBinding ItemTemplateSelector}""
+                                                  VerticalAlignment=""Center"" 
+                                                  HorizontalAlignment=""Left""
+                                                  TextBlock.Foreground=""#FAFAFA""/>
+                            </Grid>
+
                             <Popup x:Name=""Popup"" Placement=""Bottom"" IsOpen=""{TemplateBinding IsDropDownOpen}"" AllowsTransparency=""True"" Focusable=""False"" PopupAnimation=""Slide"" StaysOpen=""False"">
-                                <Grid MaxHeight=""{TemplateBinding MaxDropDownHeight}"" MinWidth=""{Binding ActualWidth, ElementName=MainBorder}"">
+                                <Grid MaxHeight=""{TemplateBinding MaxDropDownHeight}"" MinWidth=""{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"">
                                     <Border Background=""#18181B"" BorderBrush=""#3F3F46"" BorderThickness=""1"" CornerRadius=""8"" Margin=""0,4,0,4"" Padding=""2"">
                                         <Border.Effect>
                                             <DropShadowEffect BlurRadius=""16"" ShadowDepth=""6"" Color=""Black"" Opacity=""0.6""/>
