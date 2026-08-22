@@ -1771,11 +1771,39 @@ namespace UniversalDownloader
                 {
                     PlayerPlayPauseButton.Content = _audioPreviewService.IsPlaying ? "⏸" : "▶";
                 }
-                if (PlayerMuteButton != null)
-                {
-                    PlayerMuteButton.Content = _audioPreviewService.IsMuted ? "🔇" : "🔊";
-                }
+                UpdateVolumeDisplay();
             });
+        }
+
+        private void UpdateVolumeDisplay()
+        {
+            if (PlayerMuteButton == null || _audioPreviewService == null) return;
+
+            if (_audioPreviewService.IsMuted || _audioPreviewService.Volume == 0)
+            {
+                PlayerMuteButton.Content = "🔇";
+                PlayerMuteButton.Foreground = (Brush)FindResource("TextSecondaryBrush");
+            }
+            else if (_audioPreviewService.Volume < 0.35)
+            {
+                PlayerMuteButton.Content = "🔈";
+                PlayerMuteButton.Foreground = (Brush)FindResource("TextPrimaryBrush");
+            }
+            else if (_audioPreviewService.Volume < 0.70)
+            {
+                PlayerMuteButton.Content = "🔉";
+                PlayerMuteButton.Foreground = (Brush)FindResource("TextPrimaryBrush");
+            }
+            else
+            {
+                PlayerMuteButton.Content = "🔊";
+                PlayerMuteButton.Foreground = (Brush)FindResource("TextPrimaryBrush");
+            }
+
+            if (PlayerVolumeSlider != null)
+            {
+                PlayerVolumeSlider.ToolTip = $"Volume: {(int)(_audioPreviewService.Volume * 100)}%";
+            }
         }
 
         private void AudioPreviewService_PositionChanged(TimeSpan pos, TimeSpan dur)
@@ -1841,12 +1869,14 @@ namespace UniversalDownloader
             if (_audioPreviewService != null)
             {
                 _audioPreviewService.Volume = e.NewValue;
+                UpdateVolumeDisplay();
             }
         }
 
         private void PlayerMuteButton_Click(object sender, RoutedEventArgs e)
         {
             _audioPreviewService.ToggleMute();
+            UpdateVolumeDisplay();
         }
 
         private void PlayerOpenExternal_Click(object sender, RoutedEventArgs e)

@@ -257,6 +257,47 @@
             </Setter>
         </Style>
 
+        <!-- Modern Volume Slider Style -->
+        <Style TargetType="Slider" x:Key="VolumeSliderStyle">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center">
+                            <Border Height="4" Background="#27272A" CornerRadius="2"/>
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.DecreaseLarge}">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="4" Background="{StaticResource PrimaryBrush}" CornerRadius="2"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="12" Height="12" Cursor="Hand">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse Fill="White" Stroke="{StaticResource PrimaryBrush}" StrokeThickness="2">
+                                                    <Ellipse.Effect>
+                                                        <DropShadowEffect BlurRadius="4" ShadowDepth="0" Color="Black" Opacity="0.6"/>
+                                                    </Ellipse.Effect>
+                                                </Ellipse>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Global Modern ScrollBar Style -->
         <Style TargetType="ScrollBar">
             <Setter Property="Background" Value="Transparent"/>
@@ -1101,9 +1142,35 @@
 
                         <!-- Volume & Close Controls -->
                         <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                            <!-- Mute button -->
-                            <Button x:Name="PlayerMuteButton" Content="🔊" Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}" BorderThickness="0" FontSize="13" Cursor="Hand" Click="PlayerMuteButton_Click" ToolTip="Mute / Unmute" Margin="0,0,4,0"/>
-                            <Slider x:Name="PlayerVolumeSlider" Width="64" Minimum="0" Maximum="1" Value="0.8" VerticalAlignment="Center" ValueChanged="PlayerVolumeSlider_ValueChanged" Margin="0,0,12,0"/>
+                            <!-- Modern Volume Pill -->
+                            <Border Background="#18181B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="6,2" Margin="0,0,10,0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button x:Name="PlayerMuteButton" 
+                                            Content="🔊" 
+                                            Background="Transparent" 
+                                            Foreground="{StaticResource TextPrimaryBrush}" 
+                                            BorderThickness="0" 
+                                            FontSize="13" 
+                                            Width="24"
+                                            Height="24"
+                                            Padding="0"
+                                            Cursor="Hand" 
+                                            Click="PlayerMuteButton_Click" 
+                                            ToolTip="Mute / Unmute"/>
+                                    <Slider x:Name="PlayerVolumeSlider" 
+                                            Width="74" 
+                                            Minimum="0" 
+                                            Maximum="1" 
+                                            Value="0.8" 
+                                            SmallChange="0.05"
+                                            LargeChange="0.1"
+                                            Style="{StaticResource VolumeSliderStyle}" 
+                                            VerticalAlignment="Center" 
+                                            ValueChanged="PlayerVolumeSlider_ValueChanged" 
+                                            Margin="4,0,4,0" 
+                                            ToolTip="Volume: 80%"/>
+                                </StackPanel>
+                            </Border>
                             <!-- Open external file button -->
                             <Button Content="↗" Style="{StaticResource SecondaryButton}" Padding="8,4" FontSize="11" Click="PlayerOpenExternal_Click" ToolTip="Open with system default app" Margin="0,0,8,0"/>
                             <!-- Close Player Bar -->
