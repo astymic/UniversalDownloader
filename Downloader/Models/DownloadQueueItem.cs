@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -26,6 +26,7 @@ namespace UniversalDownloader.Models
         private QueueItemStatus _status = QueueItemStatus.Queued;
         private string? _errorMessage;
         private string _destinationFolder = string.Empty;
+        private string? _downloadedFilePath;
 
         public string Id
         {
@@ -66,8 +67,15 @@ namespace UniversalDownloader.Models
         public double Progress
         {
             get => _progress;
-            set { _progress = value; OnPropertyChanged(); }
+            set 
+            { 
+                _progress = value; 
+                OnPropertyChanged(); 
+                OnPropertyChanged(nameof(PercentText));
+            }
         }
+
+        public string PercentText => $"{Math.Round(Progress)}%";
 
         public string StatusText
         {
@@ -78,8 +86,27 @@ namespace UniversalDownloader.Models
         public QueueItemStatus Status
         {
             get => _status;
-            set { _status = value; OnPropertyChanged(); }
+            set 
+            { 
+                _status = value; 
+                OnPropertyChanged(); 
+                OnPropertyChanged(nameof(IsQueued));
+                OnPropertyChanged(nameof(IsDownloading));
+                OnPropertyChanged(nameof(IsCompleted));
+                OnPropertyChanged(nameof(IsFailed));
+                OnPropertyChanged(nameof(IsCanceled));
+                OnPropertyChanged(nameof(CanCancel));
+                OnPropertyChanged(nameof(CanRetry));
+            }
         }
+
+        public bool IsQueued => Status == QueueItemStatus.Queued;
+        public bool IsDownloading => Status == QueueItemStatus.Downloading;
+        public bool IsCompleted => Status == QueueItemStatus.Completed;
+        public bool IsFailed => Status == QueueItemStatus.Failed;
+        public bool IsCanceled => Status == QueueItemStatus.Canceled;
+        public bool CanCancel => Status == QueueItemStatus.Queued || Status == QueueItemStatus.Downloading;
+        public bool CanRetry => Status == QueueItemStatus.Failed || Status == QueueItemStatus.Canceled;
 
         public string? ErrorMessage
         {
@@ -91,6 +118,12 @@ namespace UniversalDownloader.Models
         {
             get => _destinationFolder;
             set { _destinationFolder = value; OnPropertyChanged(); }
+        }
+
+        public string? DownloadedFilePath
+        {
+            get => _downloadedFilePath;
+            set { _downloadedFilePath = value; OnPropertyChanged(); }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

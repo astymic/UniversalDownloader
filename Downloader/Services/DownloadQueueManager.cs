@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -23,6 +23,7 @@ namespace UniversalDownloader.Services
 
         public event Action<DownloadQueueItem>? ItemCompleted;
         public event Action<DownloadQueueItem>? ItemFailed;
+        public event Action? QueueChanged;
 
         public DownloadQueueManager(DownloadService downloadService, HistoryService historyService)
         {
@@ -35,6 +36,7 @@ namespace UniversalDownloader.Services
             Application.Current?.Dispatcher?.Invoke(() =>
             {
                 _items.Add(item);
+                QueueChanged?.Invoke();
             });
 
             _ = ProcessQueueAsync();
@@ -52,7 +54,51 @@ namespace UniversalDownloader.Services
             {
                 item.Status = QueueItemStatus.Canceled;
                 item.StatusText = "Canceled";
+                QueueChanged?.Invoke();
             }
+        }
+
+        public void CancelAll()
+        {
+            foreach (var cts in _cancellationTokens.Values)
+            {
+                try { cts.Cancel(); } catch { }
+            }
+
+            foreach (var item in _items.Where(x => x.Status == QueueItemStatus.Queued))
+            {
+                item.Status = QueueItemStatus.Canceled;
+                item.StatusText = "Canceled";
+            }
+            QueueChanged?.Invoke();
+        }
+
+        public void Retry(string itemId)
+        {
+            var item = _items.FirstOrDefault(x => x.Id == itemId);
+            if (item != null && (item.Status == QueueItemStatus.Failed || item.Status == QueueItemStatus.Canceled))
+            {
+                item.Status = QueueItemStatus.Queued;
+                item.StatusText = "Queued";
+                item.Progress = 0;
+                item.ErrorMessage = null;
+                QueueChanged?.Invoke();
+                _ = ProcessQueueAsync();
+            }
+        }
+
+        public void Remove(string itemId)
+        {
+            Cancel(itemId);
+            Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                var item = _items.FirstOrDefault(x => x.Id == itemId);
+                if (item != null)
+                {
+                    _items.Remove(item);
+                    QueueChanged?.Invoke();
+                }
+            });
         }
 
         public void ClearCompleted()
@@ -64,6 +110,7 @@ namespace UniversalDownloader.Services
                 {
                     _items.Remove(item);
                 }
+                QueueChanged?.Invoke();
             });
         }
 
@@ -94,32 +141,65 @@ namespace UniversalDownloader.Services
                         {
                             nextItem.Status = QueueItemStatus.Downloading;
                             nextItem.StatusText = "Downloading...";
+                            QueueChanged?.Invoke();
 
                             string tempDir = Path.Combine(Path.GetTempPath(), "UD_Queue_" + Guid.NewGuid().ToString("N"));
                             Directory.CreateDirectory(tempDir);
 
-                            bool success = await _downloadService.DownloadWithYtDlpAsync(
-                                nextItem.Url,
-                                nextItem.FormatCode,
-                                tempDir,
-                                nextItem.DestinationFolder,
-                                nextItem.IsAudioOnly,
-                                nextItem.AudioFormat,
-                                false, 0, 0,
-                                cts.Token);
-
-                            if (success)
+                            void OnProgress(object? sender, DownloadProgressArgs args)
                             {
-                                nextItem.Status = QueueItemStatus.Completed;
-                                nextItem.StatusText = "Completed";
-                                nextItem.Progress = 100;
-                                ItemCompleted?.Invoke(nextItem);
+                                nextItem.Progress = args.Percentage;
+                                if (!string.IsNullOrWhiteSpace(args.StatusMessage))
+                                {
+                                    nextItem.StatusText = args.StatusMessage;
+                                }
                             }
-                            else
+
+                            void OnFile(string path, string url)
                             {
-                                nextItem.Status = QueueItemStatus.Failed;
-                                nextItem.StatusText = "Download failed";
-                                ItemFailed?.Invoke(nextItem);
+                                if (url == nextItem.Url || string.IsNullOrWhiteSpace(nextItem.DownloadedFilePath))
+                                {
+                                    nextItem.DownloadedFilePath = path;
+                                    if (nextItem.Title.StartsWith("Batch Item #") && File.Exists(path))
+                                    {
+                                        nextItem.Title = Path.GetFileNameWithoutExtension(path);
+                                    }
+                                }
+                            }
+
+                            _downloadService.ProgressChanged += OnProgress;
+                            _downloadService.FileDownloaded += OnFile;
+
+                            try
+                            {
+                                bool success = await _downloadService.DownloadWithYtDlpAsync(
+                                    nextItem.Url,
+                                    nextItem.FormatCode,
+                                    tempDir,
+                                    nextItem.DestinationFolder,
+                                    nextItem.IsAudioOnly,
+                                    nextItem.AudioFormat,
+                                    false, 0, 0,
+                                    cts.Token);
+
+                                if (success)
+                                {
+                                    nextItem.Status = QueueItemStatus.Completed;
+                                    nextItem.StatusText = "Completed";
+                                    nextItem.Progress = 100;
+                                    ItemCompleted?.Invoke(nextItem);
+                                }
+                                else
+                                {
+                                    nextItem.Status = QueueItemStatus.Failed;
+                                    nextItem.StatusText = "Download failed";
+                                    ItemFailed?.Invoke(nextItem);
+                                }
+                            }
+                            finally
+                            {
+                                _downloadService.ProgressChanged -= OnProgress;
+                                _downloadService.FileDownloaded -= OnFile;
                             }
                         }
                         catch (OperationCanceledException)
@@ -138,6 +218,7 @@ namespace UniversalDownloader.Services
                         {
                             _cancellationTokens.TryRemove(nextItem.Id, out _);
                             _semaphore.Release();
+                            QueueChanged?.Invoke();
                         }
                     });
                 }

@@ -20,7 +20,7 @@ namespace UniversalDownloader
                         _queueManager.Enqueue(item);
                     }
 
-                    ModernMessageBox.Show($"Added {items.Count} items to download queue!", "Batch Import", MessageBoxButton.OK, MessageBoxImage.Information, this);
+                    ShowQueueView();
                 }
             }
             catch (Exception ex)
