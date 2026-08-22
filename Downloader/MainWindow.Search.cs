@@ -219,6 +219,11 @@ namespace UniversalDownloader
             }
         }
 
+        private Task<SearchResultBatch>? _smartMusicSearchTask;
+        private Task<SearchResultBatch>? _realYouTubeSearchTask;
+        private string _lastExecutedQuery = string.Empty;
+        private string _lastExecutedFilter = string.Empty;
+
         private async void SearchFilter_Click(object sender, RoutedEventArgs e)
         {
             if (sender is RadioButton rb)
@@ -226,6 +231,8 @@ namespace UniversalDownloader
                 if (rb == SearchFilterAll) _activeSearchPlatformFilter = "All";
                 else if (rb == SearchFilterYouTube) _activeSearchPlatformFilter = "YouTube";
                 else if (rb == SearchFilterSoundCloud) _activeSearchPlatformFilter = "SoundCloud";
+
+                _lastExecutedFilter = string.Empty; // Force refresh of music platform search
 
                 if (SearchQueryTextBox != null && !string.IsNullOrWhiteSpace(SearchQueryTextBox.Text) && !IsPlaceholder(SearchQueryTextBox.Text))
                 {
@@ -241,32 +248,48 @@ namespace UniversalDownloader
             if (IsPlaceholder(query)) return;
             SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
 
-            _searchCts?.Cancel();
-            _searchCts = new CancellationTokenSource();
+            // Check if both searches were already launched in parallel for this query
+            bool isSameQueryAndFilter = string.Equals(_lastExecutedQuery, query, StringComparison.OrdinalIgnoreCase) &&
+                                        string.Equals(_lastExecutedFilter, _activeSearchPlatformFilter, StringComparison.OrdinalIgnoreCase);
 
-            if (SearchLoadingBorder != null) SearchLoadingBorder.Visibility = Visibility.Visible;
-            if (SearchEmptyStateBorder != null) SearchEmptyStateBorder.Visibility = Visibility.Collapsed;
-            if (SearchStatsTextBlock != null)
+            if (!isSameQueryAndFilter || _smartMusicSearchTask == null || _realYouTubeSearchTask == null)
             {
-                SearchStatsTextBlock.Text = (_currentSearchMode == SearchMode.RealYouTube)
-                    ? $"Searching YouTube for '{query}'..."
-                    : $"Searching '{query}'...";
+                _searchCts?.Cancel();
+                _searchCts = new CancellationTokenSource();
+                var token = _searchCts.Token;
+
+                _lastExecutedQuery = query;
+                _lastExecutedFilter = _activeSearchPlatformFilter;
+
+                // Launch BOTH search engines simultaneously in parallel!
+                _smartMusicSearchTask = _searchService.SearchAsync(query, _activeSearchPlatformFilter, token);
+                _realYouTubeSearchTask = _searchService.SearchRealYouTubeAsync(query, token);
             }
 
-            SearchResults.Clear();
+            var targetTask = (_currentSearchMode == SearchMode.RealYouTube)
+                ? _realYouTubeSearchTask
+                : _smartMusicSearchTask;
+
+            if (targetTask == null) return;
+
+            // If the target task is already complete (from the parallel run), render instantly (0ms)
+            if (!targetTask.IsCompleted)
+            {
+                if (SearchLoadingBorder != null) SearchLoadingBorder.Visibility = Visibility.Visible;
+                if (SearchEmptyStateBorder != null) SearchEmptyStateBorder.Visibility = Visibility.Collapsed;
+                if (SearchStatsTextBlock != null)
+                {
+                    SearchStatsTextBlock.Text = (_currentSearchMode == SearchMode.RealYouTube)
+                        ? $"Searching YouTube for '{query}'..."
+                        : $"Searching '{query}'...";
+                }
+            }
 
             try
             {
-                SearchResultBatch batch;
-                if (_currentSearchMode == SearchMode.RealYouTube)
-                {
-                    batch = await _searchService.SearchRealYouTubeAsync(query, _searchCts.Token);
-                }
-                else
-                {
-                    batch = await _searchService.SearchAsync(query, _activeSearchPlatformFilter, _searchCts.Token);
-                }
+                var batch = await targetTask;
 
+                SearchResults.Clear();
                 foreach (var item in batch.Items)
                 {
                     SearchResults.Add(item);

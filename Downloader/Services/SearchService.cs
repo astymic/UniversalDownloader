@@ -52,8 +52,16 @@ namespace UniversalDownloader.Services
 
             try
             {
-                // Direct YouTube video search with authentic ranking (top 20 results)
-                var results = await QueryYtDlpSearchAsync($"ytsearch20:{cleanQuery}", "YouTube", cancellationToken);
+                // Direct authentic YouTube search web URL (Filtered to Videos, exact YouTube ranking)
+                string searchUrl = $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(cleanQuery)}&sp=EgIQAQ%3D%3D";
+                var results = await QueryYtDlpSearchAsync(searchUrl, "YouTube", cancellationToken, maxItems: 20);
+
+                // Fallback to direct ytsearch if web page extraction had 0 results
+                if (results.Count == 0)
+                {
+                    results = await QueryYtDlpSearchAsync($"ytsearch20:{cleanQuery}", "YouTube", cancellationToken, maxItems: 20);
+                }
+
                 batch.Items.AddRange(results);
                 batch.IsClosestFallback = false;
                 batch.FallbackQuery = string.Empty;
@@ -240,7 +248,7 @@ namespace UniversalDownloader.Services
             return (scResults, usedFallback, matchedFallbackQuery);
         }
 
-        private async Task<List<SearchResultItem>> QueryYtDlpSearchAsync(string searchTarget, string platform, CancellationToken cancellationToken)
+        private async Task<List<SearchResultItem>> QueryYtDlpSearchAsync(string searchTarget, string platform, CancellationToken cancellationToken, int maxItems = 15)
         {
             var list = new List<SearchResultItem>();
 
@@ -265,6 +273,11 @@ namespace UniversalDownloader.Services
             psi.ArgumentList.Add("--no-call-home");
             psi.ArgumentList.Add("--socket-timeout");
             psi.ArgumentList.Add("5");
+            if (searchTarget.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                psi.ArgumentList.Add("--playlist-items");
+                psi.ArgumentList.Add($"1:{maxItems}");
+            }
             psi.ArgumentList.Add("--extractor-args");
             psi.ArgumentList.Add("youtube:skip=translated_subs,comments,dash");
             psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
@@ -305,6 +318,12 @@ namespace UniversalDownloader.Services
             {
                 using var doc = JsonDocument.Parse(jsonLine);
                 var root = doc.RootElement;
+
+                // Skip pure channel/user entries
+                if (root.TryGetProperty("_type", out var typeProp) && typeProp.GetString() == "channel")
+                {
+                    return null;
+                }
 
                 string id = root.TryGetProperty("id", out var idProp) ? idProp.GetString() ?? "" : "";
                 string title = root.TryGetProperty("title", out var titleProp) ? titleProp.GetString() ?? "" : "";
