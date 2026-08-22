@@ -79,6 +79,34 @@ namespace UniversalDownloader
             }
         }
 
+        private void SearchQueryTextBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            if (SearchQueryTextBox != null)
+            {
+                if (SearchQueryTextBox.Text == "Search track, artist, music name or album...")
+                {
+                    SearchQueryTextBox.Text = string.Empty;
+                }
+                SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
+            }
+        }
+
+        private void SearchQueryTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (SearchQueryTextBox != null)
+            {
+                if (string.IsNullOrWhiteSpace(SearchQueryTextBox.Text))
+                {
+                    SearchQueryTextBox.Text = "Search track, artist, music name or album...";
+                    SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
+                }
+                else
+                {
+                    SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
+                }
+            }
+        }
+
         private async void QuickSearchTag_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Content is string tag)
@@ -87,6 +115,7 @@ namespace UniversalDownloader
                 if (SearchQueryTextBox != null)
                 {
                     SearchQueryTextBox.Text = cleanTag;
+                    SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
                 }
                 await PerformSearchAsync();
             }
