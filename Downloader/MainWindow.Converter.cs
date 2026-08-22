@@ -111,6 +111,7 @@ namespace UniversalDownloader
             if (HistoryScrollViewer != null) HistoryScrollViewer.Visibility = Visibility.Collapsed;
             if (SettingsScrollViewer != null) SettingsScrollViewer.Visibility = Visibility.Collapsed;
             if (QueueScrollViewer != null) QueueScrollViewer.Visibility = Visibility.Collapsed;
+            if (SearchScrollViewer != null) SearchScrollViewer.Visibility = Visibility.Collapsed;
             if (ConverterScrollViewer != null)
             {
                 ConverterScrollViewer.Visibility = Visibility.Visible;
