@@ -123,12 +123,17 @@ namespace UniversalDownloader.Services
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
                     FileName = _dependencyManager.YtDlpExecutablePath,
-                    Arguments = $"--get-title --no-warnings \"{url}\"",
                     RedirectStandardOutput = true,
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     StandardOutputEncoding = System.Text.Encoding.UTF8
                 };
+                psi.ArgumentList.Add("--get-title");
+                psi.ArgumentList.Add("--no-warnings");
+                psi.ArgumentList.Add("--ignore-config");
+                psi.ArgumentList.Add("--extractor-args");
+                psi.ArgumentList.Add("youtube:player_client=android,ios,mweb,web");
+                psi.ArgumentList.Add(url);
                 psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
 
                 using (Process process = Process.Start(psi))
@@ -196,6 +201,8 @@ namespace UniversalDownloader.Services
             psi.ArgumentList.Add("--no-warnings");
             psi.ArgumentList.Add("--ignore-config");
             psi.ArgumentList.Add("--no-playlist");
+            psi.ArgumentList.Add("--retries");
+            psi.ArgumentList.Add("5");
 
             if (!string.IsNullOrWhiteSpace(cookiesFromBrowser))
             {
@@ -235,7 +242,6 @@ namespace UniversalDownloader.Services
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
                     FileName = _dependencyManager.YtDlpExecutablePath,
-                    Arguments = $"--flat-playlist -J --no-warnings --ignore-config \"{url}\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -243,6 +249,11 @@ namespace UniversalDownloader.Services
                     StandardOutputEncoding = System.Text.Encoding.UTF8,
                     StandardErrorEncoding = System.Text.Encoding.UTF8
                 };
+                psi.ArgumentList.Add("--flat-playlist");
+                psi.ArgumentList.Add("-J");
+                psi.ArgumentList.Add("--no-warnings");
+                psi.ArgumentList.Add("--ignore-config");
+                psi.ArgumentList.Add(url);
                 psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
 
                 using (Process process = Process.Start(psi))
@@ -387,9 +398,46 @@ namespace UniversalDownloader.Services
 
             url = CleanUrl(url);
 
+            // If it's a Spotify / search query, prepare multi-attempt search queries
+            if (url.StartsWith("ytsearch", StringComparison.OrdinalIgnoreCase))
+            {
+                var searchQueries = new List<string> { url };
+                foreach (var fallback in GenerateFallbackSearchQueries(url))
+                {
+                    if (!searchQueries.Contains(fallback))
+                    {
+                        searchQueries.Add(fallback);
+                    }
+                }
+
+                Exception? lastSearchEx = null;
+                foreach (var query in searchQueries)
+                {
+                    try
+                    {
+                        return await ExecuteYtDlpDownloadAsync(query, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, null);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastSearchEx = ex;
+                        Debug.WriteLine($"Search attempt '{query}' failed: {ex.Message}");
+                    }
+                }
+
+                throw lastSearchEx ?? new Exception("No search results found on YouTube.");
+            }
+
             try
             {
                 return await ExecuteYtDlpDownloadAsync(url, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, null);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch
             {
@@ -409,9 +457,9 @@ namespace UniversalDownloader.Services
                             await DownloadDirectFileAsync(directMediaUrl, tempDownloadFolder, finalDestinationFolder, cancellationToken, headers);
                             return true;
                         }
-                        catch (Exception ex)
+                        catch (Exception directEx)
                         {
-                            Debug.WriteLine($"Direct Instagram download fallback failed: {ex.Message}");
+                            Debug.WriteLine($"Direct Instagram download fallback failed: {directEx.Message}");
                         }
                     }
 
@@ -423,12 +471,100 @@ namespace UniversalDownloader.Services
                         {
                             return await ExecuteYtDlpDownloadAsync(url, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, browser);
                         }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
                         catch { /* best effort */ }
                     }
 
                     throw new Exception("Instagram requires login for this video. Log in to Instagram in your browser (Chrome/Edge/Firefox) or verify the link.");
                 }
+
+                // For YouTube and other platform links: Attempt browser cookies fallback if unauthenticated client throttled or blocked
+                string[] browserList = new[] { "chrome", "edge", "firefox", "brave", "opera", "vivaldi" };
+                foreach (var browser in browserList)
+                {
+                    try
+                    {
+                        return await ExecuteYtDlpDownloadAsync(url, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, browser);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch { /* best effort */ }
+                }
+
+                // If specific format failed, retry with robust unified format "best" / "bestaudio"
+                try
+                {
+                    string fallbackFormat = extractAudio ? "bestaudio/best" : "best";
+                    return await ExecuteYtDlpDownloadAsync(url, fallbackFormat, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, null);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch { /* best effort */ }
+
                 throw;
+            }
+        }
+
+        private static IEnumerable<string> GenerateFallbackSearchQueries(string originalQuery)
+        {
+            if (!originalQuery.StartsWith("ytsearch", StringComparison.OrdinalIgnoreCase))
+            {
+                yield break;
+            }
+
+            int colonIdx = originalQuery.IndexOf(':');
+            if (colonIdx < 0 || colonIdx >= originalQuery.Length - 1)
+            {
+                yield break;
+            }
+
+            string prefix = originalQuery.Substring(0, colonIdx + 1);
+            string text = originalQuery.Substring(colonIdx + 1).Trim();
+
+            // Clean 1: Strip special punctuation, emojis, quotes, symbols
+            string clean = Regex.Replace(text, @"[^\w\s\-\.\,\(\)\[\]]", " ", RegexOptions.Compiled);
+            clean = Regex.Replace(clean, @"\s+", " ").Trim();
+
+            if (!string.Equals(clean, text, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(clean))
+            {
+                yield return $"{prefix}{clean}";
+            }
+
+            // Clean 2: If contains " - ", split primary artist and clean title
+            if (text.Contains(" - "))
+            {
+                var parts = text.Split(new[] { " - " }, 2, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 2)
+                {
+                    string rawArtist = parts[0].Trim();
+                    string rawTitle = parts[1].Trim();
+
+                    // Extract primary artist before comma, &, feat, ft.
+                    string primaryArtist = Regex.Split(rawArtist, @",|&|\bfeat\.?|\bft\.?", RegexOptions.IgnoreCase)[0].Trim();
+
+                    // Clean title removing (feat. ...), [Official ...], etc.
+                    string cleanTitle = Regex.Replace(rawTitle, @"\((?:feat\.?|ft\.?|official|video|audio|lyrics|extended|prod\.?).*?\)", "", RegexOptions.IgnoreCase);
+                    cleanTitle = Regex.Replace(cleanTitle, @"\[(?:feat\.?|ft\.?|official|video|audio|lyrics|extended|prod\.?).*?\]", "", RegexOptions.IgnoreCase);
+                    cleanTitle = Regex.Replace(cleanTitle, @"[^\w\s\-]", " ", RegexOptions.Compiled);
+                    cleanTitle = Regex.Replace(cleanTitle, @"\s+", " ").Trim();
+
+                    if (!string.IsNullOrWhiteSpace(primaryArtist) && !string.IsNullOrWhiteSpace(cleanTitle))
+                    {
+                        yield return $"{prefix}{primaryArtist} {cleanTitle}";
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(cleanTitle) && cleanTitle.Length > 2)
+                    {
+                        yield return $"{prefix}{cleanTitle}";
+                    }
+                }
             }
         }
 
@@ -612,11 +748,18 @@ namespace UniversalDownloader.Services
             }
 
             psi.ArgumentList.Add("--no-playlist");
-            psi.ArgumentList.Add("--no-continue");
             psi.ArgumentList.Add("--progress");
             psi.ArgumentList.Add("--newline");
             psi.ArgumentList.Add("--no-warnings");
             psi.ArgumentList.Add("--ignore-config");
+            psi.ArgumentList.Add("--retries");
+            psi.ArgumentList.Add("10");
+            psi.ArgumentList.Add("--fragment-retries");
+            psi.ArgumentList.Add("10");
+            psi.ArgumentList.Add("--file-access-retries");
+            psi.ArgumentList.Add("5");
+            psi.ArgumentList.Add("--extractor-args");
+            psi.ArgumentList.Add("youtube:player_client=android,web");
 
             if (!string.IsNullOrWhiteSpace(cookiesFromBrowser))
             {
@@ -624,10 +767,11 @@ namespace UniversalDownloader.Services
                 psi.ArgumentList.Add(cookiesFromBrowser);
             }
 
-            if (_dependencyManager.IsFfmpegReady)
+            string ffmpegDir = AppContext.BaseDirectory;
+            if (File.Exists(Path.Combine(ffmpegDir, "ffmpeg.exe")) || _dependencyManager.IsFfmpegReady)
             {
                 psi.ArgumentList.Add("--ffmpeg-location");
-                psi.ArgumentList.Add(_dependencyManager.FfmpegExecutablePath);
+                psi.ArgumentList.Add(ffmpegDir);
             }
 
             psi.ArgumentList.Add(url);

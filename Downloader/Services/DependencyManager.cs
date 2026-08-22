@@ -159,6 +159,13 @@ namespace UniversalDownloader.Services
                 if (string.IsNullOrEmpty(ffmpegSourcePath)) return false;
 
                 File.Copy(ffmpegSourcePath, FfmpegExecutablePath, true);
+
+                string? ffprobeSourcePath = Directory.EnumerateFiles(tempExtractPath, "ffprobe.exe", SearchOption.AllDirectories).FirstOrDefault();
+                if (!string.IsNullOrEmpty(ffprobeSourcePath))
+                {
+                    File.Copy(ffprobeSourcePath, Path.Combine(AppContext.BaseDirectory, "ffprobe.exe"), true);
+                }
+
                 return File.Exists(FfmpegExecutablePath);
             }
             catch (Exception ex)

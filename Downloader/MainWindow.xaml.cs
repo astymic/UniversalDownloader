@@ -1126,9 +1126,13 @@ namespace UniversalDownloader
             }
             catch (Exception ex)
             {
-                StatusTextBlock.Text = $"Error: {ex.Message.Split('\n')[0]}";
+                string msg = ex.Message.Replace("\r", " ").Replace("\n", " ").Trim();
+                if (msg.Length > 120) msg = msg.Substring(0, 117) + "...";
+                StatusTextBlock.Text = $"Error: {msg}";
+                StatusTextBlock.ToolTip = ex.ToString();
                 FileNameTextBlock.Text = "Download failed";
                 FileNameTextBlock.Visibility = Visibility.Visible;
+                Debug.WriteLine($"[DOWNLOAD ERROR] {ex}");
             }
             finally
             {
