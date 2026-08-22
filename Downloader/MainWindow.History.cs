@@ -13,6 +13,16 @@ namespace UniversalDownloader
     {
         private void HistoryButton_Click(object sender, RoutedEventArgs e)
         {
+            CollapseSpotifyDrawer();
+
+            if (HistoryScrollViewer != null && HistoryScrollViewer.Visibility == Visibility.Visible)
+            {
+                // Toggle back to Main view
+                HistoryScrollViewer.Visibility = Visibility.Collapsed;
+                if (MainScrollViewer != null) MainScrollViewer.Visibility = Visibility.Visible;
+                return;
+            }
+
             if (MainScrollViewer != null) MainScrollViewer.Visibility = Visibility.Collapsed;
             if (SettingsScrollViewer != null) SettingsScrollViewer.Visibility = Visibility.Collapsed;
             if (HistoryScrollViewer != null)

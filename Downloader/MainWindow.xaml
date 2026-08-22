@@ -517,7 +517,6 @@
                         <TextBlock Text="Universal Downloader" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button x:Name="HistoryButton" Content="&#xE81C;" Style="{StaticResource WindowControlButton}" Click="HistoryButton_Click" ToolTip="Download History"/>
                         <Button x:Name="SettingsButton" Content="&#xE713;" Style="{StaticResource WindowControlButton}" Click="SettingsButton_Click" ToolTip="Settings"/>
                         <Button x:Name="MinimizeButton" Content="&#xE921;" Style="{StaticResource WindowControlButton}" Click="MinimizeButton_Click" ToolTip="Minimize"/>
                         <Button x:Name="MaximizeRestoreButton" Content="&#xE922;" Style="{StaticResource WindowControlButton}" Click="MaximizeRestoreButton_Click" ToolTip="Maximize"/>
@@ -900,15 +899,15 @@
                         <TranslateTransform x:Name="DrawerTransform" X="260"/>
                     </Border.RenderTransform>
                     <Grid>
-                        <!-- COLLAPSED STATE (Spotify Green Button) -->
-                        <Grid x:Name="SpotifyCollapsedView" Width="60" HorizontalAlignment="Left" Visibility="Visible" Opacity="1">
+                        <!-- COLLAPSED STATE (Right Sidebar Buttons: Spotify & History) -->
+                        <StackPanel x:Name="SpotifyCollapsedView" Width="60" HorizontalAlignment="Left" Visibility="Visible" Opacity="1">
                             <Button x:Name="SpotifyCollapsedButton"
                                     Width="44"
                                     Height="44"
-                                    Margin="0,20,0,0"
-                                    VerticalAlignment="Top"
+                                    Margin="0,20,0,12"
                                     HorizontalAlignment="Center"
                                     Click="SpotifyCollapsedButton_Click"
+                                    ToolTip="Spotify Playlist Downloader"
                                     Cursor="Hand">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
@@ -929,7 +928,38 @@
                                     </ControlTemplate>
                                 </Button.Template>
                             </Button>
-                        </Grid>
+
+                            <!-- History Button -->
+                            <Button x:Name="HistoryButton"
+                                    Width="44"
+                                    Height="44"
+                                    Margin="0,0,0,12"
+                                    HorizontalAlignment="Center"
+                                    Click="HistoryButton_Click"
+                                    ToolTip="Download History"
+                                    Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="border" Background="#1E1E24" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="22">
+                                            <!-- Modern History / Clock SVG Icon -->
+                                            <Path Width="20" Height="20" Stretch="Uniform" Fill="#FAFAFA" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Data="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="#8B5CF6"/>
+                                                <Setter TargetName="border" Property="BorderBrush" Value="#A78BFA"/>
+                                                <Setter TargetName="border" Property="Effect">
+                                                    <Setter.Value>
+                                                        <DropShadowEffect BlurRadius="15" ShadowDepth="0" Color="#8B5CF6" Opacity="0.6"/>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </StackPanel>
 
                         <!-- EXPANDED STATE (Full Drawer Panel) -->
                         <Grid x:Name="SpotifyExpandedView" Visibility="Collapsed" Opacity="0" Margin="16,20,16,20">
