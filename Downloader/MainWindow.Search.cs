@@ -130,16 +130,23 @@ namespace UniversalDownloader
 
             try
             {
-                var items = await _searchService.SearchAsync(query, _activeSearchPlatformFilter, _searchCts.Token);
+                var batch = await _searchService.SearchAsync(query, _activeSearchPlatformFilter, _searchCts.Token);
 
-                foreach (var item in items)
+                foreach (var item in batch.Items)
                 {
                     SearchResults.Add(item);
                 }
 
                 if (SearchStatsTextBlock != null)
                 {
-                    SearchStatsTextBlock.Text = $"Found {SearchResults.Count} result{(SearchResults.Count == 1 ? "" : "s")} for \"{query}\"";
+                    if (batch.IsClosestFallback && !string.IsNullOrWhiteSpace(batch.FallbackQuery))
+                    {
+                        SearchStatsTextBlock.Text = $"Showing closest results for \"{batch.FallbackQuery}\" ({SearchResults.Count} found)";
+                    }
+                    else
+                    {
+                        SearchStatsTextBlock.Text = $"Found {SearchResults.Count} result{(SearchResults.Count == 1 ? "" : "s")} for \"{query}\"";
+                    }
                 }
 
                 if (SearchResults.Count == 0 && SearchEmptyStateBorder != null)

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -10,6 +10,13 @@ using UniversalDownloader.Models;
 
 namespace UniversalDownloader.Services
 {
+    public class SearchResultBatch
+    {
+        public List<SearchResultItem> Items { get; set; } = new();
+        public bool IsClosestFallback { get; set; }
+        public string FallbackQuery { get; set; } = string.Empty;
+    }
+
     public class SearchService
     {
         private readonly DependencyManager _dependencyManager;
@@ -19,11 +26,11 @@ namespace UniversalDownloader.Services
             _dependencyManager = dependencyManager;
         }
 
-        public async Task<List<SearchResultItem>> SearchAsync(string query, string platformFilter = "All", CancellationToken cancellationToken = default)
+        public async Task<SearchResultBatch> SearchAsync(string query, string platformFilter = "All", CancellationToken cancellationToken = default)
         {
-            var results = new List<SearchResultItem>();
-            if (string.IsNullOrWhiteSpace(query)) return results;
-            if (!_dependencyManager.IsYtDlpReady) return results;
+            var batch = new SearchResultBatch();
+            if (string.IsNullOrWhiteSpace(query)) return batch;
+            if (!_dependencyManager.IsYtDlpReady) return batch;
 
             string cleanQuery = query.Trim();
 
@@ -33,13 +40,83 @@ namespace UniversalDownloader.Services
             bool searchSoundCloud = string.Equals(platformFilter, "All", StringComparison.OrdinalIgnoreCase) ||
                                     string.Equals(platformFilter, "SoundCloud", StringComparison.OrdinalIgnoreCase);
 
+            var ytResults = new List<SearchResultItem>();
+            var scResults = new List<SearchResultItem>();
+            bool usedFallback = false;
+            string matchedFallbackQuery = string.Empty;
+
             // Step 1: YouTube Search (Primary)
             if (searchYouTube)
             {
                 try
                 {
-                    var ytResults = await QueryYtDlpSearchAsync($"ytsearch15:{cleanQuery}", "YouTube", cancellationToken);
-                    results.AddRange(ytResults);
+                    ytResults = await QueryYtDlpSearchAsync($"ytsearch15:{cleanQuery}", "YouTube", cancellationToken);
+
+                    // If 0 results, find closest YouTube results by progressive phrase relaxation
+                    if (ytResults.Count == 0 && cleanQuery.Contains(' '))
+                    {
+                        var words = cleanQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                        // 1. Try progressive sub-phrases dropping words from right to left
+                        for (int len = words.Length - 1; len >= 1; len--)
+                        {
+                            string subQuery = string.Join(" ", words, 0, len);
+                            if (subQuery.Length >= 2)
+                            {
+                                var fallbackYt = await QueryYtDlpSearchAsync($"ytsearch15:{subQuery}", "YouTube", cancellationToken);
+                                if (fallbackYt.Count > 0)
+                                {
+                                    ytResults.AddRange(fallbackYt);
+                                    usedFallback = true;
+                                    matchedFallbackQuery = subQuery;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // 2. If still 0 results, try skipping first words (e.g. "w2 w3", "w3 w4")
+                        if (ytResults.Count == 0 && words.Length > 2)
+                        {
+                            for (int start = 1; start < words.Length; start++)
+                            {
+                                string subQuery = string.Join(" ", words, start, words.Length - start);
+                                if (subQuery.Length >= 2)
+                                {
+                                    var fallbackYt = await QueryYtDlpSearchAsync($"ytsearch15:{subQuery}", "YouTube", cancellationToken);
+                                    if (fallbackYt.Count > 0)
+                                    {
+                                        ytResults.AddRange(fallbackYt);
+                                        usedFallback = true;
+                                        matchedFallbackQuery = subQuery;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3. If still 0 results, search for the longest distinctive individual words
+                        if (ytResults.Count == 0)
+                        {
+                            var longestWords = words.Where(w => w.Length >= 3).OrderByDescending(w => w.Length).Take(2);
+                            foreach (var word in longestWords)
+                            {
+                                var wordYt = await QueryYtDlpSearchAsync($"ytsearch10:{word}", "YouTube", cancellationToken);
+                                if (wordYt.Count > 0)
+                                {
+                                    foreach (var item in wordYt)
+                                    {
+                                        if (!ytResults.Exists(x => x.Id == item.Id))
+                                        {
+                                            ytResults.Add(item);
+                                        }
+                                    }
+                                    usedFallback = true;
+                                    matchedFallbackQuery = word;
+                                    if (ytResults.Count >= 8) break;
+                                }
+                            }
+                        }
+                    }
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
@@ -53,8 +130,31 @@ namespace UniversalDownloader.Services
             {
                 try
                 {
-                    var scResults = await QueryYtDlpSearchAsync($"scsearch10:{cleanQuery}", "SoundCloud", cancellationToken);
-                    results.AddRange(scResults);
+                    scResults = await QueryYtDlpSearchAsync($"scsearch10:{cleanQuery}", "SoundCloud", cancellationToken);
+
+                    // Fallback for SoundCloud if 0 results
+                    if (scResults.Count == 0 && cleanQuery.Contains(' '))
+                    {
+                        var words = cleanQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        for (int len = words.Length - 1; len >= 1; len--)
+                        {
+                            string subQuery = string.Join(" ", words, 0, len);
+                            if (subQuery.Length >= 2)
+                            {
+                                var fallbackSc = await QueryYtDlpSearchAsync($"scsearch10:{subQuery}", "SoundCloud", cancellationToken);
+                                if (fallbackSc.Count > 0)
+                                {
+                                    scResults.AddRange(fallbackSc);
+                                    if (!usedFallback)
+                                    {
+                                        usedFallback = true;
+                                        matchedFallbackQuery = subQuery;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
@@ -63,7 +163,12 @@ namespace UniversalDownloader.Services
                 }
             }
 
-            return results;
+            batch.Items.AddRange(ytResults);
+            batch.Items.AddRange(scResults);
+            batch.IsClosestFallback = usedFallback;
+            batch.FallbackQuery = matchedFallbackQuery;
+
+            return batch;
         }
 
         private async Task<List<SearchResultItem>> QueryYtDlpSearchAsync(string searchTarget, string platform, CancellationToken cancellationToken)
