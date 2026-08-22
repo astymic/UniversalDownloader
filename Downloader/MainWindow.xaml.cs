@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Ookii.Dialogs.Wpf;
 using UniversalDownloader.Services;
+using UniversalDownloader.Models;
 using System.Text;
 using System.Windows.Media.Animation;
 using System.Windows.Input;
@@ -24,6 +25,13 @@ namespace UniversalDownloader
         private string? _selectedDirectory;
         private readonly DependencyManager _dependencyManager;
         private readonly DownloadService _downloadService;
+        private readonly MetadataService _metadataService;
+        private readonly HistoryService _historyService;
+        private readonly TikTokExtractor _tikTokExtractor;
+        private readonly ClipboardMonitorService _clipboardMonitor;
+        private readonly DownloadQueueManager _queueManager;
+
+        public ObservableCollection<DownloadHistoryItem> HistoryItems => _historyService.Items;
 
         private bool _isInitializing = false;
         private bool _isProcessingUrl = false;
@@ -67,6 +75,101 @@ namespace UniversalDownloader
 
             _downloadService = new DownloadService(_dependencyManager);
             _downloadService.ProgressChanged += DownloadService_ProgressChanged;
+            _downloadService.FileDownloaded += OnFileDownloaded;
+
+            _metadataService = new MetadataService();
+            _historyService = new HistoryService();
+            _tikTokExtractor = new TikTokExtractor();
+            _clipboardMonitor = new ClipboardMonitorService();
+            _queueManager = new DownloadQueueManager(_downloadService, _historyService);
+
+            _clipboardMonitor.MediaUrlDetected += OnClipboardMediaUrlDetected;
+            _clipboardMonitor.Start();
+
+            InitializeTrayIcon();
+        }
+
+        private async void OnFileDownloaded(string filePath, string sourceUrl)
+        {
+            try
+            {
+                if (!File.Exists(filePath)) return;
+
+                var fileInfo = new FileInfo(filePath);
+                string ext = fileInfo.Extension.ToLower();
+                bool isAudio = ext == ".mp3" || ext == ".m4a" || ext == ".flac" || ext == ".wav" || ext == ".ogg" || ext == ".aac";
+
+                // Metadata injection if enabled
+                if (EmbedMetadataEnabled && isAudio && !string.IsNullOrWhiteSpace(_currentItemTitle))
+                {
+                    string title = _currentItemTitle;
+                    string? artist = null;
+                    if (title.Contains(" - "))
+                    {
+                        var parts = title.Split(new[] { " - " }, 2, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length == 2)
+                        {
+                            artist = parts[0].Trim();
+                            title = parts[1].Trim();
+                        }
+                    }
+
+                    await _metadataService.ApplyAudioMetadataAsync(filePath, title, artist);
+                }
+
+                // Determine platform name for history badge
+                string platform = "Media";
+                if (_downloadService.IsYouTubeLink(sourceUrl) || sourceUrl.StartsWith("ytsearch", StringComparison.OrdinalIgnoreCase)) platform = "YouTube";
+                else if (_downloadService.IsSpotifyLink(sourceUrl)) platform = "Spotify";
+                else if (_downloadService.IsInstagramLink(sourceUrl)) platform = "Instagram";
+                else if (_downloadService.IsTikTokLink(sourceUrl)) platform = "TikTok";
+                else if (_downloadService.IsTwitterLink(sourceUrl)) platform = "Twitter/X";
+                else if (_downloadService.IsRedditLink(sourceUrl)) platform = "Reddit";
+                else if (_downloadService.IsSoundCloudLink(sourceUrl)) platform = "SoundCloud";
+                else if (_downloadService.IsGoogleDriveLink(sourceUrl)) platform = "Google Drive";
+
+                var historyItem = new DownloadHistoryItem
+                {
+                    Title = !string.IsNullOrWhiteSpace(_currentItemTitle) ? _currentItemTitle : Path.GetFileNameWithoutExtension(filePath),
+                    Url = sourceUrl,
+                    Platform = platform,
+                    FilePath = filePath,
+                    FileSizeBytes = fileInfo.Length,
+                    FormattedSize = Utilities.FormatBytesOutput(fileInfo.Length),
+                    DownloadDate = DateTime.Now,
+                    IsAudio = isAudio,
+                    FormatExtension = ext.TrimStart('.')
+                };
+
+                await _historyService.AddItemAsync(historyItem);
+
+                // Show notification if minimized or not active
+                if (WindowState == WindowState.Minimized || !IsActive)
+                {
+                    ShowTrayNotification("Download Completed", $"{historyItem.Title} ({historyItem.FormattedSize})");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to post-process downloaded file '{filePath}': {ex.Message}");
+            }
+        }
+
+        private void OnClipboardMediaUrlDetected(string url)
+        {
+            Dispatcher.InvokeAsync(async () =>
+            {
+                if (AutoDetectClipboardEnabled && UrlTextBox != null)
+                {
+                    string current = UrlTextBox.Text.Trim();
+                    if (string.IsNullOrWhiteSpace(current) || current == "Paste URL here..." || current != url)
+                    {
+                        UrlTextBox.Text = url;
+                        UrlTextBox.Foreground = (Brush)FindResource("TextPrimaryBrush");
+                        await ProcessUrlChange(url);
+                    }
+                }
+            });
         }
 
         private void DependencyManager_ProgressUpdated(string status)

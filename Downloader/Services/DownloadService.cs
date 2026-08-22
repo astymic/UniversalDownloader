@@ -24,12 +24,15 @@ namespace UniversalDownloader.Services
     {
         private readonly HttpClient _httpClient;
         private readonly DependencyManager _dependencyManager;
+        private readonly TikTokExtractor _tikTokExtractor;
 
         public event EventHandler<DownloadProgressArgs>? ProgressChanged;
+        public event Action<string, string>? FileDownloaded;
 
         public DownloadService(DependencyManager dependencyManager)
         {
             _dependencyManager = dependencyManager;
+            _tikTokExtractor = new TikTokExtractor();
             _httpClient = new HttpClient();
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
             _httpClient.Timeout = TimeSpan.FromMinutes(10);
@@ -61,10 +64,24 @@ namespace UniversalDownloader.Services
             return Regex.IsMatch(url, @"(instagram\.com|instagr\.am)\/", RegexOptions.IgnoreCase);
         }
 
+        public bool IsTikTokLink(string url) => TikTokExtractor.IsTikTokUrl(url);
+
+        public bool IsTwitterLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"(twitter\.com|x\.com)\/", RegexOptions.IgnoreCase);
+        }
+
+        public bool IsRedditLink(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return Regex.IsMatch(url, @"(reddit\.com|redd\.it)\/", RegexOptions.IgnoreCase);
+        }
+
         public bool IsSocialVideoLink(string url)
         {
             if (string.IsNullOrWhiteSpace(url)) return false;
-            return Regex.IsMatch(url, @"(tiktok\.com|twitter\.com|x\.com|facebook\.com|fb\.watch|vimeo\.com|reddit\.com|twitch\.tv|pinterest\.com)\/", RegexOptions.IgnoreCase);
+            return Regex.IsMatch(url, @"(tiktok\.com|douyin\.com|twitter\.com|x\.com|facebook\.com|fb\.watch|vimeo\.com|reddit\.com|redd\.it|twitch\.tv|pinterest\.com)\/", RegexOptions.IgnoreCase);
         }
 
         public bool IsYouTubePlaylistLink(string url)
@@ -275,7 +292,7 @@ namespace UniversalDownloader.Services
             }
         }
 
-        public async Task DownloadDirectFileAsync(string url, string tempDownloadFolder, string finalDestinationFolder, CancellationToken cancellationToken, Dictionary<string, string>? customHeaders = null)
+        public async Task DownloadDirectFileAsync(string url, string tempDownloadFolder, string finalDestinationFolder, CancellationToken cancellationToken, Dictionary<string, string>? customHeaders = null, string? overrideFileName = null)
         {
             CleanDirectory(tempDownloadFolder);
 
@@ -297,50 +314,50 @@ namespace UniversalDownloader.Services
 
                     using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                     {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    response.EnsureSuccessStatusCode();
+                        cancellationToken.ThrowIfCancellationRequested();
+                        response.EnsureSuccessStatusCode();
 
-                    tempFileName = GetFileNameFromHeaders(response, url);
-                    tempFilePath = Path.Combine(tempDownloadFolder, tempFileName);
-                    
-                    ReportProgress("Downloading...", tempFileName, 0, true);
+                        tempFileName = !string.IsNullOrWhiteSpace(overrideFileName) ? overrideFileName : GetFileNameFromHeaders(response, url);
+                        tempFilePath = Path.Combine(tempDownloadFolder, tempFileName);
+                        
+                        ReportProgress("Downloading...", tempFileName, 0, true);
 
-                    long? totalBytes = response.Content.Headers.ContentLength;
-                    int lastPercentage = -1;
+                        long? totalBytes = response.Content.Headers.ContentLength;
+                        int lastPercentage = -1;
 
-                    using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
-                    using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
-                    {
-                        byte[] buffer = new byte[81920]; int bytesRead; long totalBytesRead = 0;
-
-                        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+                        using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+                        using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            await fileStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
-                            totalBytesRead += bytesRead;
-                            
-                            if (totalBytes.HasValue && totalBytes.Value > 0)
+                            byte[] buffer = new byte[81920]; int bytesRead; long totalBytesRead = 0;
+
+                            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
                             {
-                                double percentage = (double)totalBytesRead / totalBytes.Value * 100;
-                                if ((int)percentage != lastPercentage)
+                                cancellationToken.ThrowIfCancellationRequested();
+                                await fileStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                                totalBytesRead += bytesRead;
+                                
+                                if (totalBytes.HasValue && totalBytes.Value > 0)
                                 {
-                                    ReportProgress($"Downloading: {percentage:F1}% of {Utilities.FormatBytesOutput(totalBytes.Value)}", tempFileName, percentage, false);
-                                    lastPercentage = (int)percentage;
+                                    double percentage = (double)totalBytesRead / totalBytes.Value * 100;
+                                    if ((int)percentage != lastPercentage)
+                                    {
+                                        ReportProgress($"Downloading: {percentage:F1}% of {Utilities.FormatBytesOutput(totalBytes.Value)}", tempFileName, percentage, false);
+                                        lastPercentage = (int)percentage;
+                                    }
+                                }
+                                else
+                                {
+                                    ReportProgress($"Downloading ({Utilities.FormatBytesOutput(totalBytesRead)})...", tempFileName, 0, true);
                                 }
                             }
-                            else
-                            {
-                                ReportProgress($"Downloading ({Utilities.FormatBytesOutput(totalBytesRead)})...", tempFileName, 0, true);
-                            }
                         }
-                    }
 
-                    CopyToFinalDestinationAndClean(tempDownloadFolder, finalDestinationFolder);
-                    ReportProgress($"Download complete — saved as '{tempFileName}'", tempFileName, 100, false);
+                        CopyToFinalDestinationAndClean(tempDownloadFolder, finalDestinationFolder, url);
+                        ReportProgress($"Download complete — saved as '{tempFileName}'", tempFileName, 100, false);
+                    }
                 }
             }
-        }
-        catch (OperationCanceledException)
+            catch (OperationCanceledException)
             {
                 if (tempFilePath != null && File.Exists(tempFilePath))
                 {
@@ -429,6 +446,36 @@ namespace UniversalDownloader.Services
                 }
 
                 throw lastSearchEx ?? new Exception("No search results found on YouTube.");
+            }
+
+            // Direct TikTok no-watermark extraction
+            if (IsTikTokLink(url) && !useTrimming)
+            {
+                try
+                {
+                    var mediaInfo = await _tikTokExtractor.ExtractTikTokMediaAsync(url);
+                    if (mediaInfo != null)
+                    {
+                        string? targetUrl = extractAudio && !string.IsNullOrWhiteSpace(mediaInfo.DirectAudioUrl)
+                            ? mediaInfo.DirectAudioUrl
+                            : mediaInfo.DirectVideoUrl;
+
+                        if (!string.IsNullOrWhiteSpace(targetUrl))
+                        {
+                            string title = !string.IsNullOrWhiteSpace(overrideFileName) ? overrideFileName : (mediaInfo.Title ?? "TikTok Video");
+                            string ext = extractAudio ? (audioFormat ?? "mp3") : "mp4";
+                            string cleanName = Utilities.SanitizeFileName(title);
+                            if (!cleanName.EndsWith("." + ext, StringComparison.OrdinalIgnoreCase)) cleanName += "." + ext;
+
+                            await DownloadDirectFileAsync(targetUrl, tempDownloadFolder, finalDestinationFolder, cancellationToken, null, cleanName);
+                            return true;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Direct TikTok download fallback failed: {ex.Message}");
+                }
             }
 
             try
@@ -908,7 +955,7 @@ namespace UniversalDownloader.Services
             catch { }
         }
 
-        private void CopyToFinalDestinationAndClean(string tempDownloadFolder, string finalDestinationFolder)
+        private void CopyToFinalDestinationAndClean(string tempDownloadFolder, string finalDestinationFolder, string sourceUrl = "")
         {
             if (!Directory.Exists(finalDestinationFolder))
             {
@@ -925,6 +972,12 @@ namespace UniversalDownloader.Services
                 File.Copy(sourceFile, destFile, true);
                 
                 try { File.Delete(sourceFile); } catch { }
+
+                try
+                {
+                    FileDownloaded?.Invoke(destFile, sourceUrl);
+                }
+                catch { }
             }
         }
 

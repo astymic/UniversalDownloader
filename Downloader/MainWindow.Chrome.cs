@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -210,7 +210,16 @@ namespace UniversalDownloader
 
         private void CloseButton_Click(object? sender, RoutedEventArgs e)
         {
-            this.Close();
+            if (MinimizeToTrayEnabled)
+            {
+                this.Hide();
+                ShowTrayNotification("Universal Downloader", "App running in background. Double-click tray icon to restore.");
+            }
+            else
+            {
+                DisposeTrayIcon();
+                this.Close();
+            }
         }
 
         private void MainWindow_StateChanged(object? sender, EventArgs e)

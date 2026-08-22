@@ -500,6 +500,7 @@
                         <TextBlock Text="Universal Downloader" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button x:Name="HistoryButton" Content="&#xE81C;" Style="{StaticResource WindowControlButton}" Click="HistoryButton_Click" ToolTip="Download History"/>
                         <Button x:Name="SettingsButton" Content="&#xE713;" Style="{StaticResource WindowControlButton}" Click="SettingsButton_Click" ToolTip="Settings"/>
                         <Button x:Name="MinimizeButton" Content="&#xE921;" Style="{StaticResource WindowControlButton}" Click="MinimizeButton_Click" ToolTip="Minimize"/>
                         <Button x:Name="MaximizeRestoreButton" Content="&#xE922;" Style="{StaticResource WindowControlButton}" Click="MaximizeRestoreButton_Click" ToolTip="Maximize"/>
@@ -765,6 +766,83 @@
                                 </Grid>
                             </StackPanel>
                         </Border>
+
+                        <!-- General / Clipboard Settings -->
+                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                            <StackPanel>
+                                <TextBlock Text="CLIPBOARD &amp; NOTIFICATIONS" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
+                                <CheckBox x:Name="AutoDetectClipboardCheckBox" Style="{StaticResource ModernCheckBox}" Content="Auto-detect supported media links copied to clipboard" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,14" IsChecked="True"/>
+                                <CheckBox x:Name="MinimizeToTrayCheckBox" Style="{StaticResource ModernCheckBox}" Content="Minimize to System Tray when closing the window" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,4"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Media Quality & Metadata Settings -->
+                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                            <StackPanel>
+                                <TextBlock Text="MEDIA TAGS &amp; ENRICHMENT" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
+                                <CheckBox x:Name="EmbedMetadataCheckBox" Style="{StaticResource ModernCheckBox}" Content="Embed ID3 tags (Artist, Title, Album) &amp; album art into audio files" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,14" IsChecked="True"/>
+                                <CheckBox x:Name="DownloadSubtitlesCheckBox" Style="{StaticResource ModernCheckBox}" Content="Download subtitles/captions with video when available" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,4"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Download History View -->
+                <ScrollViewer x:Name="HistoryScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed">
+                    <StackPanel Margin="40,20,40,40" MaxWidth="720">
+                        <!-- Top Bar: Back & Clear History -->
+                        <Grid Margin="0,0,0,24">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="&#x2190; Back to Downloader" Style="{StaticResource SecondaryButton}" Click="BackFromHistory_Click" HorizontalAlignment="Left" Padding="14,8"/>
+                            <Button Grid.Column="1" Content="Clear All History" Style="{StaticResource MinimalistCancelButton}" Click="ClearAllHistory_Click" Padding="12,6" FontSize="12"/>
+                        </Grid>
+
+                        <!-- Header -->
+                        <TextBlock Text="Download History" 
+                                   FontSize="36" 
+                                   FontWeight="Bold" 
+                                   Foreground="{StaticResource TextPrimaryBrush}" 
+                                   Margin="0,0,0,24"/>
+
+                        <!-- History Items List -->
+                        <ItemsControl x:Name="HistoryItemsControl" ItemsSource="{Binding Path=HistoryItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="16" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Item Info -->
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border Background="#208B5CF6" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
+                                                        <TextBlock Text="{Binding Platform}" Foreground="{StaticResource PrimaryHoverBrush}" FontSize="11" FontWeight="SemiBold"/>
+                                                    </Border>
+                                                    <TextBlock Text="{Binding FormattedSize}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                    <TextBlock Text="•" Foreground="{StaticResource BorderBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                    <TextBlock Text="{Binding DownloadDate, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </StackPanel>
+
+                                            <!-- Action Buttons -->
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Button Style="{StaticResource SecondaryButton}" Content="▶ Open" Click="HistoryOpenFile_Click" Tag="{Binding}" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Open file with default app"/>
+                                                <Button Style="{StaticResource SecondaryButton}" Content="📂 Folder" Click="HistoryOpenFolder_Click" Tag="{Binding}" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Show file in folder"/>
+                                                <Button Style="{StaticResource SecondaryButton}" Content="📋 Link" Click="HistoryCopyUrl_Click" Tag="{Binding}" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Copy original URL"/>
+                                                <Button Style="{StaticResource MinimalistCancelButton}" Content="✕" Click="HistoryDeleteItem_Click" Tag="{Binding}" Padding="8,6" FontSize="11" ToolTip="Remove from history"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </ScrollViewer>
 
