@@ -33,6 +33,7 @@ namespace UniversalDownloader
         private readonly ClipboardMonitorService _clipboardMonitor;
         private readonly DownloadQueueManager _queueManager;
         private readonly AudioPreviewService _audioPreviewService;
+        private readonly LyricsService _lyricsService;
         private bool _isUserSeeking = false;
 
         public ObservableCollection<DownloadHistoryItem> HistoryItems => _historyService.Items;
@@ -53,6 +54,8 @@ namespace UniversalDownloader
         private bool _isDraggingEndThumb = false;
 
         private CancellationTokenSource? _cancellationTokenSource;
+        private System.Windows.Threading.DispatcherTimer? _urlDebounceTimer;
+        private CancellationTokenSource? _urlProcessingCts;
         private string _currentItemTitle = "";
         private ObservableCollection<PlaylistVideoItem> _playlistItems = new ObservableCollection<PlaylistVideoItem>();
         private bool _isPlaylistMode = false;
@@ -93,11 +96,14 @@ namespace UniversalDownloader
             _audioPreviewService.MediaFailed += AudioPreviewService_MediaFailed;
             _audioPreviewService.MediaEnded += AudioPreviewService_MediaEnded;
 
+            _lyricsService = new LyricsService();
+
             _clipboardMonitor.MediaUrlDetected += OnClipboardMediaUrlDetected;
             _clipboardMonitor.Start();
 
             InitializeTrayIcon();
             InitializeHistoryBindings();
+            InitializeMediaConverter();
         }
 
         private async void OnFileDownloaded(string filePath, string sourceUrl)
@@ -126,6 +132,30 @@ namespace UniversalDownloader
                     }
 
                     await _metadataService.ApplyAudioMetadataAsync(filePath, title, artist);
+                }
+
+                // Synced lyrics (.lrc companion file) download if enabled
+                if (DownloadLyricsEnabled && isAudio && !string.IsNullOrWhiteSpace(_currentItemTitle))
+                {
+                    try
+                    {
+                        string title = _currentItemTitle;
+                        string? artist = null;
+                        if (title.Contains(" - "))
+                        {
+                            var parts = title.Split(new[] { " - " }, 2, StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length == 2)
+                            {
+                                artist = parts[0].Trim();
+                                title = parts[1].Trim();
+                            }
+                        }
+                        await _lyricsService.FetchAndSaveLyricsAsync(filePath, title, artist);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Failed to download synced lyrics: {ex.Message}");
+                    }
                 }
 
                 // Resolve real source URL for history and link copying
@@ -192,7 +222,7 @@ namespace UniversalDownloader
                     {
                         UrlTextBox.Text = url;
                         UrlTextBox.Foreground = (Brush)FindResource("TextPrimaryBrush");
-                        await ProcessUrlChange(url);
+                        await ProcessUrlChange(url, CancellationToken.None);
                     }
                 }
             });
@@ -265,7 +295,7 @@ namespace UniversalDownloader
 
             if (UrlTextBox != null && !string.IsNullOrWhiteSpace(UrlTextBox.Text) && UrlTextBox.Text != "Paste URL here...")
             {
-                await ProcessUrlChange(UrlTextBox.Text);
+                await ProcessUrlChange(UrlTextBox.Text, CancellationToken.None);
             }
             else
             {
@@ -502,37 +532,74 @@ namespace UniversalDownloader
             }
         }
 
-        private async void UrlTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        private void UrlTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (YouTubeQualityComboBox == null || StatusTextBlock == null || FileNameTextBlock == null || QualitySection == null) return;
-            if (_isProcessingUrl || _isDownloadingFile) return;
+            if (_isDownloadingFile) return;
+
+            string currentUrl = UrlTextBox.Text?.Trim() ?? "";
+
+            _urlDebounceTimer?.Stop();
+            _urlProcessingCts?.Cancel();
+
+            if (string.IsNullOrWhiteSpace(currentUrl) || currentUrl == "Paste URL here...")
+            {
+                _isProcessingUrl = false;
+                _ = ProcessUrlChange(currentUrl, CancellationToken.None);
+                return;
+            }
+
+            // Non-blocking debounce timer (300ms)
+            _urlDebounceTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+            _urlDebounceTimer.Tick += async (s, ev) =>
+            {
+                _urlDebounceTimer?.Stop();
+                await TriggerProcessUrlAsync(currentUrl);
+            };
+            _urlDebounceTimer.Start();
+        }
+
+        private async Task TriggerProcessUrlAsync(string url)
+        {
+            _urlProcessingCts?.Cancel();
+            _urlProcessingCts = new CancellationTokenSource();
+            var token = _urlProcessingCts.Token;
 
             _isProcessingUrl = true;
-            UpdateUiElementStates("Status: Processing URL...");
+            UpdateUiElementStates("Status: Checking URL...");
 
-            string currentUrl = UrlTextBox.Text;
             try
             {
-                await ProcessUrlChange(currentUrl);
+                await ProcessUrlChange(url, token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Cancelled due to new user input
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error during ProcessUrlChange: {ex}");
-                StatusTextBlock.Text = "Error processing URL.";
-                FileNameTextBlock.Text = "";
-                FileNameTextBlock.Visibility = Visibility.Collapsed;
-                QualitySection.Visibility = Visibility.Collapsed;
-                if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
-                YouTubeQualityComboBox.ItemsSource = null;
+                if (!token.IsCancellationRequested)
+                {
+                    StatusTextBlock.Text = "Error processing URL.";
+                    FileNameTextBlock.Text = "";
+                    FileNameTextBlock.Visibility = Visibility.Collapsed;
+                    QualitySection.Visibility = Visibility.Collapsed;
+                    if (TrimmingSection != null) TrimmingSection.Visibility = Visibility.Collapsed;
+                    YouTubeQualityComboBox.ItemsSource = null;
+                }
             }
             finally
             {
-                _isProcessingUrl = false;
-                UpdateUiElementStates();
+                if (!token.IsCancellationRequested)
+                {
+                    _isProcessingUrl = false;
+                    UpdateUiElementStates();
+                }
             }
         }
 
-        private async Task ProcessUrlChange(string url)
+        private async Task ProcessUrlChange(string url, CancellationToken cancellationToken = default)
         {
             YouTubeQualityComboBox.ItemsSource = null;
             QualitySection.Visibility = Visibility.Collapsed;

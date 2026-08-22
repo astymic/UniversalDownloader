@@ -17,11 +17,15 @@ namespace UniversalDownloader
         private const string SettingsKeyDownloadSubtitles = "DownloadSubtitles";
         private const string SettingsKeyMinimizeToTray = "MinimizeToTray";
         private const string SettingsKeyMultiConnectionAcceleration = "MultiConnectionAcceleration";
+        private const string SettingsKeyDownloadLyrics = "DownloadLyrics";
+        private const string SettingsKeyFilenameTemplate = "FilenameTemplate";
 
         public bool AutoDetectClipboardEnabled { get; set; } = true;
         public bool EmbedMetadataEnabled { get; set; } = true;
         public bool DownloadSubtitlesEnabled { get; set; } = false;
         public bool MultiConnectionAccelerationEnabled { get; set; } = true;
+        public bool DownloadLyricsEnabled { get; set; } = true;
+        public string FilenameTemplate { get; set; } = "{title}";
 
         private string GetSettingsFilePath()
         {
@@ -84,6 +88,25 @@ namespace UniversalDownloader
                         MultiConnectionAccelerationEnabled = accelToken.ToObject<bool>();
                         if (_downloadService != null) _downloadService.EnableMultiConnectionAcceleration = MultiConnectionAccelerationEnabled;
                     }
+
+                    if (settings.TryGetValue(SettingsKeyDownloadLyrics, out JToken? lyricsToken) && lyricsToken != null)
+                    {
+                        DownloadLyricsEnabled = lyricsToken.ToObject<bool>();
+                    }
+
+                    if (settings.TryGetValue(SettingsKeyFilenameTemplate, out JToken? tmplToken) && tmplToken != null)
+                    {
+                        string? t = tmplToken.ToString();
+                        if (!string.IsNullOrWhiteSpace(t))
+                        {
+                            FilenameTemplate = t;
+                        }
+                    }
+
+                    if (_downloadService != null)
+                    {
+                        _downloadService.CustomFilenameTemplate = FilenameTemplate;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -135,6 +158,7 @@ namespace UniversalDownloader
         {
             if (MainScrollViewer != null) MainScrollViewer.Visibility = Visibility.Collapsed;
             if (HistoryScrollViewer != null) HistoryScrollViewer.Visibility = Visibility.Collapsed;
+            if (ConverterScrollViewer != null) ConverterScrollViewer.Visibility = Visibility.Collapsed;
             if (SettingsScrollViewer != null) SettingsScrollViewer.Visibility = Visibility.Visible;
             if (SettingsDirectoryPathTextBox != null && !string.IsNullOrEmpty(SelectedDirectory))
             {
@@ -146,12 +170,15 @@ namespace UniversalDownloader
             if (DownloadSubtitlesCheckBox != null) DownloadSubtitlesCheckBox.IsChecked = DownloadSubtitlesEnabled;
             if (MinimizeToTrayCheckBox != null) MinimizeToTrayCheckBox.IsChecked = MinimizeToTrayEnabled;
             if (MultiConnectionAccelerationCheckBox != null) MultiConnectionAccelerationCheckBox.IsChecked = MultiConnectionAccelerationEnabled;
+            if (DownloadLyricsCheckBox != null) DownloadLyricsCheckBox.IsChecked = DownloadLyricsEnabled;
+            if (FilenameTemplateTextBox != null) FilenameTemplateTextBox.Text = FilenameTemplate;
         }
 
         private void BackToDownloader_Click(object sender, RoutedEventArgs e)
         {
             if (SettingsScrollViewer != null) SettingsScrollViewer.Visibility = Visibility.Collapsed;
             if (HistoryScrollViewer != null) HistoryScrollViewer.Visibility = Visibility.Collapsed;
+            if (ConverterScrollViewer != null) ConverterScrollViewer.Visibility = Visibility.Collapsed;
             if (MainScrollViewer != null) MainScrollViewer.Visibility = Visibility.Visible;
         }
 
@@ -188,6 +215,51 @@ namespace UniversalDownloader
                 SaveSetting(SettingsKeyMultiConnectionAcceleration, MultiConnectionAccelerationEnabled.ToString().ToLower());
                 if (_downloadService != null) _downloadService.EnableMultiConnectionAcceleration = MultiConnectionAccelerationEnabled;
             }
+
+            if (DownloadLyricsCheckBox != null)
+            {
+                DownloadLyricsEnabled = DownloadLyricsCheckBox.IsChecked == true;
+                SaveSetting(SettingsKeyDownloadLyrics, DownloadLyricsEnabled.ToString().ToLower());
+            }
+        }
+
+        private void FilenameTemplateTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (FilenameTemplateTextBox != null)
+            {
+                string tmpl = FilenameTemplateTextBox.Text?.Trim() ?? "{title}";
+                if (string.IsNullOrWhiteSpace(tmpl)) tmpl = "{title}";
+                FilenameTemplate = tmpl;
+                if (_downloadService != null) _downloadService.CustomFilenameTemplate = FilenameTemplate;
+                SaveSetting(SettingsKeyFilenameTemplate, FilenameTemplate);
+            }
+        }
+
+        private void TemplateChip_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag != null && FilenameTemplateTextBox != null)
+            {
+                string token = btn.Tag.ToString() ?? "";
+                if (!string.IsNullOrEmpty(token))
+                {
+                    int caret = FilenameTemplateTextBox.CaretIndex;
+                    string current = FilenameTemplateTextBox.Text ?? "";
+                    FilenameTemplateTextBox.Text = current.Insert(caret, token);
+                    FilenameTemplateTextBox.CaretIndex = caret + token.Length;
+                    FilenameTemplateTextBox.Focus();
+                }
+            }
+        }
+
+        private void ResetTemplate_Click(object sender, RoutedEventArgs e)
+        {
+            FilenameTemplate = "{title}";
+            if (FilenameTemplateTextBox != null)
+            {
+                FilenameTemplateTextBox.Text = "{title}";
+            }
+            if (_downloadService != null) _downloadService.CustomFilenameTemplate = "{title}";
+            SaveSetting(SettingsKeyFilenameTemplate, "{title}");
         }
     }
 }

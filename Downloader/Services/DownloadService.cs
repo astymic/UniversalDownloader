@@ -40,6 +40,24 @@ namespace UniversalDownloader.Services
 
         public string? ProgressPrefix { get; set; }
         public bool EnableMultiConnectionAcceleration { get; set; } = true;
+        public string CustomFilenameTemplate { get; set; } = "{title}";
+
+        public string ConvertTemplateToYtDlp(string template)
+        {
+            if (string.IsNullOrWhiteSpace(template)) return "%(title)s.%(ext)s";
+            string res = template
+                .Replace("{title}", "%(title)s")
+                .Replace("{artist}", "%(artist,uploader)s")
+                .Replace("{platform}", "%(extractor)s")
+                .Replace("{quality}", "%(resolution,format_note)s")
+                .Replace("{upload_date}", "%(upload_date)s");
+
+            if (!res.EndsWith(".%(ext)s", StringComparison.OrdinalIgnoreCase))
+            {
+                res += ".%(ext)s";
+            }
+            return res;
+        }
 
         private void ReportProgress(string status, string? filename = null, double percentage = 0, bool isIndeterminate = false)
         {
@@ -755,9 +773,9 @@ namespace UniversalDownloader.Services
         {
             CleanDirectory(tempDownloadFolder);
 
-            // We want the final filename to match the YouTube title as closely as possible without extra tags.
-            string baseFileNameTemplate = "%(title)s.%(ext)s";
-            if (IsKnownAudioPlatformLink(url) && extractAudio)
+            // Apply filename template (defaults to {title} -> %(title)s.%(ext)s)
+            string baseFileNameTemplate = ConvertTemplateToYtDlp(CustomFilenameTemplate);
+            if (IsKnownAudioPlatformLink(url) && extractAudio && (string.IsNullOrWhiteSpace(CustomFilenameTemplate) || CustomFilenameTemplate == "{title}"))
             {
                 baseFileNameTemplate = "%(artist)s - %(title)s.%(ext)s";
             }

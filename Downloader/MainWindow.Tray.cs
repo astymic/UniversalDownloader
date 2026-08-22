@@ -18,17 +18,43 @@ namespace UniversalDownloader
             {
                 _notifyIcon = new NotifyIcon();
 
-                // Load icon from resource / file
-                string iconPath = Path.Combine(AppContext.BaseDirectory, "akashi.ico");
-                if (File.Exists(iconPath))
+                System.Drawing.Icon? appIcon = null;
+                // 1. Try loading from embedded executable application icon
+                try
                 {
-                    _notifyIcon.Icon = new Icon(iconPath);
+                    string? procPath = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                    if (!string.IsNullOrEmpty(procPath) && File.Exists(procPath))
+                    {
+                        appIcon = System.Drawing.Icon.ExtractAssociatedIcon(procPath);
+                    }
                 }
-                else
+                catch { }
+
+                // 2. Try loading from WPF application resource stream
+                if (appIcon == null)
                 {
-                    _notifyIcon.Icon = SystemIcons.Application;
+                    try
+                    {
+                        var resStream = Application.GetResourceStream(new Uri("pack://application:,,,/akashi.ico"))?.Stream;
+                        if (resStream != null)
+                        {
+                            appIcon = new System.Drawing.Icon(resStream);
+                        }
+                    }
+                    catch { }
                 }
 
+                // 3. Try loading from disk
+                if (appIcon == null)
+                {
+                    string iconPath = Path.Combine(AppContext.BaseDirectory, "akashi.ico");
+                    if (File.Exists(iconPath))
+                    {
+                        appIcon = new Icon(iconPath);
+                    }
+                }
+
+                _notifyIcon.Icon = appIcon ?? SystemIcons.Application;
                 _notifyIcon.Text = "Universal Downloader";
                 _notifyIcon.Visible = true;
 

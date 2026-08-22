@@ -7,6 +7,7 @@
         mc:Ignorable="d"
         Title="Universal File Downloader" Height="850" Width="900"
         MinHeight="680" MinWidth="700"
+        Icon="akashi.ico"
         WindowStartupLocation="CenterScreen"
         FontFamily="Inter, Segoe UI, Arial"
         FontWeight="Normal"
@@ -677,7 +678,14 @@
                                 BorderBrush="{StaticResource BorderBrush}"
                                 Effect="{StaticResource CardShadow}">
                             <StackPanel>
-                                <TextBlock Text="LINK TO DOWNLOAD" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="LINK TO DOWNLOAD" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Content="📋 Batch Import" Style="{StaticResource SecondaryButton}" Padding="12,4" FontSize="11.5" Click="BatchImportButton_Click" ToolTip="Paste multiple URLs at once"/>
+                                </Grid>
                                 <TextBox x:Name="UrlTextBox" Style="{StaticResource ModernTextBox}" Text="Paste URL here..." TextChanged="UrlTextBox_TextChanged" GotFocus="UrlTextBox_GotFocus" LostFocus="UrlTextBox_LostFocus" PreviewMouseDown="UrlTextBox_PreviewMouseDown"/>
                             </StackPanel>
                         </Border>
@@ -923,7 +931,31 @@
                             <StackPanel>
                                 <TextBlock Text="MEDIA TAGS &amp; ENRICHMENT" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
                                 <CheckBox x:Name="EmbedMetadataCheckBox" Style="{StaticResource ModernCheckBox}" Content="Embed ID3 tags (Artist, Title, Album) &amp; album art into audio files" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,14" IsChecked="True"/>
+                                <CheckBox x:Name="DownloadLyricsCheckBox" Style="{StaticResource ModernCheckBox}" Content="Download synced lyrics (.lrc companion file) for music tracks" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,14" IsChecked="True"/>
                                 <CheckBox x:Name="DownloadSubtitlesCheckBox" Style="{StaticResource ModernCheckBox}" Content="Download subtitles/captions with video when available" Checked="SettingCheckbox_Changed" Unchecked="SettingCheckbox_Changed" Margin="0,0,0,4"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Custom Filename Pattern Builder -->
+                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="CUSTOM FILENAME TEMPLATE" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Content="Reset Default" Style="{StaticResource SecondaryButton}" Padding="10,3" FontSize="11" Click="ResetTemplate_Click" ToolTip="Reset to default"/>
+                                </Grid>
+                                <TextBox x:Name="FilenameTemplateTextBox" Style="{StaticResource ModernTextBox}" Text="{}{title}" TextChanged="FilenameTemplateTextBox_TextChanged" Margin="0,0,0,12"/>
+                                <TextBlock Text="Click variable tokens to insert into filename template:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" Margin="0,0,0,8"/>
+                                <WrapPanel Orientation="Horizontal">
+                                    <Button Content="{}{title}" Style="{StaticResource SecondaryButton}" Tag="{}{title}" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert track or video title"/>
+                                    <Button Content="{}{artist}" Style="{StaticResource SecondaryButton}" Tag="{}{artist}" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert artist or channel name"/>
+                                    <Button Content="{}{platform}" Style="{StaticResource SecondaryButton}" Tag="{}{platform}" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert platform name (YouTube, Spotify, etc.)"/>
+                                    <Button Content="{}{quality}" Style="{StaticResource SecondaryButton}" Tag="{}{quality}" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert quality label (1080p, 320k, etc.)"/>
+                                    <Button Content="{}{upload_date}" Style="{StaticResource SecondaryButton}" Tag="{}{upload_date}" Click="TemplateChip_Click" Padding="8,4" FontSize="11" Margin="0,0,6,6" ToolTip="Insert current date (YYYY-MM-DD)"/>
+                                </WrapPanel>
                             </StackPanel>
                         </Border>
 
@@ -1078,6 +1110,214 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Media Converter View -->
+                <ScrollViewer x:Name="ConverterScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed">
+                    <StackPanel Margin="40,20,40,90" MaxWidth="760">
+                        <!-- Top Bar: Back Button -->
+                        <Grid Margin="0,0,0,20">
+                            <Button Content="&#x2190; Back to Downloader" Style="{StaticResource SecondaryButton}" Click="BackFromConverter_Click" HorizontalAlignment="Left" Padding="14,8"/>
+                        </Grid>
+
+                        <!-- Header -->
+                        <TextBlock Text="Media Converter" 
+                                   FontSize="32" 
+                                   FontWeight="Bold" 
+                                   Foreground="{StaticResource TextPrimaryBrush}" 
+                                   Margin="0,0,0,6"/>
+                        <TextBlock Text="Convert your local audio and video files with ultra-fast offline FFmpeg encoding." 
+                                   Foreground="{StaticResource TextSecondaryBrush}" 
+                                   FontSize="13" 
+                                   Margin="0,0,0,20"/>
+
+                        <!-- Drag & Drop Zone / Browse -->
+                        <Border x:Name="ConverterDropZone" 
+                                Background="#141418" 
+                                BorderBrush="#3F3F46" 
+                                BorderThickness="2" 
+                                CornerRadius="16" 
+                                Padding="32,24" 
+                                Margin="0,0,0,20"
+                                AllowDrop="True"
+                                Drop="ConverterDropZone_Drop"
+                                DragOver="ConverterDropZone_DragOver"
+                                Cursor="Hand"
+                                PreviewMouseLeftButtonDown="ConverterBrowseFiles_Click">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="📁" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                                <TextBlock Text="Drag &amp; Drop audio or video files here" Foreground="{StaticResource TextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBlock Text="or click to browse local files (MP4, MKV, MP3, FLAC, WAV, M4A, AVI, WEBM, etc.)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                                <Button Content="Browse Files" Style="{StaticResource SecondaryButton}" Padding="16,6" FontSize="12" HorizontalAlignment="Center" Click="ConverterBrowseFiles_Click"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Selected Files List -->
+                        <Border x:Name="ConverterFilesListBorder" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,20" Visibility="Collapsed">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="FILES TO CONVERT" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Content="Clear List" Style="{StaticResource DangerButton}" Padding="10,4" FontSize="11" Click="ConverterClearAll_Click"/>
+                                </Grid>
+
+                                <ItemsControl x:Name="ConverterItemsControl" ItemsSource="{Binding Path=ConverterItems}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#18181B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <!-- File Info & Progress -->
+                                                    <StackPanel Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
+                                                            <TextBlock Text="{Binding FileSize}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" Margin="0,0,8,0"/>
+                                                            <TextBlock Text="•" Foreground="{StaticResource BorderBrush}" FontSize="11" Margin="0,0,8,0"/>
+                                                            <TextBlock Text="{Binding Status}" Foreground="{StaticResource PrimaryHoverBrush}" FontSize="11.5"/>
+                                                        </StackPanel>
+                                                        <!-- Item Progress Bar when active -->
+                                                        <ProgressBar Value="{Binding Progress}" Maximum="100" Height="4" Background="#27272A" Foreground="{StaticResource PrimaryBrush}" BorderThickness="0">
+                                                            <ProgressBar.Style>
+                                                                <Style TargetType="ProgressBar">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsConverting}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </ProgressBar.Style>
+                                                        </ProgressBar>
+                                                    </StackPanel>
+
+                                                    <!-- Item Action Buttons -->
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <!-- Play preview if completed -->
+                                                        <Button Content="▶ Play" Click="ConverterPlayItem_Click" Tag="{Binding}" Margin="0,0,6,0" Padding="10,5" FontSize="11">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource PrimaryOutlineButton}">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                        </Button>
+                                                        <!-- Folder button if completed -->
+                                                        <Button Content="📂 Folder" Click="ConverterOpenItemFolder_Click" Tag="{Binding}" Margin="0,0,6,0" Padding="8,5" FontSize="11">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                        </Button>
+                                                        <!-- Remove item -->
+                                                        <Button Content="✕" Style="{StaticResource MinimalistCancelButton}" Click="ConverterRemoveItem_Click" Tag="{Binding}" Width="26" Height="26" FontSize="11"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Conversion Settings Card -->
+                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="24" Margin="0,0,0,24">
+                            <StackPanel>
+                                <TextBlock Text="CONVERSION SETTINGS" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
+
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Target Format -->
+                                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                        <TextBlock Text="Target Format:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,6"/>
+                                        <ComboBox x:Name="ConverterTargetFormatComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0">
+                                            <ComboBoxItem Content="MP3 Audio (.mp3)" IsSelected="True"/>
+                                            <ComboBoxItem Content="M4A / AAC Audio (.m4a)"/>
+                                            <ComboBoxItem Content="FLAC Lossless (.flac)"/>
+                                            <ComboBoxItem Content="WAV Lossless (.wav)"/>
+                                            <ComboBoxItem Content="OGG Vorbis (.ogg)"/>
+                                            <ComboBoxItem Content="OPUS Audio (.opus)"/>
+                                            <ComboBoxItem Content="MP4 Video (.mp4)"/>
+                                            <ComboBoxItem Content="MKV Video (.mkv)"/>
+                                            <ComboBoxItem Content="WEBM Video (.webm)"/>
+                                            <ComboBoxItem Content="AVI Video (.avi)"/>
+                                            <ComboBoxItem Content="GIF Animation (.gif)"/>
+                                        </ComboBox>
+                                    </StackPanel>
+
+                                    <!-- Audio Bitrate -->
+                                    <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                        <TextBlock Text="Audio Bitrate / Quality:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,6"/>
+                                        <ComboBox x:Name="ConverterAudioBitrateComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0">
+                                            <ComboBoxItem Content="320 kbps (High Quality)" IsSelected="True"/>
+                                            <ComboBoxItem Content="256 kbps"/>
+                                            <ComboBoxItem Content="192 kbps (Standard)"/>
+                                            <ComboBoxItem Content="128 kbps (Compact)"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Video Scale Preset -->
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                        <TextBlock Text="Video Resolution (if converting video):" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,6"/>
+                                        <ComboBox x:Name="ConverterVideoResolutionComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0">
+                                            <ComboBoxItem Content="Original Resolution" IsSelected="True"/>
+                                            <ComboBoxItem Content="1080p Full HD"/>
+                                            <ComboBoxItem Content="720p HD"/>
+                                            <ComboBoxItem Content="480p SD"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Output Folder -->
+                                <TextBlock Text="Output Destination:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,6"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="ConverterDestinationTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" IsReadOnly="True" Text="Select output folder..." Margin="0,0,12,0"/>
+                                    <Button Grid.Column="1" Content="Browse" Style="{StaticResource SecondaryButton}" Padding="20,10" Click="ConverterBrowseDestination_Click"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Start Conversion Button -->
+                        <Button x:Name="StartConversionButton" 
+                                Content="⚡ Start Conversion" 
+                                Style="{StaticResource ModernButton}" 
+                                Height="46" 
+                                Width="240" 
+                                HorizontalAlignment="Center" 
+                                Click="StartConversionButton_Click"
+                                IsEnabled="False"/>
                     </StackPanel>
                 </ScrollViewer>
 
@@ -1286,6 +1526,37 @@
                                                 <Setter TargetName="border" Property="Effect">
                                                     <Setter.Value>
                                                         <DropShadowEffect BlurRadius="15" ShadowDepth="0" Color="#8B5CF6" Opacity="0.6"/>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+
+                            <!-- Media Converter Button -->
+                            <Button x:Name="ConverterButton"
+                                    Width="44"
+                                    Height="44"
+                                    Margin="0,0,0,12"
+                                    HorizontalAlignment="Center"
+                                    Click="ConverterButton_Click"
+                                    ToolTip="Media Converter"
+                                    Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="border" Background="#1E1E24" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="22">
+                                            <!-- Modern Convert / Repeat SVG Icon -->
+                                            <Path Width="18" Height="18" Stretch="Uniform" Fill="#FAFAFA" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Data="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="#3B82F6"/>
+                                                <Setter TargetName="border" Property="BorderBrush" Value="#60A5FA"/>
+                                                <Setter TargetName="border" Property="Effect">
+                                                    <Setter.Value>
+                                                        <DropShadowEffect BlurRadius="15" ShadowDepth="0" Color="#3B82F6" Opacity="0.6"/>
                                                     </Setter.Value>
                                                 </Setter>
                                             </Trigger>
