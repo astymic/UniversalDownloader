@@ -16,7 +16,7 @@ namespace UniversalDownloader.Services
         private readonly HistoryService _historyService;
         private readonly ObservableCollection<DownloadQueueItem> _items = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _cancellationTokens = new();
-        private readonly SemaphoreSlim _semaphore = new(2, 2); // Max 2 concurrent downloads
+        private readonly SemaphoreSlim _semaphore = new(1, 1); // 1 download at a time for stability and UI isolation
         private bool _isProcessing;
 
         public ObservableCollection<DownloadQueueItem> Items => _items;
@@ -96,9 +96,12 @@ namespace UniversalDownloader.Services
             var item = _items.FirstOrDefault(x => x.Id == itemId);
             if (item != null && item.Status == QueueItemStatus.Queued)
             {
-                item.Status = QueueItemStatus.Canceled;
-                item.StatusText = "Canceled";
-                QueueChanged?.Invoke();
+                Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    item.Status = QueueItemStatus.Canceled;
+                    item.StatusText = "Canceled";
+                    QueueChanged?.Invoke();
+                });
             }
         }
 
@@ -109,12 +112,15 @@ namespace UniversalDownloader.Services
                 try { cts.Cancel(); } catch { }
             }
 
-            foreach (var item in _items.Where(x => x.Status == QueueItemStatus.Queued))
+            Application.Current?.Dispatcher?.Invoke(() =>
             {
-                item.Status = QueueItemStatus.Canceled;
-                item.StatusText = "Canceled";
-            }
-            QueueChanged?.Invoke();
+                foreach (var item in _items.Where(x => x.Status == QueueItemStatus.Queued))
+                {
+                    item.Status = QueueItemStatus.Canceled;
+                    item.StatusText = "Canceled";
+                }
+                QueueChanged?.Invoke();
+            });
         }
 
         public void Retry(string itemId)
@@ -122,11 +128,14 @@ namespace UniversalDownloader.Services
             var item = _items.FirstOrDefault(x => x.Id == itemId);
             if (item != null && (item.Status == QueueItemStatus.Failed || item.Status == QueueItemStatus.Canceled))
             {
-                item.Status = QueueItemStatus.Queued;
-                item.StatusText = "Queued";
-                item.Progress = 0;
-                item.ErrorMessage = null;
-                QueueChanged?.Invoke();
+                Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    item.Status = QueueItemStatus.Queued;
+                    item.StatusText = "Queued";
+                    item.Progress = 0;
+                    item.ErrorMessage = null;
+                    QueueChanged?.Invoke();
+                });
                 ResolveItemTitleAsync(item);
                 _ = ProcessQueueAsync();
             }
@@ -177,16 +186,19 @@ namespace UniversalDownloader.Services
                     if (nextItem == null) break;
 
                     await _semaphore.WaitAsync();
-                    _ = Task.Run(async () =>
+                    try
                     {
                         var cts = new CancellationTokenSource();
                         _cancellationTokens[nextItem.Id] = cts;
 
                         try
                         {
-                            nextItem.Status = QueueItemStatus.Downloading;
-                            nextItem.StatusText = "Downloading...";
-                            QueueChanged?.Invoke();
+                            Application.Current?.Dispatcher?.Invoke(() =>
+                            {
+                                nextItem.Status = QueueItemStatus.Downloading;
+                                nextItem.StatusText = "Downloading...";
+                                QueueChanged?.Invoke();
+                            });
 
                             string tempDir = Path.Combine(Path.GetTempPath(), "UD_Queue_" + Guid.NewGuid().ToString("N"));
                             Directory.CreateDirectory(tempDir);
@@ -207,7 +219,10 @@ namespace UniversalDownloader.Services
                                     var meta = await _downloadService.GetSpotifyMetadataAsync(nextItem.Url);
                                     if (meta != null && !string.IsNullOrWhiteSpace(meta.Title))
                                     {
-                                        nextItem.Title = $"{meta.Artist} - {meta.Title}".Trim();
+                                        Application.Current?.Dispatcher?.Invoke(() =>
+                                        {
+                                            nextItem.Title = $"{meta.Artist} - {meta.Title}".Trim();
+                                        });
                                     }
                                 }
 
@@ -222,13 +237,17 @@ namespace UniversalDownloader.Services
                                 string? resolved = await _downloadService.GetTitleWithYtDlpAsync(nextItem.Url);
                                 if (!string.IsNullOrWhiteSpace(resolved) && resolved.Trim().Length > 1)
                                 {
-                                    nextItem.Title = resolved.Trim();
+                                    Application.Current?.Dispatcher?.Invoke(() =>
+                                    {
+                                        nextItem.Title = resolved.Trim();
+                                    });
                                 }
                             }
 
-                            void OnProgress(object? sender, DownloadProgressArgs args)
+                            var itemProgress = new Progress<DownloadProgressArgs>(args =>
                             {
-                                // Only process progress if percentage is realistic
+                                if (nextItem.Status != QueueItemStatus.Downloading) return;
+
                                 if (args.Percentage > 0)
                                 {
                                     nextItem.Progress = args.Percentage;
@@ -237,24 +256,23 @@ namespace UniversalDownloader.Services
                                 {
                                     nextItem.StatusText = args.StatusMessage;
                                 }
-                            }
+                            });
 
-                            _downloadService.ProgressChanged += OnProgress;
+                            bool success = await _downloadService.DownloadWithYtDlpAsync(
+                                downloadUrl,
+                                nextItem.IsAudioOnly ? "bestaudio/best" : nextItem.FormatCode,
+                                tempDir,
+                                nextItem.DestinationFolder,
+                                nextItem.IsAudioOnly,
+                                nextItem.AudioFormat,
+                                false, 0, 0,
+                                cts.Token,
+                                overrideTitle,
+                                itemProgress);
 
-                            try
+                            if (success)
                             {
-                                bool success = await _downloadService.DownloadWithYtDlpAsync(
-                                    downloadUrl,
-                                    nextItem.IsAudioOnly ? "bestaudio/best" : nextItem.FormatCode,
-                                    tempDir,
-                                    nextItem.DestinationFolder,
-                                    nextItem.IsAudioOnly,
-                                    nextItem.AudioFormat,
-                                    false, 0, 0,
-                                    cts.Token,
-                                    overrideTitle);
-
-                                if (success)
+                                Application.Current?.Dispatcher?.Invoke(() =>
                                 {
                                     nextItem.Status = QueueItemStatus.Completed;
                                     nextItem.StatusText = "Completed";
@@ -279,39 +297,51 @@ namespace UniversalDownloader.Services
                                         }
                                     }
 
-                                    ItemCompleted?.Invoke(nextItem);
-                                }
-                                else
+                                    QueueChanged?.Invoke();
+                                });
+
+                                ItemCompleted?.Invoke(nextItem);
+                            }
+                            else
+                            {
+                                Application.Current?.Dispatcher?.Invoke(() =>
                                 {
                                     nextItem.Status = QueueItemStatus.Failed;
                                     nextItem.StatusText = "Download failed";
-                                    ItemFailed?.Invoke(nextItem);
-                                }
-                            }
-                            finally
-                            {
-                                _downloadService.ProgressChanged -= OnProgress;
+                                    QueueChanged?.Invoke();
+                                });
+                                ItemFailed?.Invoke(nextItem);
                             }
                         }
                         catch (OperationCanceledException)
                         {
-                            nextItem.Status = QueueItemStatus.Canceled;
-                            nextItem.StatusText = "Canceled";
+                            Application.Current?.Dispatcher?.Invoke(() =>
+                            {
+                                nextItem.Status = QueueItemStatus.Canceled;
+                                nextItem.StatusText = "Canceled";
+                                QueueChanged?.Invoke();
+                            });
                         }
                         catch (Exception ex)
                         {
-                            nextItem.Status = QueueItemStatus.Failed;
-                            nextItem.StatusText = "Error";
-                            nextItem.ErrorMessage = ex.Message;
+                            Application.Current?.Dispatcher?.Invoke(() =>
+                            {
+                                nextItem.Status = QueueItemStatus.Failed;
+                                nextItem.StatusText = "Error";
+                                nextItem.ErrorMessage = ex.Message;
+                                QueueChanged?.Invoke();
+                            });
                             ItemFailed?.Invoke(nextItem);
                         }
                         finally
                         {
                             _cancellationTokens.TryRemove(nextItem.Id, out _);
-                            _semaphore.Release();
-                            QueueChanged?.Invoke();
                         }
-                    });
+                    }
+                    finally
+                    {
+                        _semaphore.Release();
+                    }
                 }
             }
             finally

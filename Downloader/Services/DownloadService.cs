@@ -482,7 +482,7 @@ namespace UniversalDownloader.Services
             return string.IsNullOrWhiteSpace(fileName) ? "unknown_file.dat" : Utilities.SanitizeFileName(fileName);
         }
 
-        public async Task<bool> DownloadWithYtDlpAsync(string url, string? formatSelection, string tempDownloadFolder, string finalDestinationFolder, bool extractAudio, string audioFormat, bool useTrimming, double trimStartSeconds, double trimEndSeconds, CancellationToken cancellationToken, string? overrideFileName = null)
+        public async Task<bool> DownloadWithYtDlpAsync(string url, string? formatSelection, string tempDownloadFolder, string finalDestinationFolder, bool extractAudio, string audioFormat, bool useTrimming, double trimStartSeconds, double trimEndSeconds, CancellationToken cancellationToken, string? overrideFileName = null, IProgress<DownloadProgressArgs>? progressCallback = null)
         {
             if (!_dependencyManager.IsYtDlpReady)
             {
@@ -508,7 +508,7 @@ namespace UniversalDownloader.Services
                 {
                     try
                     {
-                        return await ExecuteYtDlpDownloadAsync(query, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, null);
+                        return await ExecuteYtDlpDownloadAsync(query, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, null, progressCallback);
                     }
                     catch (OperationCanceledException)
                     {
@@ -826,7 +826,7 @@ namespace UniversalDownloader.Services
             }
         }
 
-        private async Task<bool> ExecuteYtDlpDownloadAsync(string url, string? formatSelection, string tempDownloadFolder, string finalDestinationFolder, bool extractAudio, string audioFormat, bool useTrimming, double trimStartSeconds, double trimEndSeconds, CancellationToken cancellationToken, string? overrideFileName, string? cookiesFromBrowser)
+        private async Task<bool> ExecuteYtDlpDownloadAsync(string url, string? formatSelection, string tempDownloadFolder, string finalDestinationFolder, bool extractAudio, string audioFormat, bool useTrimming, double trimStartSeconds, double trimEndSeconds, CancellationToken cancellationToken, string? overrideFileName, string? cookiesFromBrowser, IProgress<DownloadProgressArgs>? progressCallback = null)
         {
             CleanDirectory(tempDownloadFolder);
 
@@ -916,7 +916,7 @@ namespace UniversalDownloader.Services
                 {
                     if (e.Data != null)
                     {
-                        ParseYtDlpProgress(e.Data, ref progressStarted, ref lastPercentage);
+                        ParseYtDlpProgress(e.Data, ref progressStarted, ref lastPercentage, progressCallback);
                     }
                 };
                 
@@ -1650,9 +1650,28 @@ namespace UniversalDownloader.Services
             }
         }
 
-        private void ParseYtDlpProgress(string line, ref bool progressStarted, ref double lastPercentage)
+        private void ParseYtDlpProgress(string line, ref bool progressStarted, ref double lastPercentage, IProgress<DownloadProgressArgs>? progressCallback = null)
         {
             if (string.IsNullOrWhiteSpace(line)) return;
+
+            void EmitProgress(string msg, string? fn, double pct, bool ind)
+            {
+                var args = new DownloadProgressArgs
+                {
+                    StatusMessage = msg,
+                    Filename = fn,
+                    Percentage = pct,
+                    IsIndeterminate = ind
+                };
+                if (progressCallback != null)
+                {
+                    progressCallback.Report(args);
+                }
+                else
+                {
+                    ProgressChanged?.Invoke(this, args);
+                }
+            }
 
             string dlLabel = "[download]";
             if (line.StartsWith(dlLabel))
@@ -1660,11 +1679,11 @@ namespace UniversalDownloader.Services
                 string dlContent = line.Substring(dlLabel.Length).Trim();
                 if (dlContent.StartsWith("Destination:"))
                 {
-                    ReportProgress("Downloading...", null, 0, true);
+                    EmitProgress("Downloading...", null, 0, true);
                 }
                 else if (dlContent.Contains("has already been downloaded"))
                 {
-                    ReportProgress("File already downloaded.", null, 100, false);
+                    EmitProgress("File already downloaded.", null, 100, false);
                 }
                 else
                 {
@@ -1678,7 +1697,7 @@ namespace UniversalDownloader.Services
                                 string sizeStr = match.Groups["size"].Value;
                                 string speedStr = match.Groups["speed"].Success ? match.Groups["speed"].Value : "N/A";
                                 string etaStr = match.Groups["eta"].Success ? match.Groups["eta"].Value : "N/A";
-                                ReportProgress($"Downloading: {percent:F1}% of {sizeStr} ({speedStr}) ETA: {etaStr}", null, percent, false);
+                                EmitProgress($"Downloading: {percent:F1}% of {sizeStr} ({speedStr}) ETA: {etaStr}", null, percent, false);
                                 lastPercentage = percent;
                             }
                         }
@@ -1687,11 +1706,11 @@ namespace UniversalDownloader.Services
             }
             else if (line.StartsWith("[ExtractAudio]"))
             {
-                ReportProgress("Extracting audio...", null, 100, true);
+                EmitProgress("Extracting audio...", null, 100, true);
             }
             else if (line.StartsWith("[Merger]"))
             {
-                ReportProgress("Merging streams...", null, 100, true);
+                EmitProgress("Merging streams...", null, 100, true);
             }
         }
     }
