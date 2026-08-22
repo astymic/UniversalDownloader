@@ -32,6 +32,8 @@ namespace UniversalDownloader
         private readonly TikTokExtractor _tikTokExtractor;
         private readonly ClipboardMonitorService _clipboardMonitor;
         private readonly DownloadQueueManager _queueManager;
+        private readonly AudioPreviewService _audioPreviewService;
+        private bool _isUserSeeking = false;
 
         public ObservableCollection<DownloadHistoryItem> HistoryItems => _historyService.Items;
 
@@ -85,10 +87,17 @@ namespace UniversalDownloader
             _clipboardMonitor = new ClipboardMonitorService();
             _queueManager = new DownloadQueueManager(_downloadService, _historyService);
 
+            _audioPreviewService = new AudioPreviewService();
+            _audioPreviewService.PlaybackStateChanged += AudioPreviewService_PlaybackStateChanged;
+            _audioPreviewService.PositionChanged += AudioPreviewService_PositionChanged;
+            _audioPreviewService.MediaFailed += AudioPreviewService_MediaFailed;
+            _audioPreviewService.MediaEnded += AudioPreviewService_MediaEnded;
+
             _clipboardMonitor.MediaUrlDetected += OnClipboardMediaUrlDetected;
             _clipboardMonitor.Start();
 
             InitializeTrayIcon();
+            InitializeHistoryBindings();
         }
 
         private async void OnFileDownloaded(string filePath, string sourceUrl)
@@ -1730,6 +1739,143 @@ namespace UniversalDownloader
             StatusTextBlock.Text = $"Loaded playlist '{playlist.Name}' from previous imports. Ready to download!";
             CollapseSpotifyDrawer();
             UpdateUiElementStates();
+        }
+
+        public void PlayHistoryItemPreview(DownloadHistoryItem item)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(item.FilePath)) return;
+
+            if (!File.Exists(item.FilePath))
+            {
+                ModernMessageBox.Show("File no longer exists on disk at the saved location.", "File Not Found", MessageBoxButton.OK, MessageBoxImage.Warning, this);
+                return;
+            }
+
+            if (BottomPlayerBar != null)
+            {
+                BottomPlayerBar.Visibility = Visibility.Visible;
+            }
+
+            if (PlayerTitleTextBlock != null) PlayerTitleTextBlock.Text = item.Title;
+            if (PlayerPlatformTextBlock != null) PlayerPlatformTextBlock.Text = item.Platform;
+            if (PlayerFormatTextBlock != null) PlayerFormatTextBlock.Text = !string.IsNullOrEmpty(item.FormatExtension) ? item.FormatExtension.ToUpper() : (item.IsAudio ? "AUDIO" : "VIDEO");
+
+            _audioPreviewService.Play(item);
+        }
+
+        private void AudioPreviewService_PlaybackStateChanged()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (PlayerPlayPauseButton != null)
+                {
+                    PlayerPlayPauseButton.Content = _audioPreviewService.IsPlaying ? "⏸" : "▶";
+                }
+                if (PlayerMuteButton != null)
+                {
+                    PlayerMuteButton.Content = _audioPreviewService.IsMuted ? "🔇" : "🔊";
+                }
+            });
+        }
+
+        private void AudioPreviewService_PositionChanged(TimeSpan pos, TimeSpan dur)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (!_isUserSeeking && PlayerSeekSlider != null && dur.TotalSeconds > 0)
+                {
+                    PlayerSeekSlider.Maximum = dur.TotalSeconds;
+                    PlayerSeekSlider.Value = pos.TotalSeconds;
+                }
+
+                if (PlayerCurrentTimeTextBlock != null)
+                {
+                    PlayerCurrentTimeTextBlock.Text = pos.ToString(pos.TotalHours >= 1 ? @"hh\:mm\:ss" : @"mm\:ss");
+                }
+
+                if (PlayerTotalTimeTextBlock != null)
+                {
+                    PlayerTotalTimeTextBlock.Text = dur.ToString(dur.TotalHours >= 1 ? @"hh\:mm\:ss" : @"mm\:ss");
+                }
+            });
+        }
+
+        private void AudioPreviewService_MediaEnded()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (PlayerSeekSlider != null) PlayerSeekSlider.Value = 0;
+                if (PlayerCurrentTimeTextBlock != null) PlayerCurrentTimeTextBlock.Text = "00:00";
+            });
+        }
+
+        private void AudioPreviewService_MediaFailed(string error)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                ModernMessageBox.Show($"Failed to play media preview: {error}", "Playback Error", MessageBoxButton.OK, MessageBoxImage.Error, this);
+            });
+        }
+
+        private void PlayerPlayPauseButton_Click(object sender, RoutedEventArgs e)
+        {
+            _audioPreviewService.TogglePlayPause();
+        }
+
+        private void PlayerSeekSlider_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            _isUserSeeking = true;
+        }
+
+        private void PlayerSeekSlider_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isUserSeeking && PlayerSeekSlider != null)
+            {
+                _audioPreviewService.Seek(TimeSpan.FromSeconds(PlayerSeekSlider.Value));
+                _isUserSeeking = false;
+            }
+        }
+
+        private void PlayerVolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_audioPreviewService != null)
+            {
+                _audioPreviewService.Volume = e.NewValue;
+            }
+        }
+
+        private void PlayerMuteButton_Click(object sender, RoutedEventArgs e)
+        {
+            _audioPreviewService.ToggleMute();
+        }
+
+        private void PlayerOpenExternal_Click(object sender, RoutedEventArgs e)
+        {
+            var item = _audioPreviewService.CurrentItem;
+            if (item != null && File.Exists(item.FilePath))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = item.FilePath,
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex)
+                {
+                    ModernMessageBox.Show($"Could not open file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error, this);
+                }
+            }
+        }
+
+        private void PlayerClose_Click(object sender, RoutedEventArgs e)
+        {
+            _audioPreviewService.Stop();
+            if (BottomPlayerBar != null)
+            {
+                BottomPlayerBar.Visibility = Visibility.Collapsed;
+            }
         }
     }
 
