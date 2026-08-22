@@ -370,7 +370,8 @@ namespace UniversalDownloader.Services
 
         public async Task DownloadDirectFileAsync(string url, string tempDownloadFolder, string finalDestinationFolder, CancellationToken cancellationToken, Dictionary<string, string>? customHeaders = null, string? overrideFileName = null)
         {
-            CleanDirectory(tempDownloadFolder);
+            string jobTempFolder = Path.Combine(tempDownloadFolder, $"direct_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(jobTempFolder);
 
             string tempFileName = "unknown_file.dat";
             string? tempFilePath = null;
@@ -394,7 +395,7 @@ namespace UniversalDownloader.Services
                         response.EnsureSuccessStatusCode();
 
                         tempFileName = !string.IsNullOrWhiteSpace(overrideFileName) ? overrideFileName : GetFileNameFromHeaders(response, url);
-                        tempFilePath = Path.Combine(tempDownloadFolder, tempFileName);
+                        tempFilePath = Path.Combine(jobTempFolder, tempFileName);
                         
                         ReportProgress("Downloading...", tempFileName, 0, true);
 
@@ -428,7 +429,7 @@ namespace UniversalDownloader.Services
                             }
                         }
 
-                        CopyToFinalDestinationAndClean(tempDownloadFolder, finalDestinationFolder, url);
+                        CopyToFinalDestinationAndClean(jobTempFolder, finalDestinationFolder, url);
                         ReportProgress($"Download complete — saved as '{tempFileName}'", tempFileName, 100, false);
                     }
                 }
@@ -448,6 +449,17 @@ namespace UniversalDownloader.Services
                     try { File.Delete(tempFilePath); } catch { }
                 }
                 throw new Exception($"Download Error: {ex.Message}");
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(jobTempFolder))
+                    {
+                        Directory.Delete(jobTempFolder, true);
+                    }
+                }
+                catch { }
             }
         }
 
@@ -828,7 +840,9 @@ namespace UniversalDownloader.Services
 
         private async Task<bool> ExecuteYtDlpDownloadAsync(string url, string? formatSelection, string tempDownloadFolder, string finalDestinationFolder, bool extractAudio, string audioFormat, bool useTrimming, double trimStartSeconds, double trimEndSeconds, CancellationToken cancellationToken, string? overrideFileName, string? cookiesFromBrowser, IProgress<DownloadProgressArgs>? progressCallback = null)
         {
-            CleanDirectory(tempDownloadFolder);
+            // Create an isolated subfolder for this specific download job to avoid cross-job interference
+            string jobTempFolder = Path.Combine(tempDownloadFolder, $"dl_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(jobTempFolder);
 
             // Apply filename template (defaults to {title} -> %(title)s.%(ext)s)
             string baseFileNameTemplate = ConvertTemplateToYtDlp(CustomFilenameTemplate);
@@ -836,7 +850,7 @@ namespace UniversalDownloader.Services
             {
                 baseFileNameTemplate = "%(artist)s - %(title)s.%(ext)s";
             }
-            string outputTemplate = Path.Combine(tempDownloadFolder, baseFileNameTemplate);
+            string outputTemplate = Path.Combine(jobTempFolder, baseFileNameTemplate);
 
             ProcessStartInfo psi = new ProcessStartInfo
             {
@@ -856,9 +870,10 @@ namespace UniversalDownloader.Services
             {
                 psi.ArgumentList.Add("--extract-audio");
                 psi.ArgumentList.Add("--audio-format");
-                psi.ArgumentList.Add(audioFormat);
+                psi.ArgumentList.Add(string.IsNullOrWhiteSpace(audioFormat) ? "mp3" : audioFormat);
                 psi.ArgumentList.Add("--audio-quality");
                 psi.ArgumentList.Add("0");
+                psi.ArgumentList.Add("--no-keep-video");
                 psi.ArgumentList.Add("-f");
                 psi.ArgumentList.Add(string.IsNullOrWhiteSpace(formatSelection) ? "bestaudio/best" : formatSelection);
             }
@@ -910,116 +925,173 @@ namespace UniversalDownloader.Services
             double lastPercentage = 0;
             var stderrOutput = new System.Text.StringBuilder();
 
-            using (Process process = new Process { StartInfo = psi, EnableRaisingEvents = true })
+            try
             {
-                process.OutputDataReceived += (s, e) =>
+                using (Process process = new Process { StartInfo = psi, EnableRaisingEvents = true })
                 {
-                    if (e.Data != null)
+                    process.OutputDataReceived += (s, e) =>
                     {
-                        ParseYtDlpProgress(e.Data, ref progressStarted, ref lastPercentage, progressCallback);
-                    }
-                };
-                
-                process.ErrorDataReceived += (s, e) =>
-                {
-                    if (e.Data != null)
-                    {
-                        stderrOutput.AppendLine(e.Data);
-                        if (useTrimming && e.Data.Contains("time="))
+                        if (e.Data != null)
                         {
-                            ParseFfmpegProgress(e.Data, trimStartSeconds, trimEndSeconds, ref lastPercentage);
+                            ParseYtDlpProgress(e.Data, ref progressStarted, ref lastPercentage, progressCallback);
                         }
-                        else if (!e.Data.Contains("[debug]") && !useTrimming)
-                        {
-                            Debug.WriteLine($"yt-dlp stderr: {e.Data}");
-                        }
-                    }
-                };
-
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-
-                try
-                {
-                    await process.WaitForExitAsync(cancellationToken);
-                }
-                catch (TaskCanceledException)
-                {
-                    if (!process.HasExited) process.Kill(true);
-                    CleanDirectory(tempDownloadFolder);
-                    throw new OperationCanceledException();
-                }
-                catch (Exception)
-                {
-                    if (!process.HasExited) process.Kill(true);
-                    CleanDirectory(tempDownloadFolder);
-                    throw;
-                }
-
-                if (process.ExitCode == 0)
-                {
-                    string[] downloadedFiles = Directory.GetFiles(tempDownloadFolder);
-                    if (downloadedFiles.Length > 0)
+                    };
+                    
+                    process.ErrorDataReceived += (s, e) =>
                     {
-                        string downloadedFile = downloadedFiles[0];
-                        string extension = Path.GetExtension(downloadedFile);
-                        
-                        if (!string.IsNullOrWhiteSpace(overrideFileName))
+                        if (e.Data != null)
                         {
-                            string sanitized = Utilities.SanitizeFileName(overrideFileName);
-                            string newFileName = sanitized;
-                            if (!newFileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+                            stderrOutput.AppendLine(e.Data);
+                            if (useTrimming && e.Data.Contains("time="))
                             {
-                                newFileName += extension;
+                                ParseFfmpegProgress(e.Data, trimStartSeconds, trimEndSeconds, ref lastPercentage);
                             }
-                            string newFilePath = Path.Combine(tempDownloadFolder, newFileName);
-                            try
+                            else if (!e.Data.Contains("[debug]") && !useTrimming)
                             {
-                                if (string.Compare(downloadedFile, newFilePath, StringComparison.OrdinalIgnoreCase) != 0)
+                                Debug.WriteLine($"yt-dlp stderr: {e.Data}");
+                            }
+                        }
+                    };
+
+                    process.Start();
+                    process.BeginOutputReadLine();
+                    process.BeginErrorReadLine();
+
+                    try
+                    {
+                        await process.WaitForExitAsync(cancellationToken);
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        if (!process.HasExited) process.Kill(true);
+                        CleanDirectory(jobTempFolder);
+                        throw new OperationCanceledException();
+                    }
+                    catch (Exception)
+                    {
+                        if (!process.HasExited) process.Kill(true);
+                        CleanDirectory(jobTempFolder);
+                        throw;
+                    }
+
+                    if (process.ExitCode == 0)
+                    {
+                        // Clean any temporary / partial files from job folder
+                        var initialFiles = Directory.GetFiles(jobTempFolder);
+                        foreach (var f in initialFiles.Where(IsTemporaryOrPartFile))
+                        {
+                            try { File.Delete(f); } catch { }
+                        }
+
+                        var validFiles = Directory.GetFiles(jobTempFolder).Where(f => !IsTemporaryOrPartFile(f)).ToList();
+
+                        if (extractAudio)
+                        {
+                            string targetExt = "." + (string.IsNullOrWhiteSpace(audioFormat) ? "mp3" : audioFormat.TrimStart('.').ToLowerInvariant());
+                            string? targetAudioFile = validFiles.FirstOrDefault(f => Path.GetExtension(f).Equals(targetExt, StringComparison.OrdinalIgnoreCase))
+                                                   ?? validFiles.FirstOrDefault(f => IsAudioFile(f));
+
+                            if (targetAudioFile != null)
+                            {
+                                // Remove any intermediate video files (.mp4, .webm) that may have been saved alongside
+                                foreach (var videoFile in validFiles.Where(f => !IsAudioFile(f)))
                                 {
-                                    if (File.Exists(newFilePath))
-                                    {
-                                        File.Delete(newFilePath);
-                                    }
-                                    File.Move(downloadedFile, newFilePath);
+                                    try { File.Delete(videoFile); } catch { }
                                 }
-                                downloadedFile = newFilePath;
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.WriteLine($"Failed to rename downloaded file to override name: {ex.Message}");
+                                validFiles = new List<string> { targetAudioFile };
                             }
                         }
 
-                        if (useTrimming && trimEndSeconds > trimStartSeconds)
+                        if (validFiles.Count > 0)
                         {
-                            await TrimLocalVideoAsync(downloadedFile, finalDestinationFolder, extractAudio, audioFormat, trimStartSeconds, trimEndSeconds, cancellationToken);
+                            string downloadedFile = validFiles[0];
+                            string extension = Path.GetExtension(downloadedFile);
+                            
+                            if (!string.IsNullOrWhiteSpace(overrideFileName))
+                            {
+                                string sanitized = Utilities.SanitizeFileName(overrideFileName);
+                                string newFileName = sanitized;
+                                if (!newFileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    newFileName += extension;
+                                }
+                                string newFilePath = Path.Combine(jobTempFolder, newFileName);
+                                try
+                                {
+                                    if (string.Compare(downloadedFile, newFilePath, StringComparison.OrdinalIgnoreCase) != 0)
+                                    {
+                                        if (File.Exists(newFilePath))
+                                        {
+                                            File.Delete(newFilePath);
+                                        }
+                                        File.Move(downloadedFile, newFilePath);
+                                    }
+                                    downloadedFile = newFilePath;
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"Failed to rename downloaded file to override name: {ex.Message}");
+                                }
+                            }
+
+                            if (useTrimming && trimEndSeconds > trimStartSeconds)
+                            {
+                                await TrimLocalVideoAsync(downloadedFile, finalDestinationFolder, extractAudio, audioFormat, trimStartSeconds, trimEndSeconds, cancellationToken);
+                            }
+                            else
+                            {
+                                CopyToFinalDestinationAndClean(jobTempFolder, finalDestinationFolder, url, extractAudio, audioFormat);
+                            }
                         }
                         else
                         {
-                            CopyToFinalDestinationAndClean(tempDownloadFolder, finalDestinationFolder, url);
+                            throw new Exception("No downloaded files found in the temporary folder.");
                         }
                     }
                     else
                     {
-                        throw new Exception("No downloaded files found in the temporary folder.");
+                        CleanDirectory(jobTempFolder);
+                        string errorMsg = stderrOutput.ToString();
+                        var errorLines = errorMsg.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                                               .Where(line => line.ToLower().Contains("error") || line.ToLower().Contains("failed"))
+                                               .Take(3)
+                                               .ToArray();
+                        string details = errorLines.Length > 0 ? string.Join("; ", errorLines) : "Unknown error";
+                        throw new Exception($"yt-dlp failed (exit code {process.ExitCode}): {details}");
+                    }
+
+                    return process.ExitCode == 0;
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(jobTempFolder))
+                    {
+                        Directory.Delete(jobTempFolder, true);
                     }
                 }
-                else
-                {
-                    CleanDirectory(tempDownloadFolder);
-                    string errorMsg = stderrOutput.ToString();
-                    var errorLines = errorMsg.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                                           .Where(line => line.ToLower().Contains("error") || line.ToLower().Contains("failed"))
-                                           .Take(3)
-                                           .ToArray();
-                    string details = errorLines.Length > 0 ? string.Join("; ", errorLines) : "Unknown error";
-                    throw new Exception($"yt-dlp failed (exit code {process.ExitCode}): {details}");
-                }
-
-                return process.ExitCode == 0;
+                catch { }
             }
+        }
+
+        private static bool IsTemporaryOrPartFile(string filePath)
+        {
+            string fileName = Path.GetFileName(filePath);
+            string ext = Path.GetExtension(filePath).ToLowerInvariant();
+
+            return ext == ".part" || ext == ".ytdl" || ext == ".aria2" || ext == ".temp" || ext == ".tmp" ||
+                   fileName.EndsWith(".part", StringComparison.OrdinalIgnoreCase) ||
+                   fileName.EndsWith(".ytdl", StringComparison.OrdinalIgnoreCase) ||
+                   fileName.Contains(".part-Frag", StringComparison.OrdinalIgnoreCase) ||
+                   fileName.Contains(".temp.", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsAudioFile(string filePath)
+        {
+            string ext = Path.GetExtension(filePath).ToLowerInvariant();
+            return ext is ".mp3" or ".m4a" or ".aac" or ".flac" or ".wav" or ".ogg" or ".opus" or ".wma" or ".aiff";
         }
 
         private void CleanDirectory(string path)
@@ -1037,17 +1109,34 @@ namespace UniversalDownloader.Services
             catch { }
         }
 
-        private void CopyToFinalDestinationAndClean(string tempDownloadFolder, string finalDestinationFolder, string sourceUrl = "")
+        private void CopyToFinalDestinationAndClean(string tempDownloadFolder, string finalDestinationFolder, string sourceUrl = "", bool extractAudio = false, string? expectedAudioFormat = null)
         {
             if (!Directory.Exists(finalDestinationFolder))
             {
                 Directory.CreateDirectory(finalDestinationFolder);
             }
 
+            if (!Directory.Exists(tempDownloadFolder)) return;
+
             string[] files = Directory.GetFiles(tempDownloadFolder);
             foreach (var sourceFile in files)
             {
                 string fileName = Path.GetFileName(sourceFile);
+
+                // 1. NEVER copy part/incomplete/temporary files
+                if (IsTemporaryOrPartFile(sourceFile))
+                {
+                    try { File.Delete(sourceFile); } catch { }
+                    continue;
+                }
+
+                // 2. If audio-only was requested, NEVER copy intermediate video files (.mp4/.webm/.mkv)
+                if (extractAudio && !IsAudioFile(sourceFile))
+                {
+                    try { File.Delete(sourceFile); } catch { }
+                    continue;
+                }
+
                 string destFile = Path.Combine(finalDestinationFolder, fileName);
                 
                 ReportProgress("Copying to destination...", fileName, 100, true);
