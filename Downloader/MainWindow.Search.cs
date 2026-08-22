@@ -51,11 +51,7 @@ namespace UniversalDownloader
             if (SearchScrollViewer != null)
             {
                 SearchScrollViewer.Visibility = Visibility.Visible;
-                if (SearchQueryTextBox != null && SearchQueryTextBox.Text == "Search track, artist, music name or album...")
-                {
-                    SearchQueryTextBox.Focus();
-                    SearchQueryTextBox.SelectAll();
-                }
+                SearchQueryTextBox?.Focus();
             }
         }
 
@@ -79,31 +75,13 @@ namespace UniversalDownloader
             }
         }
 
-        private void SearchQueryTextBox_GotFocus(object sender, RoutedEventArgs e)
+        private void SearchQueryTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (SearchQueryTextBox != null)
+            if (SearchPlaceholderTextBlock != null && SearchQueryTextBox != null)
             {
-                if (SearchQueryTextBox.Text == "Search track, artist, music name or album...")
-                {
-                    SearchQueryTextBox.Text = string.Empty;
-                }
-                SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
-            }
-        }
-
-        private void SearchQueryTextBox_LostFocus(object sender, RoutedEventArgs e)
-        {
-            if (SearchQueryTextBox != null)
-            {
-                if (string.IsNullOrWhiteSpace(SearchQueryTextBox.Text))
-                {
-                    SearchQueryTextBox.Text = "Search track, artist, music name or album...";
-                    SearchQueryTextBox.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
-                }
-                else
-                {
-                    SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
-                }
+                SearchPlaceholderTextBlock.Visibility = string.IsNullOrEmpty(SearchQueryTextBox.Text)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
             }
         }
 
@@ -115,7 +93,6 @@ namespace UniversalDownloader
                 if (SearchQueryTextBox != null)
                 {
                     SearchQueryTextBox.Text = cleanTag;
-                    SearchQueryTextBox.Foreground = System.Windows.Media.Brushes.White;
                 }
                 await PerformSearchAsync();
             }
@@ -129,7 +106,7 @@ namespace UniversalDownloader
                 else if (rb == SearchFilterYouTube) _activeSearchPlatformFilter = "YouTube";
                 else if (rb == SearchFilterSoundCloud) _activeSearchPlatformFilter = "SoundCloud";
 
-                if (SearchQueryTextBox != null && !string.IsNullOrWhiteSpace(SearchQueryTextBox.Text) && SearchQueryTextBox.Text != "Search track, artist, music name or album...")
+                if (SearchQueryTextBox != null && !string.IsNullOrWhiteSpace(SearchQueryTextBox.Text))
                 {
                     await PerformSearchAsync();
                 }
@@ -140,7 +117,7 @@ namespace UniversalDownloader
         {
             if (SearchQueryTextBox == null || _searchService == null) return;
             string query = SearchQueryTextBox.Text.Trim();
-            if (string.IsNullOrWhiteSpace(query) || query == "Search track, artist, music name or album...") return;
+            if (string.IsNullOrWhiteSpace(query)) return;
 
             _searchCts?.Cancel();
             _searchCts = new CancellationTokenSource();

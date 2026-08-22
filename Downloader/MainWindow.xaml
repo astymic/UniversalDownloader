@@ -383,7 +383,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
                         <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="12" Padding="{TemplateBinding Padding}">
-                            <ScrollViewer x:Name="PART_ContentHost"/>
+                            <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsFocused" Value="True">
@@ -1711,17 +1711,27 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <TextBox x:Name="SearchQueryTextBox" 
-                                             Style="{StaticResource ModernTextBox}" 
-                                             Height="48" 
-                                             FontSize="14.5"
-                                             Padding="16,12"
-                                             Foreground="White"
-                                             CaretBrush="White"
-                                             KeyDown="SearchQueryTextBox_KeyDown"
-                                             GotFocus="SearchQueryTextBox_GotFocus"
-                                             LostFocus="SearchQueryTextBox_LostFocus"
-                                             Text="Search track, artist, music name or album..."/>
+                                    <Grid Grid.Column="0">
+                                        <TextBox x:Name="SearchQueryTextBox" 
+                                                 Style="{StaticResource ModernTextBox}" 
+                                                 Height="48" 
+                                                 FontSize="14.5"
+                                                 Padding="16,0"
+                                                 VerticalContentAlignment="Center"
+                                                 Foreground="White"
+                                                 CaretBrush="White"
+                                                 KeyDown="SearchQueryTextBox_KeyDown"
+                                                 TextChanged="SearchQueryTextBox_TextChanged"/>
+
+                                        <!-- Watermark Placeholder Overlay -->
+                                        <TextBlock x:Name="SearchPlaceholderTextBlock" 
+                                                   Text="Search track, artist, music name or album..." 
+                                                   Foreground="{StaticResource TextSecondaryBrush}" 
+                                                   FontSize="14.5" 
+                                                   VerticalAlignment="Center" 
+                                                   Margin="18,0,0,0" 
+                                                   IsHitTestVisible="False"/>
+                                    </Grid>
 
                                     <Button Grid.Column="1" 
                                             x:Name="ExecuteSearchButton"
