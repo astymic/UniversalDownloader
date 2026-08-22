@@ -1,4 +1,4 @@
-﻿name: Publish Release
+name: Publish Release
 
 on:
   push:
@@ -29,7 +29,27 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: "Universal Downloader v1.0.0 — Official Release"
           files: publish/Universal Downloader.exe
-          generate_release_notes: true
+          body: |
+            ## 🚀 Universal Downloader v1.0.0
+
+            A modern, fast, and feature-rich media downloader, converter, and audio identification workstation for Windows.
+
+            ### ✨ Key Features:
+            * 🔍 **Unified Search Hub** — Search and download music & videos across YouTube & SoundCloud simultaneously.
+            * 🎙️ **Shazam Song Recognition** — Instant 5-second acoustic identification from PC Audio or Microphone with live visualizer.
+            * 📥 **Multi-Platform Downloader** — High-speed downloads from YouTube, Spotify CSV, SoundCloud, Google Drive, and 1,000+ sites.
+            * 📋 **Download Queue Manager** — Batch downloading with pause/resume, retry support, and live queue badges.
+            * 🔄 **Built-in Media Converter** — Fast FFmpeg conversion between MP4, MKV, MP3, AAC, FLAC, WAV, and OGG.
+            * 📜 **History & Metadata** — Automatic ID3 tag embedding, album art, and optional synchronized `.lrc` lyrics.
+            * ⚡ **Zero Setup** — `yt-dlp`, `ffmpeg`, and `aria2c` dependencies are automatically managed in the background.
+
+            ---
+
+            ### 📦 Quick Start:
+            1. Download **`Universal Downloader.exe`** from the **Assets** section below.
+            2. Run the application directly (self-contained, no installation or external .NET runtime needed).
+          generate_release_notes: false
           draft: false
           prerelease: false
