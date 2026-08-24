@@ -29,12 +29,61 @@ namespace UniversalDownloader.Services
 
         public static string GetCurrentAppVersion()
         {
-            var version = Assembly.GetEntryAssembly()?.GetName().Version;
-            if (version != null && version.Major > 0)
+            try
             {
-                return $"{version.Major}.{version.Minor}.{version.Build}";
+                // 1. Check ProductVersion from running executable
+                string? exePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName;
+                if (!string.IsNullOrWhiteSpace(exePath) && File.Exists(exePath))
+                {
+                    var fvi = FileVersionInfo.GetVersionInfo(exePath);
+                    if (!string.IsNullOrWhiteSpace(fvi.ProductVersion))
+                    {
+                        string ver = fvi.ProductVersion.Split('+')[0].Trim();
+                        if (Version.TryParse(ver, out var parsed))
+                        {
+                            return NormalizeVersion(parsed);
+                        }
+                    }
+                    if (!string.IsNullOrWhiteSpace(fvi.FileVersion))
+                    {
+                        string ver = fvi.FileVersion.Trim();
+                        if (Version.TryParse(ver, out var parsed))
+                        {
+                            return NormalizeVersion(parsed);
+                        }
+                    }
+                }
+
+                // 2. Check AssemblyInformationalVersion
+                var infoVerAttr = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+                if (!string.IsNullOrWhiteSpace(infoVerAttr))
+                {
+                    string clean = infoVerAttr.Split('+')[0].Trim();
+                    if (Version.TryParse(clean, out var parsed))
+                    {
+                        return NormalizeVersion(parsed);
+                    }
+                }
+
+                // 3. Check Assembly Name Version
+                var asmVer = Assembly.GetEntryAssembly()?.GetName().Version;
+                if (asmVer != null && asmVer.Major > 0)
+                {
+                    return NormalizeVersion(asmVer);
+                }
             }
-            return "1.0.8";
+            catch { }
+
+            return "1.0.9";
+        }
+
+        private static string NormalizeVersion(Version version)
+        {
+            if (version.Revision > 0)
+                return $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
+            if (version.Build >= 0)
+                return $"{version.Major}.{version.Minor}.{version.Build}";
+            return $"{version.Major}.{version.Minor}";
         }
 
         public async Task<UpdateInfo> CheckForUpdatesAsync(CancellationToken cancellationToken = default)
@@ -81,9 +130,9 @@ namespace UniversalDownloader.Services
                 {
                     updateInfo.IsUpdateAvailable = remoteVer > localVer;
                 }
-                else if (!string.IsNullOrWhiteSpace(cleanTag) && !cleanTag.Equals(updateInfo.CurrentVersion, StringComparison.OrdinalIgnoreCase))
+                else
                 {
-                    updateInfo.IsUpdateAvailable = true;
+                    updateInfo.IsUpdateAvailable = false;
                 }
 
                 // Detect OS and find appropriate release asset
@@ -167,16 +216,22 @@ namespace UniversalDownloader.Services
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
+                // Write a robust cmd script with admin fallback for Program Files / corporate permission environments
                 string cmdScriptPath = Path.Combine(Path.GetTempPath(), $"updater_{Guid.NewGuid():N}.cmd");
                 string scriptContent = $@"@echo off
+setlocal enabledelayedexpansion
 timeout /t 1 /nobreak >nul
-:loop
+:waitloop
 tasklist /fi ""PID eq {currentPid}"" 2>nul | find ""{currentPid}"" >nul
 if not errorlevel 1 (
     timeout /t 1 /nobreak >nul
-    goto loop
+    goto waitloop
 )
-copy /y ""{downloadedFilePath}"" ""{currentExecutablePath}"" >nul
+copy /y ""{downloadedFilePath}"" ""{currentExecutablePath}"" >nul 2>&1
+if errorlevel 1 (
+    powershell -NoProfile -Command ""Start-Process cmd -ArgumentList '/c copy /y \""""{downloadedFilePath}\"""" \""""{currentExecutablePath}\"""" && start \""""\"""" \""""{currentExecutablePath}\""""' -Verb RunAs""
+    exit
+)
 start """" ""{currentExecutablePath}""
 del ""%~f0""
 ";
@@ -207,7 +262,7 @@ sleep 1
 while kill -0 {currentPid} 2>/dev/null; do
     sleep 0.5
 done
-cp -f ""{downloadedFilePath}"" ""{currentExecutablePath}""
+cp -f ""{downloadedFilePath}"" ""{currentExecutablePath}"" 2>/dev/null || sudo cp -f ""{downloadedFilePath}"" ""{currentExecutablePath}""
 chmod +x ""{currentExecutablePath}""
 nohup ""{currentExecutablePath}"" >/dev/null 2>&1 &
 rm -- ""$0""
