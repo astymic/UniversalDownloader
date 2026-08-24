@@ -126,6 +126,11 @@ namespace UniversalDownloader
                     SelectedDirectory = null;
                 }
             }
+
+            if (SettingsAppVersionText != null)
+            {
+                SettingsAppVersionText.Text = $" (v{UpdateService.GetCurrentAppVersion()})";
+            }
         }
 
         private async Task SaveSettingAsync(string key, string value)

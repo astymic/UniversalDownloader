@@ -4,6 +4,9 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Media;
 using UniversalDownloader.Models;
 using UniversalDownloader.Services;
 
@@ -34,6 +37,11 @@ namespace UniversalDownloader
 
                 await Dispatcher.InvokeAsync(() =>
                 {
+                    if (SettingsAppVersionText != null)
+                    {
+                        SettingsAppVersionText.Text = $" (v{info.CurrentVersion})";
+                    }
+
                     if (info.IsUpdateAvailable)
                     {
                         if (UpdateAvailableButton != null)
@@ -50,9 +58,17 @@ namespace UniversalDownloader
                             ShowUpdateDialog(info);
                         }
                     }
-                    else if (!silent)
+                    else
                     {
-                        ShowToast($"You're on the latest version (v{info.CurrentVersion})! ✨");
+                        if (UpdateAvailableButton != null)
+                        {
+                            UpdateAvailableButton.Visibility = Visibility.Collapsed;
+                        }
+
+                        if (!silent)
+                        {
+                            ShowToast($"You're on the latest version (v{info.CurrentVersion})! ✨");
+                        }
                     }
                 });
             }
@@ -98,7 +114,7 @@ namespace UniversalDownloader
                 UpdateDialogReleaseDateTextBlock.Text = info.PublishedAt.HasValue ? $"Published: {info.PublishedAt.Value:yyyy-MM-dd • hh:mm tt}" : string.Empty;
 
             if (UpdateDialogNotesTextBlock != null)
-                UpdateDialogNotesTextBlock.Text = !string.IsNullOrWhiteSpace(info.ReleaseNotes) ? info.ReleaseNotes.Trim() : "Performance enhancements, bug fixes, and general improvements.";
+                PopulateMarkdownNotes(UpdateDialogNotesTextBlock, info.ReleaseNotes);
 
             if (UpdateProgressPanel != null)
                 UpdateProgressPanel.Visibility = Visibility.Collapsed;
@@ -110,6 +126,92 @@ namespace UniversalDownloader
             }
 
             UpdateDialogOverlay.Visibility = Visibility.Visible;
+        }
+
+        private static void PopulateMarkdownNotes(TextBlock textBlock, string? markdown)
+        {
+            textBlock.Inlines.Clear();
+            if (string.IsNullOrWhiteSpace(markdown))
+            {
+                textBlock.Inlines.Add(new Run("Performance enhancements, bug fixes, and general improvements.")
+                {
+                    Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CBD5E1"))
+                });
+                return;
+            }
+
+            var lines = markdown.Replace("\r\n", "\n").Split('\n');
+            bool hasContent = false;
+
+            foreach (var rawLine in lines)
+            {
+                string line = rawLine.Trim();
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    if (hasContent)
+                    {
+                        textBlock.Inlines.Add(new LineBreak());
+                    }
+                    continue;
+                }
+
+                if (hasContent)
+                {
+                    textBlock.Inlines.Add(new LineBreak());
+                }
+                hasContent = true;
+
+                // Heading lines (###, ##, #)
+                if (line.StartsWith("#"))
+                {
+                    string headingText = line.TrimStart('#').Trim();
+                    var headingRun = new Run(headingText)
+                    {
+                        FontWeight = FontWeights.Bold,
+                        FontSize = line.StartsWith("###") ? 12.5 : 13.5,
+                        Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#38BDF8"))
+                    };
+                    textBlock.Inlines.Add(headingRun);
+                    continue;
+                }
+
+                // Bullet point lines (* or -)
+                if (line.StartsWith("* ") || line.StartsWith("- "))
+                {
+                    string bulletContent = line.Substring(2).Trim();
+                    textBlock.Inlines.Add(new Run("  • ")
+                    {
+                        FontWeight = FontWeights.Bold,
+                        Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#38BDF8"))
+                    });
+
+                    AddFormattedInlines(textBlock, bulletContent);
+                    continue;
+                }
+
+                // Standard text lines
+                AddFormattedInlines(textBlock, line);
+            }
+        }
+
+        private static void AddFormattedInlines(TextBlock textBlock, string text)
+        {
+            // Parse **bold** tokens
+            var parts = text.Split(new[] { "**" }, StringSplitOptions.None);
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (string.IsNullOrEmpty(parts[i])) continue;
+
+                bool isBold = (i % 2 == 1);
+                var run = new Run(parts[i])
+                {
+                    FontWeight = isBold ? FontWeights.Bold : FontWeights.Normal,
+                    Foreground = isBold 
+                        ? new SolidColorBrush(Colors.White) 
+                        : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CBD5E1"))
+                };
+                textBlock.Inlines.Add(run);
+            }
         }
 
         private void UpdateDialogClose_Click(object sender, RoutedEventArgs e)

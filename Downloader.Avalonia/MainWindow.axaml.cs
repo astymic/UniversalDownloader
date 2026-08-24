@@ -494,6 +494,11 @@ namespace UniversalDownloader.Avalonia
 
                 Dispatcher.UIThread.Post(() =>
                 {
+                    if (SettingsAppVersionText != null)
+                    {
+                        SettingsAppVersionText.Text = $" (v{info.CurrentVersion})";
+                    }
+
                     if (info.IsUpdateAvailable)
                     {
                         if (UpdateAvailableButton != null)
@@ -510,11 +515,19 @@ namespace UniversalDownloader.Avalonia
                             ShowUpdateDialog(info);
                         }
                     }
-                    else if (!silent)
+                    else
                     {
-                        if (SettingsUpdateStatusText != null)
+                        if (UpdateAvailableButton != null)
                         {
-                            SettingsUpdateStatusText.Text = $"You're on the latest version (v{info.CurrentVersion})! ✨";
+                            UpdateAvailableButton.IsVisible = false;
+                        }
+
+                        if (!silent)
+                        {
+                            if (SettingsUpdateStatusText != null)
+                            {
+                                SettingsUpdateStatusText.Text = $"You're on the latest version (v{info.CurrentVersion})! ✨";
+                            }
                         }
                     }
                 });
@@ -554,7 +567,9 @@ namespace UniversalDownloader.Avalonia
                 UpdateDialogReleaseDateTextBlock.Text = info.PublishedAt.HasValue ? $"Published: {info.PublishedAt.Value:yyyy-MM-dd • hh:mm tt}" : string.Empty;
 
             if (UpdateDialogNotesTextBlock != null)
-                UpdateDialogNotesTextBlock.Text = !string.IsNullOrWhiteSpace(info.ReleaseNotes) ? info.ReleaseNotes.Trim() : "Performance enhancements, bug fixes, and general improvements.";
+            {
+                UpdateDialogNotesTextBlock.Text = CleanMarkdownForDisplay(info.ReleaseNotes);
+            }
 
             if (UpdateProgressPanel != null)
                 UpdateProgressPanel.IsVisible = false;
@@ -566,6 +581,41 @@ namespace UniversalDownloader.Avalonia
             }
 
             UpdateDialogOverlay.IsVisible = true;
+        }
+
+        private static string CleanMarkdownForDisplay(string? markdown)
+        {
+            if (string.IsNullOrWhiteSpace(markdown))
+                return "Performance enhancements, bug fixes, and general improvements.";
+
+            var lines = markdown.Replace("\r\n", "\n").Split('\n');
+            var sb = new System.Text.StringBuilder();
+
+            foreach (var rawLine in lines)
+            {
+                string line = rawLine.Trim();
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    sb.AppendLine();
+                    continue;
+                }
+
+                if (line.StartsWith("#"))
+                {
+                    sb.AppendLine(line.TrimStart('#').Trim());
+                }
+                else if (line.StartsWith("* ") || line.StartsWith("- "))
+                {
+                    string content = line.Substring(2).Replace("**", "").Trim();
+                    sb.AppendLine($"  • {content}");
+                }
+                else
+                {
+                    sb.AppendLine(line.Replace("**", ""));
+                }
+            }
+
+            return sb.ToString().Trim();
         }
 
         private void UpdateDialogClose_Click(object? sender, RoutedEventArgs e)
