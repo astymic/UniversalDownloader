@@ -109,6 +109,7 @@ namespace UniversalDownloader
             InitializeQueueBindings();
             InitializeSearchBindings();
             InitializeLiveStreamFeature();
+            InitializeAutoUpdater();
         }
 
         private async void OnFileDownloaded(string filePath, string sourceUrl)

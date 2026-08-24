@@ -62,6 +62,13 @@ A modern, high-performance, cross-platform desktop application (**Windows & Linu
 ### ⚡ Zero-Setup Dependency Manager
 - Automatically downloads, verifies, and updates `yt-dlp.exe`, `ffmpeg.exe`, `ffprobe.exe`, and `aria2c.exe` in the background with zero user setup required.
 
+### 🔄 In-App Auto-Updater (GitHub Releases)
+- **Automatic Background Version Checks** — Checks GitHub Releases for new updates on launch.
+- **Top Header Update Button** — When a new version is released, an `✨ Update (vX.X.X)` button dynamically appears in the top window bar next to Settings.
+- **Cross-Platform OS Detection** — Automatically detects Windows vs Linux and matches the correct platform package/binary asset.
+- **1-Click In-App Modal** — View version comparison, changelog, and click `[⬇ Update & Restart]` to automatically download, install, and restart into the latest version.
+- **Manual Checks in Settings** — Always available `[🔄 Check for Updates]` button in the Settings menu.
+
 ---
 
 ## 🎨 Modern UI & Glassmorphism

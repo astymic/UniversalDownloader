@@ -89,6 +89,7 @@ namespace UniversalDownloader.Avalonia
             QueueItemsControl.ItemsSource = _queueManager.Items;
             HistoryItemsControl.ItemsSource = _historyService.Items;
 
+            InitializeAutoUpdater();
             Loaded += MainWindow_Loaded;
         }
 
@@ -467,6 +468,216 @@ namespace UniversalDownloader.Avalonia
 
             LiveStreamDownloadAllButton.Content = $"✓ Queued ({session.Tracks.Count})";
             LiveStreamDownloadAllButton.IsEnabled = false;
+        }
+        #endregion
+
+        #region Auto-Updater
+        private readonly UpdateService _updateService = new();
+        private UpdateInfo? _latestUpdateInfo;
+        private CancellationTokenSource? _updateCts;
+
+        private void InitializeAutoUpdater()
+        {
+            Task.Run(async () =>
+            {
+                await Task.Delay(3000);
+                await CheckForAppUpdatesAsync(silent: true);
+            });
+        }
+
+        public async Task CheckForAppUpdatesAsync(bool silent = true)
+        {
+            try
+            {
+                var info = await _updateService.CheckForUpdatesAsync();
+                _latestUpdateInfo = info;
+
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (info.IsUpdateAvailable)
+                    {
+                        if (UpdateAvailableButton != null)
+                        {
+                            if (UpdateBadgeTextBlock != null)
+                            {
+                                UpdateBadgeTextBlock.Text = $" v{info.LatestVersion}";
+                            }
+                            UpdateAvailableButton.IsVisible = true;
+                        }
+
+                        if (!silent)
+                        {
+                            ShowUpdateDialog(info);
+                        }
+                    }
+                    else if (!silent)
+                    {
+                        if (SettingsUpdateStatusText != null)
+                        {
+                            SettingsUpdateStatusText.Text = $"You're on the latest version (v{info.CurrentVersion})! ✨";
+                        }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Update check failed: {ex.Message}");
+            }
+        }
+
+        private void UpdateAvailableButton_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_latestUpdateInfo != null && _latestUpdateInfo.IsUpdateAvailable)
+            {
+                ShowUpdateDialog(_latestUpdateInfo);
+            }
+            else
+            {
+                _ = CheckForAppUpdatesAsync(silent: false);
+            }
+        }
+
+        private void ShowUpdateDialog(UpdateInfo info)
+        {
+            if (UpdateDialogOverlay == null) return;
+
+            if (UpdateDialogCurrentVersionTextBlock != null)
+                UpdateDialogCurrentVersionTextBlock.Text = $"v{info.CurrentVersion}";
+
+            if (UpdateDialogLatestVersionTextBlock != null)
+                UpdateDialogLatestVersionTextBlock.Text = $"v{info.LatestVersion}";
+
+            if (UpdateDialogReleaseTitleTextBlock != null)
+                UpdateDialogReleaseTitleTextBlock.Text = !string.IsNullOrWhiteSpace(info.ReleaseTitle) ? info.ReleaseTitle : $"Universal Downloader v{info.LatestVersion}";
+
+            if (UpdateDialogReleaseDateTextBlock != null)
+                UpdateDialogReleaseDateTextBlock.Text = info.PublishedAt.HasValue ? $"Published: {info.PublishedAt.Value:yyyy-MM-dd • hh:mm tt}" : string.Empty;
+
+            if (UpdateDialogNotesTextBlock != null)
+                UpdateDialogNotesTextBlock.Text = !string.IsNullOrWhiteSpace(info.ReleaseNotes) ? info.ReleaseNotes.Trim() : "Performance enhancements, bug fixes, and general improvements.";
+
+            if (UpdateProgressPanel != null)
+                UpdateProgressPanel.IsVisible = false;
+
+            if (UpdateDialogApplyButton != null)
+            {
+                UpdateDialogApplyButton.IsEnabled = true;
+                UpdateDialogApplyButton.Content = "⬇ Update & Restart";
+            }
+
+            UpdateDialogOverlay.IsVisible = true;
+        }
+
+        private void UpdateDialogClose_Click(object? sender, RoutedEventArgs e)
+        {
+            _updateCts?.Cancel();
+            if (UpdateDialogOverlay != null)
+            {
+                UpdateDialogOverlay.IsVisible = false;
+            }
+        }
+
+        private void UpdateDialogViewGitHub_Click(object? sender, RoutedEventArgs e)
+        {
+            string url = _latestUpdateInfo?.ReleaseUrl ?? "https://github.com/astymic/UniversalDownloader/releases";
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to open browser: {ex.Message}");
+            }
+        }
+
+        private async void UpdateDialogApply_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_latestUpdateInfo == null) return;
+
+            if (string.IsNullOrWhiteSpace(_latestUpdateInfo.DownloadUrl))
+            {
+                UpdateDialogViewGitHub_Click(sender, e);
+                return;
+            }
+
+            if (UpdateProgressPanel != null)
+                UpdateProgressPanel.IsVisible = true;
+
+            if (UpdateDialogApplyButton != null)
+            {
+                UpdateDialogApplyButton.IsEnabled = false;
+                UpdateDialogApplyButton.Content = "Downloading...";
+            }
+
+            _updateCts = new CancellationTokenSource();
+            var progress = new Progress<double>(percent =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (UpdateDownloadProgressBar != null)
+                        UpdateDownloadProgressBar.Value = percent;
+
+                    if (UpdateProgressPercentTextBlock != null)
+                        UpdateProgressPercentTextBlock.Text = $"{percent:F0}%";
+
+                    if (UpdateProgressStatusTextBlock != null)
+                        UpdateProgressStatusTextBlock.Text = percent >= 100 ? "Finalizing update..." : $"Downloading v{_latestUpdateInfo.LatestVersion}... ({percent:F0}%)";
+                });
+            });
+
+            try
+            {
+                string tempDir = Path.Combine(Path.GetTempPath(), "UniversalDownloader_Update");
+                string downloadedFile = await _updateService.DownloadUpdateAssetAsync(_latestUpdateInfo.DownloadUrl, tempDir, progress, _updateCts.Token);
+
+                if (File.Exists(downloadedFile))
+                {
+                    if (UpdateProgressStatusTextBlock != null)
+                        UpdateProgressStatusTextBlock.Text = "Restarting to apply update...";
+
+                    await Task.Delay(800);
+                    _updateService.ApplyUpdateAndRestart(downloadedFile);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                if (UpdateProgressStatusTextBlock != null)
+                    UpdateProgressStatusTextBlock.Text = "Update canceled.";
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Update download failed: {ex.Message}");
+                if (UpdateProgressStatusTextBlock != null)
+                    UpdateProgressStatusTextBlock.Text = $"Update failed: {ex.Message}";
+
+                if (UpdateDialogApplyButton != null)
+                {
+                    UpdateDialogApplyButton.IsEnabled = true;
+                    UpdateDialogApplyButton.Content = "Retry Update";
+                }
+            }
+        }
+
+        private async void CheckForUpdates_Click(object? sender, RoutedEventArgs e)
+        {
+            if (SettingsUpdateStatusText != null)
+            {
+                SettingsUpdateStatusText.Text = "Checking GitHub Releases...";
+            }
+
+            await CheckForAppUpdatesAsync(silent: false);
+
+            if (SettingsUpdateStatusText != null)
+            {
+                if (_latestUpdateInfo != null && _latestUpdateInfo.IsUpdateAvailable)
+                {
+                    SettingsUpdateStatusText.Text = $"Update available: v{_latestUpdateInfo.LatestVersion} ✨";
+                }
+                else
+                {
+                    SettingsUpdateStatusText.Text = $"You're on the latest version (v{UpdateService.GetCurrentAppVersion()}).";
+                }
+            }
         }
         #endregion
     }

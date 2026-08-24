@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using Newtonsoft.Json.Linq;
+using UniversalDownloader.Services;
 
 namespace UniversalDownloader
 {
@@ -318,6 +319,28 @@ namespace UniversalDownloader
                 if (SettingsYtDlpStatus != null)
                 {
                     SettingsYtDlpStatus.Text = $"Update failed: {ex.Message}";
+                }
+            }
+        }
+
+        private async void CheckForUpdates_Click(object sender, RoutedEventArgs e)
+        {
+            if (SettingsUpdateStatusText != null)
+            {
+                SettingsUpdateStatusText.Text = "Checking GitHub Releases...";
+            }
+
+            await CheckForAppUpdatesAsync(silent: false);
+
+            if (SettingsUpdateStatusText != null)
+            {
+                if (_latestUpdateInfo != null && _latestUpdateInfo.IsUpdateAvailable)
+                {
+                    SettingsUpdateStatusText.Text = $"Update available: v{_latestUpdateInfo.LatestVersion} ✨";
+                }
+                else
+                {
+                    SettingsUpdateStatusText.Text = $"You're on the latest version (v{UpdateService.GetCurrentAppVersion()}).";
                 }
             }
         }

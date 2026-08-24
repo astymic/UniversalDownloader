@@ -34,7 +34,15 @@
                                         <TextBlock Text="Fast, Multi-Source Media &amp; Music Downloader" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
                                     </StackPanel>
                                 </StackPanel>
-                                <TextBlock Grid.Column="1" x:Name="StatusBadgeTextBlock" Text="Ready" Foreground="#10B981" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <Button x:Name="UpdateAvailableButton" Classes="primary" Height="32" Padding="12,0" Background="#059669" BorderBrush="#10B981" IsVisible="False" Click="UpdateAvailableButton_Click" ToolTip.Tip="New version available! Click to update.">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <TextBlock Text="✨ Update" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="UpdateBadgeTextBlock" Text=" v1.0.9" FontSize="11" Foreground="#D1FAE5" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <TextBlock x:Name="StatusBadgeTextBlock" Text="Ready" Foreground="#10B981" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
+                                </StackPanel>
                             </Grid>
 
                             <!-- URL Input Grid -->
@@ -295,8 +303,90 @@
                             <CheckBox x:Name="AutoUpdateDependenciesCheckBox" Content="🔄 Auto-update yt-dlp on startup" IsChecked="True"/>
                         </StackPanel>
                     </Border>
+
+                    <!-- Application Updates Card -->
+                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="🚀 Application Updates" FontWeight="Bold" FontSize="14"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="Universal Downloader" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                                        <TextBlock x:Name="SettingsAppVersionText" Text=" (v1.0.8)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="SettingsUpdateStatusText" Text="Check for newer releases on GitHub" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="primary" Content="🔄 Check for Updates" Height="36" Padding="14,0" Click="CheckForUpdates_Click"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
+
+            <!-- UPDATE MODAL DIALOG OVERLAY -->
+            <Grid x:Name="UpdateDialogOverlay" Background="#B3000000" IsVisible="False" ZIndex="999">
+                <Border Background="{StaticResource SurfaceBrush}" 
+                        BorderBrush="#38BDF8" 
+                        BorderThickness="1" 
+                        CornerRadius="16" 
+                        Width="500" 
+                        MaxHeight="600" 
+                        Padding="24" 
+                        HorizontalAlignment="Center" 
+                        VerticalAlignment="Center">
+                    <StackPanel Spacing="14">
+                        <!-- Header -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Spacing="2">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="🚀" FontSize="20" VerticalAlignment="Center"/>
+                                    <TextBlock Text="New Version Available!" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="Current: " FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock x:Name="UpdateDialogCurrentVersionTextBlock" Text="v1.0.8" FontSize="12" FontWeight="Bold" Foreground="#94A3B8"/>
+                                    <TextBlock Text=" ➔ " FontSize="12" Foreground="#38BDF8" FontWeight="Bold"/>
+                                    <TextBlock Text="Latest: " FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock x:Name="UpdateDialogLatestVersionTextBlock" Text="v1.0.9" FontSize="12" FontWeight="Bold" Foreground="#10B981"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="secondary" Content="✕" Width="30" Height="30" Click="UpdateDialogClose_Click"/>
+                        </Grid>
+
+                        <!-- Release Title / Date -->
+                        <Border Background="#16161E" CornerRadius="10" Padding="12" BorderBrush="#272732" BorderThickness="1">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="UpdateDialogReleaseTitleTextBlock" Text="Release Title" FontWeight="Bold" FontSize="13" Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="UpdateDialogReleaseDateTextBlock" Text="Published: 2026-08-24" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Changelog Notes -->
+                        <TextBlock Text="📋 What's New:" FontSize="12" FontWeight="SemiBold" Foreground="#CBD5E1"/>
+                        <Border Background="#0D0D12" CornerRadius="8" Padding="12" BorderBrush="#22222E" BorderThickness="1" MaxHeight="160">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <TextBlock x:Name="UpdateDialogNotesTextBlock" Text="Release notes..." TextWrapping="Wrap" FontSize="11.5" Foreground="#CBD5E1" LineHeight="17"/>
+                            </ScrollViewer>
+                        </Border>
+
+                        <!-- Download Progress -->
+                        <StackPanel x:Name="UpdateProgressPanel" Spacing="4" IsVisible="False">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock x:Name="UpdateProgressStatusTextBlock" Text="Downloading update..." FontSize="11.5" Foreground="#38BDF8" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="1" x:Name="UpdateProgressPercentTextBlock" Text="0%" FontSize="11.5" Foreground="White" FontWeight="Bold"/>
+                            </Grid>
+                            <ProgressBar x:Name="UpdateDownloadProgressBar" Height="6" Minimum="0" Maximum="100" Value="0" Foreground="#10B981" Background="#262630"/>
+                        </StackPanel>
+
+                        <!-- Action Buttons -->
+                        <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,10,0,0">
+                            <Button Grid.Column="0" Classes="secondary" Content="🌐 View on GitHub" Height="38" Padding="12,0" FontSize="11.5" Click="UpdateDialogViewGitHub_Click"/>
+                            <Button Grid.Column="1" Classes="secondary" Content="Later" Height="38" Padding="16,0" FontSize="11.5" Margin="8,0" Click="UpdateDialogClose_Click"/>
+                            <Button x:Name="UpdateDialogApplyButton" Grid.Column="2" Classes="primary" Content="⬇ Update &amp; Restart" Height="38" Padding="16,0" FontSize="12" FontWeight="Bold" Background="#059669" BorderBrush="#10B981" Click="UpdateDialogApply_Click"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
 
         <!-- RIGHT NAVIGATION RAIL -->
