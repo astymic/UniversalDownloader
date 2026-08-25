@@ -323,6 +323,82 @@
                 </StackPanel>
             </ScrollViewer>
 
+            <!-- ANIME SERIES BATCH DOWNLOAD OVERLAY -->
+            <Grid x:Name="AnimeDrawerGrid" Background="#B3000000" IsVisible="False" ZIndex="998">
+                <Border Background="{StaticResource SurfaceBrush}" 
+                        BorderBrush="#F43F5E" 
+                        BorderThickness="1" 
+                        CornerRadius="16" 
+                        Width="560" 
+                        MaxHeight="680" 
+                        Padding="24" 
+                        HorizontalAlignment="Center" 
+                        VerticalAlignment="Center">
+                    <StackPanel Spacing="14">
+                        <!-- Header -->
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Border Grid.Column="0" Width="60" Height="84" CornerRadius="8" Background="#20202A" ClipToBounds="True" Margin="0,0,14,0">
+                                <Image x:Name="AnimeDrawerPosterImage" Stretch="UniformToFill"/>
+                            </Border>
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="🎬 АНИМЕ СЕРИИ" Foreground="#F43F5E" FontSize="11" FontWeight="Bold"/>
+                                <TextBlock x:Name="AnimeDrawerTitleText" Text="Название Аниме" FontSize="17" FontWeight="Bold" Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="AnimeDrawerMetaText" Text="2024 • 24 серий • ⭐ 8.5" Foreground="#10B981" FontSize="11" FontWeight="SemiBold"/>
+                            </StackPanel>
+
+                            <Button Grid.Column="2" Classes="secondary" Content="✕" Width="30" Height="30" Click="AnimeDrawerClose_Click"/>
+                        </Grid>
+
+                        <!-- Dubbing Selector -->
+                        <Border Background="#16161E" CornerRadius="10" Padding="12" BorderBrush="#272732" BorderThickness="1">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Text="🎙️ Озвучка:" FontWeight="Bold" FontSize="12" Foreground="White"/>
+                                    <TextBlock Text="Выбор перевода" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                                <ComboBox x:Name="AnimeDubsComboBox" Grid.Column="1" Height="34" HorizontalAlignment="Stretch" SelectionChanged="AnimeDubsComboBox_SelectionChanged"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Episodes Header & Controls -->
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBlock x:Name="AnimeSelectedCountText" Grid.Column="0" Text="Выбрано: 24 из 24" Foreground="#CBD5E1" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" Classes="secondary" Content="✓ Все" Height="30" Padding="10,0" FontSize="11" Margin="0,0,8,0" Click="AnimeSelectAll_Click"/>
+                            <Button Grid.Column="2" Classes="secondary" Content="Снять" Height="30" Padding="10,0" FontSize="11" Click="AnimeDeselectAll_Click"/>
+                        </Grid>
+
+                        <!-- Scrollable Episodes List -->
+                        <Border Background="#0D0D12" CornerRadius="8" Padding="8" BorderBrush="#22222E" BorderThickness="1" MaxHeight="260">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl x:Name="AnimeEpisodesItemsControl">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#16161E" CornerRadius="6" Padding="10,6" Margin="0,0,0,4" BorderBrush="#242432" BorderThickness="1">
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding DisplayTitle}" FontSize="12" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
+                                                    <Border Grid.Column="2" Background="#1E293B" CornerRadius="4" Padding="6,2" BorderBrush="#38BDF8" BorderThickness="1">
+                                                        <TextBlock Text="{Binding QualityBadge}" Foreground="#38BDF8" FontSize="10" FontWeight="Bold"/>
+                                                    </Border>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+
+                        <!-- Footer Actions -->
+                        <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,8,0,0">
+                            <TextBlock Grid.Column="0" Text="Авто: 1080p (CVH/Alloha) ➔ 720p (Kodik)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" Classes="secondary" Content="Отмена" Height="36" Padding="14,0" FontSize="11" Margin="0,0,8,0" Click="AnimeDrawerClose_Click"/>
+                            <Button x:Name="AnimeDownloadSelectedButton" Grid.Column="2" Classes="primary" Content="⬇ Скачать выбранные" Height="36" Padding="16,0" FontSize="11.5" FontWeight="Bold" Background="#E11D48" BorderBrush="#F43F5E" Click="AnimeDownloadSelected_Click"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
             <!-- UPDATE MODAL DIALOG OVERLAY -->
             <Grid x:Name="UpdateDialogOverlay" Background="#B3000000" IsVisible="False" ZIndex="999">
                 <Border Background="{StaticResource SurfaceBrush}" 

@@ -2836,6 +2836,139 @@
                 </Border>
             </Grid>
 
+            <!-- ANIME SERIES BATCH DOWNLOAD DRAWER -->
+            <Grid x:Name="AnimeDrawerGrid" 
+                  Grid.Row="0" 
+                  Grid.RowSpan="2" 
+                  HorizontalAlignment="Stretch" 
+                  VerticalAlignment="Stretch" 
+                  Background="#CC09090D" 
+                  Visibility="Collapsed" 
+                  Panel.ZIndex="99998">
+                <Border Background="#14141A" 
+                        BorderBrush="#F43F5E" 
+                        BorderThickness="1" 
+                        CornerRadius="16" 
+                        Width="620" 
+                        MaxHeight="720" 
+                        Padding="26" 
+                        HorizontalAlignment="Center" 
+                        VerticalAlignment="Center">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="40" Direction="0" ShadowDepth="0" Color="#F43F5E" Opacity="0.25"/>
+                    </Border.Effect>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header with Anime Poster, Title, and Close Button -->
+                        <Grid Grid.Row="0" Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Poster thumbnail -->
+                            <Border Grid.Column="0" Width="68" Height="96" CornerRadius="8" Background="#20202A" ClipToBounds="True" Margin="0,0,16,0" BorderBrush="#3A3A4A" BorderThickness="1">
+                                <Image x:Name="AnimeDrawerPosterImage" Stretch="UniformToFill"/>
+                            </Border>
+
+                            <!-- Title & Metadata -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="🎬 АНИМЕ СЕРИИ" Foreground="#F43F5E" FontSize="11" FontWeight="Bold" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="AnimeDrawerTitleText" Text="Название Аниме" Foreground="{StaticResource TextPrimaryBrush}" FontSize="18" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="AnimeDrawerOriginalTitleText" Text="Original Title" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="AnimeDrawerMetaText" Text="2024 • 24 серий • ⭐ 8.5" Foreground="{StaticResource SuccessBrush}" FontSize="11.5" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                            </StackPanel>
+
+                            <!-- Close Button -->
+                            <Button Grid.Column="2" Content="&#xE8BB;" Style="{StaticResource WindowControlButton}" Width="30" Height="30" Click="AnimeDrawerClose_Click" ToolTip="Закрыть"/>
+                        </Grid>
+
+                        <!-- Dubbing / Voice Selector Row -->
+                        <Border Grid.Row="1" Background="#1A1A24" CornerRadius="10" Padding="14,12" Margin="0,0,0,14" BorderBrush="#2A2A38" BorderThickness="1">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="🎙️ Озвучка / Перевод:" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12.5" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Выберите озвучку для просмотра серий" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5"/>
+                                </StackPanel>
+                                <ComboBox x:Name="AnimeDubsComboBox" 
+                                          Grid.Column="1" 
+                                          Height="36" 
+                                          FontSize="12.5"
+                                          SelectionChanged="AnimeDubsComboBox_SelectionChanged"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Episodes Header & Controls (Select All / Deselect All) -->
+                        <Grid Grid.Row="2" Margin="0,0,0,8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0" Margin="2,0,2,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="AnimeSelectedCountText" Grid.Column="0" Text="Выбрано: 24 из 24" Foreground="#CBD5E1" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="✓ Выбрать все" Style="{StaticResource SecondaryButton}" Padding="10,4" FontSize="11" Margin="0,0,8,0" Click="AnimeSelectAll_Click"/>
+                                <Button Grid.Column="2" Content="Снять выбор" Style="{StaticResource SecondaryButton}" Padding="10,4" FontSize="11" Click="AnimeDeselectAll_Click"/>
+                            </Grid>
+
+                            <!-- Scrollable Episodes Checklist -->
+                            <Border Grid.Row="1" Background="#0D0D12" CornerRadius="10" Padding="8" BorderBrush="#22222E" BorderThickness="1" MaxHeight="300">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl x:Name="AnimeEpisodesItemsControl">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#16161E" CornerRadius="8" Padding="12,8" Margin="0,0,0,6" BorderBrush="#242432" BorderThickness="1">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="AnimeEpisodeCheckbox_Changed" Unchecked="AnimeEpisodeCheckbox_Changed"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding DisplayTitle}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                        <Border Grid.Column="2" Background="#1E293B" CornerRadius="6" Padding="8,3" BorderBrush="#38BDF8" BorderThickness="1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding QualityBadge}" Foreground="#38BDF8" FontSize="10.5" FontWeight="Bold"/>
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+
+                        <!-- Action Buttons Footer -->
+                        <Grid Grid.Row="3" Margin="0,16,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Автовыбор: 1080p (CVH/Alloha) ➔ 720p (Kodik)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" Content="Отмена" Style="{StaticResource SecondaryButton}" Height="38" Padding="16,0" FontSize="11.5" Margin="0,0,10,0" Click="AnimeDrawerClose_Click"/>
+                            <Button x:Name="AnimeDownloadSelectedButton" Grid.Column="2" Content="⬇ Скачать выбранные" Style="{StaticResource ModernButton}" Height="38" Padding="20,0" FontSize="12" FontWeight="Bold" Background="#E11D48" BorderBrush="#F43F5E" Click="AnimeDownloadSelected_Click"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+
             <!-- Update Dialog Modal Overlay (Centered over full window) -->
             <Grid x:Name="UpdateDialogOverlay" 
                   Grid.Row="0" 

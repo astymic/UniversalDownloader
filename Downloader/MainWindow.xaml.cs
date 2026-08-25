@@ -685,6 +685,13 @@ namespace UniversalDownloader
             _playlistItems.Clear();
             if (FindName("PlaylistSection") is Border playlistBorder2) playlistBorder2.Visibility = Visibility.Collapsed;
 
+            // ── Anime Series Catalog check ──
+            if (YummyAnimeService.IsYummyAnimeUrl(url))
+            {
+                await LoadAnimeSeriesAsync(url);
+                return;
+            }
+
             // ── Playlist check FIRST (before single video) ──
             if (_downloadService.IsSpotifyPlaylistOrAlbumLink(url))
             {

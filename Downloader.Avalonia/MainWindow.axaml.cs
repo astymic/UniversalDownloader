@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -165,6 +166,12 @@ namespace UniversalDownloader.Avalonia
         {
             string url = UrlTextBox.Text?.Trim() ?? "";
             if (string.IsNullOrWhiteSpace(url)) return;
+
+            if (YummyAnimeService.IsYummyAnimeUrl(url))
+            {
+                await LoadAnimeSeriesAsync(url);
+                return;
+            }
 
             _downloadCts?.Cancel();
             _downloadCts = new CancellationTokenSource();
@@ -728,6 +735,151 @@ namespace UniversalDownloader.Avalonia
                     SettingsUpdateStatusText.Text = $"You're on the latest version (v{UpdateService.GetCurrentAppVersion()}).";
                 }
             }
+        }
+        #endregion
+
+        #region Anime
+        private readonly YummyAnimeService _yummyAnimeService = new();
+        private AnimeSeriesInfo? _currentAnimeSeries;
+        private AnimeDubInfo? _selectedAnimeDub;
+
+        private async Task LoadAnimeSeriesAsync(string url)
+        {
+            if (ProgressBorder != null)
+            {
+                ProgressBorder.IsVisible = true;
+                ProgressStatusTextBlock.Text = "Loading anime dubs and episodes... 🍿";
+            }
+
+            try
+            {
+                var series = await _yummyAnimeService.FetchAnimeSeriesAsync(url);
+                if (series == null)
+                {
+                    if (ProgressStatusTextBlock != null) ProgressStatusTextBlock.Text = "Failed to load anime info.";
+                    return;
+                }
+
+                _currentAnimeSeries = series;
+
+                if (AnimeDrawerTitleText != null)
+                    AnimeDrawerTitleText.Text = !string.IsNullOrWhiteSpace(series.Title) ? series.Title : series.Slug;
+
+                if (AnimeDrawerMetaText != null)
+                    AnimeDrawerMetaText.Text = $"{series.Year} • {series.TotalEpisodesCount} серий" + (!string.IsNullOrWhiteSpace(series.Rating) ? $" • ⭐ {series.Rating}" : "");
+
+                if (AnimeDubsComboBox != null)
+                {
+                    AnimeDubsComboBox.ItemsSource = series.Dubs;
+                    if (series.Dubs.Count > 0)
+                    {
+                        AnimeDubsComboBox.SelectedIndex = 0;
+                    }
+                }
+
+                if (AnimeDrawerGrid != null)
+                {
+                    AnimeDrawerGrid.IsVisible = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ProgressStatusTextBlock != null) ProgressStatusTextBlock.Text = $"Error: {ex.Message}";
+            }
+        }
+
+        private void AnimeDubsComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (AnimeDubsComboBox?.SelectedItem is AnimeDubInfo dub)
+            {
+                _selectedAnimeDub = dub;
+                if (AnimeEpisodesItemsControl != null)
+                {
+                    AnimeEpisodesItemsControl.ItemsSource = dub.Episodes;
+                }
+                UpdateAnimeSelectionCount();
+            }
+        }
+
+        private void UpdateAnimeSelectionCount()
+        {
+            if (_selectedAnimeDub == null) return;
+
+            int selectedCount = _selectedAnimeDub.Episodes.Count(ep => ep.IsSelected);
+            int totalCount = _selectedAnimeDub.Episodes.Count;
+
+            if (AnimeSelectedCountText != null)
+            {
+                AnimeSelectedCountText.Text = $"Выбрано: {selectedCount} из {totalCount}";
+            }
+
+            if (AnimeDownloadSelectedButton != null)
+            {
+                AnimeDownloadSelectedButton.IsEnabled = selectedCount > 0;
+                AnimeDownloadSelectedButton.Content = selectedCount == totalCount
+                    ? $"⬇ Скачать все ({totalCount} серий)"
+                    : $"⬇ Скачать выбранные ({selectedCount})";
+            }
+        }
+
+        private void AnimeSelectAll_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_selectedAnimeDub == null) return;
+            foreach (var ep in _selectedAnimeDub.Episodes)
+            {
+                ep.IsSelected = true;
+            }
+            UpdateAnimeSelectionCount();
+        }
+
+        private void AnimeDeselectAll_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_selectedAnimeDub == null) return;
+            foreach (var ep in _selectedAnimeDub.Episodes)
+            {
+                ep.IsSelected = false;
+            }
+            UpdateAnimeSelectionCount();
+        }
+
+        private void AnimeDownloadSelected_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_currentAnimeSeries == null || _selectedAnimeDub == null) return;
+
+            var selectedEpisodes = _selectedAnimeDub.Episodes.Where(ep => ep.IsSelected).ToList();
+            if (selectedEpisodes.Count == 0) return;
+
+            if (AnimeDrawerGrid != null) AnimeDrawerGrid.IsVisible = false;
+
+            int enqueuedCount = 0;
+            foreach (var ep in selectedEpisodes)
+            {
+                string targetUrl = ep.SelectedPlayer?.IframeUrl ?? $"https://ru.yummyani.me/catalog/item/{_currentAnimeSeries.Slug}?episode={ep.EpisodeNumber}";
+                string quality = ep.BestQualityText;
+                string itemTitle = $"{_currentAnimeSeries.Title} - E{ep.EpisodeNumber:D2} [{_selectedAnimeDub.Name}] [{quality}]";
+
+                var qItem = new DownloadQueueItem
+                {
+                    Title = itemTitle,
+                    Url = targetUrl,
+                    FormatCode = "bestvideo+bestaudio/best",
+                    DestinationFolder = _downloadFolder
+                };
+
+                _queueManager.Enqueue(qItem);
+                enqueuedCount++;
+            }
+
+            if (ProgressBorder != null)
+            {
+                ProgressBorder.IsVisible = true;
+                ProgressStatusTextBlock.Text = $"Added {enqueuedCount} episodes to Download Queue! 🍿";
+            }
+        }
+
+        private void AnimeDrawerClose_Click(object? sender, RoutedEventArgs e)
+        {
+            if (AnimeDrawerGrid != null) AnimeDrawerGrid.IsVisible = false;
         }
         #endregion
     }
