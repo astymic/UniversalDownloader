@@ -454,6 +454,47 @@
             </Setter>
         </Style>
 
+        <Style TargetType="CheckBox" x:Key="AnimeCheckBox">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="BoxBorder" 
+                                Width="20" 
+                                Height="20" 
+                                CornerRadius="6" 
+                                BorderThickness="1.5" 
+                                BorderBrush="#3A3A4C" 
+                                Background="#1A1A26" 
+                                VerticalAlignment="Center">
+                            <Path x:Name="CheckIcon" 
+                                  Data="M 4 10 L 8 14 L 16 6" 
+                                  Stroke="White" 
+                                  StrokeThickness="2.2" 
+                                  StrokeStartLineCap="Round" 
+                                  StrokeEndLineCap="Round" 
+                                  StrokeLineJoin="Round"
+                                  Stretch="None" 
+                                  Visibility="Collapsed" 
+                                  HorizontalAlignment="Center" 
+                                  VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="BoxBorder" Property="Background" Value="#F43F5E"/>
+                                <Setter TargetName="BoxBorder" Property="BorderBrush" Value="#F43F5E"/>
+                                <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BoxBorder" Property="BorderBrush" Value="#FB7185"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="ComboBox" x:Key="ModernComboBox">
             <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
@@ -2903,8 +2944,10 @@
                                 </StackPanel>
                                 <ComboBox x:Name="AnimeDubsComboBox" 
                                           Grid.Column="1" 
-                                          Height="36" 
+                                          Style="{StaticResource ModernComboBox}"
+                                          Height="38" 
                                           FontSize="12.5"
+                                          DisplayMemberPath="DisplayBadge"
                                           SelectionChanged="AnimeDubsComboBox_SelectionChanged"/>
                             </Grid>
                         </Border>
@@ -2940,7 +2983,7 @@
                                                             <ColumnDefinition Width="*"/>
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
-                                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="AnimeEpisodeCheckbox_Changed" Unchecked="AnimeEpisodeCheckbox_Changed"/>
+                                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}" Style="{StaticResource AnimeCheckBox}" VerticalAlignment="Center" Margin="0,0,12,0" Checked="AnimeEpisodeCheckbox_Changed" Unchecked="AnimeEpisodeCheckbox_Changed"/>
                                                         <TextBlock Grid.Column="1" Text="{Binding DisplayTitle}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                                         <Border Grid.Column="2" Background="#1E293B" CornerRadius="6" Padding="8,3" BorderBrush="#38BDF8" BorderThickness="1" VerticalAlignment="Center">
                                                             <TextBlock Text="{Binding QualityBadge}" Foreground="#38BDF8" FontSize="10.5" FontWeight="Bold"/>

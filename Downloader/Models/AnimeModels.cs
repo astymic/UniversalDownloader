@@ -37,7 +37,18 @@ namespace UniversalDownloader.Models
 
         public int EpisodeNumber { get; set; }
         public string Title { get; set; } = string.Empty;
-        public string DisplayTitle => !string.IsNullOrWhiteSpace(Title) ? $"Серия {EpisodeNumber}: {Title}" : $"Серия {EpisodeNumber}";
+
+        public string DisplayTitle
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(Title) || Title.Equals($"Серия {EpisodeNumber}", StringComparison.OrdinalIgnoreCase) || Title.Equals($"{EpisodeNumber}", StringComparison.OrdinalIgnoreCase))
+                {
+                    return $"Серия {EpisodeNumber}";
+                }
+                return $"Серия {EpisodeNumber}: {Title}";
+            }
+        }
         
         public bool IsSelected
         {

@@ -1192,7 +1192,13 @@ namespace UniversalDownloader
                 return;
             }
 
-            string url = UrlTextBox.Text;
+            string url = UrlTextBox.Text?.Trim() ?? string.Empty;
+            if (YummyAnimeService.IsYummyAnimeUrl(url))
+            {
+                await LoadAnimeSeriesAsync(url);
+                return;
+            }
+
             bool hasSpotifyCsvTracks = _playlistItems.Count > 0 && _isPlaylistMode && 
                 (_playlistItems[0].VideoUrl.StartsWith("ytsearch1:", StringComparison.OrdinalIgnoreCase));
             bool isUrlValid = !string.IsNullOrWhiteSpace(url) && url != "Paste URL here...";

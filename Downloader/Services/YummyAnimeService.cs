@@ -71,27 +71,31 @@ namespace UniversalDownloader.Services
 
             try
             {
-                // Try remix loader endpoint first
-                string loaderUrl = $"https://ru.yummyani.me/catalog/item/{slug}?_data=routes%2F_app.catalog.item.%24slug";
-                using var req = new HttpRequestMessage(HttpMethod.Get, loaderUrl);
-                req.Headers.Add("Accept", "application/json");
-
-                string jsonContent = string.Empty;
-                using var response = await _httpClient.SendAsync(req, cancellationToken);
-                if (response.IsSuccessStatusCode)
-                {
-                    jsonContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                }
-
-                // If loader endpoint didn't succeed, fallback to downloading HTML page
+                string pageUrl = $"https://ru.yummyani.me/catalog/item/{slug}";
                 string htmlContent = string.Empty;
-                if (string.IsNullOrWhiteSpace(jsonContent))
+
+                try
                 {
-                    string pageUrl = $"https://ru.yummyani.me/catalog/item/{slug}";
                     htmlContent = await _httpClient.GetStringAsync(pageUrl, cancellationToken);
                 }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to get page HTML: {ex.Message}");
+                }
 
-                ParseAnimeData(series, jsonContent, htmlContent);
+                if (string.IsNullOrWhiteSpace(htmlContent))
+                {
+                    return null;
+                }
+
+                ParseAnimeData(series, htmlContent);
+
+                // Fetch full dynamic videos/dubs from api.yani.tv if anime ID is available
+                if (!string.IsNullOrWhiteSpace(series.AnimeId))
+                {
+                    await FetchAndPopulateVideosAsync(series, series.AnimeId, cancellationToken);
+                }
+
                 return series;
             }
             catch (Exception ex)
@@ -101,242 +105,156 @@ namespace UniversalDownloader.Services
             }
         }
 
-        private void ParseAnimeData(AnimeSeriesInfo series, string jsonContent, string htmlContent)
+        private void ParseAnimeData(AnimeSeriesInfo series, string htmlContent)
         {
-            JObject? root = null;
-            if (!string.IsNullOrWhiteSpace(jsonContent))
+            // 1. Try to extract from window.__staticRouterHydrationData
+            var hydrationMatch = Regex.Match(htmlContent, @"window\.__staticRouterHydrationData\s*=\s*JSON\.parse\(""(.*?)""\);", RegexOptions.Singleline);
+            if (hydrationMatch.Success)
             {
                 try
                 {
-                    root = JObject.Parse(jsonContent);
-                }
-                catch { }
-            }
+                    string jsonEscaped = hydrationMatch.Groups[1].Value;
+                    string jsonStr = Regex.Unescape(jsonEscaped);
+                    var root = JObject.Parse(jsonStr);
+                    var loaderData = root["loaderData"] as JObject;
+                    var animeRoute = loaderData?.Properties().FirstOrDefault(p => p.Value["anime"] != null)?.Value;
+                    var animeObj = animeRoute?["anime"];
 
-            if (root == null && !string.IsNullOrWhiteSpace(htmlContent))
-            {
-                // Look for window.__remixContext or embedded JSON
-                var match = Regex.Match(htmlContent, @"window\.__remixContext\s*=\s*(\{.*?\});\s*<\/script>", RegexOptions.Singleline);
-                if (match.Success)
-                {
-                    try
+                    if (animeObj != null)
                     {
-                        var remix = JObject.Parse(match.Groups[1].Value);
-                        root = remix["state"]?["loaderData"]?["routes/_app.catalog.item.$slug"] as JObject
-                            ?? remix["loaderData"]?["routes/_app.catalog.item.$slug"] as JObject;
+                        series.AnimeId = animeObj["anime_id"]?.ToString() ?? animeObj["id"]?.ToString() ?? string.Empty;
+                        series.Title = animeObj["title"]?.ToString() ?? string.Empty;
+                        series.OriginalTitle = animeObj["original"]?.ToString() ?? animeObj["other_titles"]?[0]?.ToString() ?? string.Empty;
+                        series.Description = animeObj["description"]?.ToString() ?? string.Empty;
+                        series.Rating = animeObj["rating"]?["val"]?.ToString() ?? animeObj["rating"]?.ToString() ?? string.Empty;
+                        series.Year = animeObj["year"]?.ToString() ?? string.Empty;
+
+                        // Poster
+                        var posterToken = animeObj["poster"];
+                        if (posterToken is JObject pObj)
+                        {
+                            string p = pObj["big"]?.ToString() ?? pObj["fullsize"]?.ToString() ?? pObj["huge"]?.ToString() ?? pObj["medium"]?.ToString() ?? string.Empty;
+                            if (p.StartsWith("//")) p = "https:" + p;
+                            series.PosterUrl = p;
+                        }
+
+                        // Episodes count
+                        var epsToken = animeObj["episodes"];
+                        if (epsToken != null)
+                        {
+                            if (int.TryParse(epsToken["count"]?.ToString() ?? epsToken["aired"]?.ToString(), out var count))
+                            {
+                                series.TotalEpisodesCount = count;
+                            }
+                        }
                     }
-                    catch { }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to parse hydration JSON: {ex.Message}");
                 }
             }
 
-            // Extract anime metadata
-            JToken? animeObj = root?["anime"] ?? root?["data"]?["anime"] ?? root;
-            if (animeObj != null)
+            // Fallbacks from OpenGraph and HTML Meta tags if missing
+            if (string.IsNullOrWhiteSpace(series.Title))
             {
-                series.AnimeId = animeObj["id"]?.ToString() ?? animeObj["anime_id"]?.ToString() ?? string.Empty;
-                series.Title = animeObj["title"]?.ToString() ?? animeObj["name"]?.ToString() ?? series.Slug;
-                series.OriginalTitle = animeObj["original_title"]?.ToString() ?? string.Empty;
-                series.Year = animeObj["year"]?.ToString() ?? string.Empty;
-                series.Rating = animeObj["rating"]?.ToString() ?? string.Empty;
-                series.Description = animeObj["description"]?.ToString() ?? string.Empty;
-
-                // Poster URL
-                var posterToken = animeObj["poster"];
-                if (posterToken is JObject pObj)
+                var titleMatch = Regex.Match(htmlContent, @"<meta\s+property=""og:title""\s+content=""([^""]+)""");
+                if (titleMatch.Success) series.Title = titleMatch.Groups[1].Value;
+            }
+            if (string.IsNullOrWhiteSpace(series.PosterUrl))
+            {
+                var posterMatch = Regex.Match(htmlContent, @"<meta\s+property=""og:image""\s+content=""([^""]+)""");
+                if (posterMatch.Success)
                 {
-                    string posterPath = pObj["big"]?.ToString() ?? pObj["fullsize"]?.ToString() ?? pObj["medium"]?.ToString() ?? string.Empty;
-                    if (posterPath.StartsWith("//")) posterPath = "https:" + posterPath;
-                    series.PosterUrl = posterPath;
-                }
-                else if (posterToken != null)
-                {
-                    string pStr = posterToken.ToString();
-                    if (pStr.StartsWith("//")) pStr = "https:" + pStr;
-                    series.PosterUrl = pStr;
-                }
-
-                // Total episodes count
-                if (int.TryParse(animeObj["episodes"]?["count"]?.ToString() ?? animeObj["episodes_count"]?.ToString(), out var count))
-                {
-                    series.TotalEpisodesCount = count;
+                    string p = posterMatch.Groups[1].Value;
+                    if (p.StartsWith("//")) p = "https:" + p;
+                    series.PosterUrl = p;
                 }
             }
-
-            // Extract video translations / dubs
-            ParseDubsAndEpisodes(series, root, htmlContent);
+            if (string.IsNullOrWhiteSpace(series.Description))
+            {
+                var descMatch = Regex.Match(htmlContent, @"<meta\s+property=""og:description""\s+content=""([^""]+)""");
+                if (descMatch.Success) series.Description = descMatch.Groups[1].Value;
+            }
+            if (string.IsNullOrWhiteSpace(series.AnimeId))
+            {
+                var idMatch = Regex.Match(htmlContent, @"""anime_id"":\s*(\d+)|""id"":\s*(\d+)");
+                if (idMatch.Success)
+                {
+                    series.AnimeId = idMatch.Groups[1].Success ? idMatch.Groups[1].Value : idMatch.Groups[2].Value;
+                }
+            }
+            if (string.IsNullOrWhiteSpace(series.Title))
+            {
+                series.Title = series.Slug;
+            }
         }
 
-        private void ParseDubsAndEpisodes(AnimeSeriesInfo series, JObject? root, string htmlContent)
+        private async Task FetchAndPopulateVideosAsync(AnimeSeriesInfo series, string animeId, CancellationToken cancellationToken)
         {
-            var dubDict = new Dictionary<string, AnimeDubInfo>(StringComparer.OrdinalIgnoreCase);
-
-            // 1. Check videos array in JSON
-            JArray? videosArray = root?["videos"] as JArray 
-                               ?? root?["data"]?["videos"] as JArray 
-                               ?? root?["anime"]?["videos"] as JArray;
-
-            if (videosArray != null && videosArray.Count > 0)
+            try
             {
+                string apiUrl = $"https://api.yani.tv/anime/{animeId}/videos";
+                using var req = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+                req.Headers.Add("Accept", "application/json");
+
+                using var response = await _httpClient.SendAsync(req, cancellationToken);
+                if (!response.IsSuccessStatusCode) return;
+
+                string json = await response.Content.ReadAsStringAsync(cancellationToken);
+                var token = JToken.Parse(json);
+
+                JArray? videosArray = token is JArray arr
+                    ? arr
+                    : (token["response"] as JArray ?? token["data"] as JArray ?? token["videos"] as JArray);
+
+                if (videosArray == null || videosArray.Count == 0) return;
+
+                var dubDict = new Dictionary<string, AnimeDubInfo>(StringComparer.OrdinalIgnoreCase);
+
                 foreach (var v in videosArray)
                 {
-                    string dubName = v["author"]?.ToString() ?? v["voice"]?.ToString() ?? v["translation"]?.ToString() ?? "Озвучка";
-                    string playerName = v["player"]?.ToString() ?? v["type"]?.ToString() ?? "CVH";
-                    int episodeNum = 1;
-                    if (int.TryParse(v["episode"]?.ToString() ?? v["number"]?.ToString(), out var ep))
+                    string dubName = v["data"]?["dubbing"]?.ToString() ?? v["dubbing"]?.ToString() ?? "Озвучка";
+                    string playerName = v["data"]?["player"]?.ToString() ?? v["player"]?.ToString() ?? "Kodik";
+                    string iframeUrl = v["iframe_url"]?.ToString() ?? v["url"]?.ToString() ?? string.Empty;
+
+                    if (!int.TryParse(v["number"]?.ToString() ?? v["episode"]?.ToString(), out var episodeNum) || episodeNum <= 0)
                     {
-                        episodeNum = ep;
+                        episodeNum = 1;
                     }
 
-                    string iframeUrl = v["url"]?.ToString() ?? v["src"]?.ToString() ?? v["link"]?.ToString() ?? string.Empty;
+                    if (iframeUrl.StartsWith("//"))
+                    {
+                        iframeUrl = "https:" + iframeUrl;
+                    }
 
-                    AddOrUpdateDub(dubDict, dubName, playerName, episodeNum, iframeUrl);
+                    AddOrUpdateDubVideo(dubDict, dubName, playerName, episodeNum, iframeUrl);
+                }
+
+                if (dubDict.Count > 0)
+                {
+                    series.Dubs.Clear();
+                    foreach (var dub in dubDict.Values.OrderByDescending(d => d.Episodes.Count).ThenBy(d => d.Name))
+                    {
+                        dub.Episodes = new ObservableCollection<AnimeEpisodeInfo>(dub.Episodes.OrderBy(e => e.EpisodeNumber));
+                        dub.AvailableEpisodesCount = dub.Episodes.Count;
+                        dub.TotalEpisodesCount = series.TotalEpisodesCount > 0 ? series.TotalEpisodesCount : dub.Episodes.Count;
+                        series.Dubs.Add(dub);
+                    }
+
+                    if (series.TotalEpisodesCount <= 0)
+                    {
+                        series.TotalEpisodesCount = series.Dubs.Max(d => d.Episodes.Count);
+                    }
                 }
             }
-
-            // 2. If no videos in JSON, extract from HTML player blocks
-            if (dubDict.Count == 0 && !string.IsNullOrWhiteSpace(htmlContent))
+            catch (Exception ex)
             {
-                ParseDubsFromHtml(dubDict, htmlContent);
-            }
-
-            // 3. If still empty, provide standard fallback dubs for the series
-            if (dubDict.Count == 0)
-            {
-                int totalEps = series.TotalEpisodesCount > 0 ? series.TotalEpisodesCount : 12;
-                var defaultDub = new AnimeDubInfo
-                {
-                    DubId = "dreamcast",
-                    Name = "Dream Cast (Лучшая озвучка)",
-                    AvailableEpisodesCount = totalEps,
-                    TotalEpisodesCount = totalEps
-                };
-
-                for (int i = 1; i <= totalEps; i++)
-                {
-                    var ep = new AnimeEpisodeInfo
-                    {
-                        EpisodeNumber = i,
-                        Title = $"Серия {i}",
-                        BestQualityText = "1080p",
-                        BestPlayerName = "CVH",
-                        IsSelected = true
-                    };
-                    ep.Players.Add(new AnimePlayerInfo
-                    {
-                        PlayerName = "CVH",
-                        Quality = "1080p",
-                        EpisodeNumber = i
-                    });
-                    ep.Players.Add(new AnimePlayerInfo
-                    {
-                        PlayerName = "Alloha",
-                        Quality = "1080p",
-                        EpisodeNumber = i
-                    });
-                    ep.Players.Add(new AnimePlayerInfo
-                    {
-                        PlayerName = "Kodik",
-                        Quality = "720p",
-                        EpisodeNumber = i
-                    });
-                    ep.SelectedPlayer = ep.Players[0];
-                    defaultDub.Episodes.Add(ep);
-                }
-
-                dubDict[defaultDub.Name] = defaultDub;
-
-                // Add AniDUB
-                var anidub = new AnimeDubInfo
-                {
-                    DubId = "anidub",
-                    Name = "AniDUB",
-                    AvailableEpisodesCount = totalEps,
-                    TotalEpisodesCount = totalEps
-                };
-                for (int i = 1; i <= totalEps; i++)
-                {
-                    var ep = new AnimeEpisodeInfo
-                    {
-                        EpisodeNumber = i,
-                        Title = $"Серия {i}",
-                        BestQualityText = "1080p",
-                        BestPlayerName = "Alloha",
-                        IsSelected = true
-                    };
-                    ep.Players.Add(new AnimePlayerInfo { PlayerName = "Alloha", Quality = "1080p", EpisodeNumber = i });
-                    ep.Players.Add(new AnimePlayerInfo { PlayerName = "Kodik", Quality = "720p", EpisodeNumber = i });
-                    ep.SelectedPlayer = ep.Players[0];
-                    anidub.Episodes.Add(ep);
-                }
-                dubDict[anidub.Name] = anidub;
-
-                // Add AnimeVost
-                var animeVost = new AnimeDubInfo
-                {
-                    DubId = "animevost",
-                    Name = "AnimeVost",
-                    AvailableEpisodesCount = totalEps,
-                    TotalEpisodesCount = totalEps
-                };
-                for (int i = 1; i <= totalEps; i++)
-                {
-                    var ep = new AnimeEpisodeInfo
-                    {
-                        EpisodeNumber = i,
-                        Title = $"Серия {i}",
-                        BestQualityText = "720p",
-                        BestPlayerName = "Kodik",
-                        IsSelected = true
-                    };
-                    ep.Players.Add(new AnimePlayerInfo { PlayerName = "Kodik", Quality = "720p", EpisodeNumber = i });
-                    ep.SelectedPlayer = ep.Players[0];
-                    animeVost.Episodes.Add(ep);
-                }
-                dubDict[animeVost.Name] = animeVost;
-
-                // Add Subtitles
-                var subs = new AnimeDubInfo
-                {
-                    DubId = "subs",
-                    Name = "Субтитры (Оригинал)",
-                    AvailableEpisodesCount = totalEps,
-                    TotalEpisodesCount = totalEps
-                };
-                for (int i = 1; i <= totalEps; i++)
-                {
-                    var ep = new AnimeEpisodeInfo
-                    {
-                        EpisodeNumber = i,
-                        Title = $"Серия {i}",
-                        BestQualityText = "1080p",
-                        BestPlayerName = "CVH",
-                        IsSelected = true
-                    };
-                    ep.Players.Add(new AnimePlayerInfo { PlayerName = "CVH", Quality = "1080p", EpisodeNumber = i });
-                    ep.SelectedPlayer = ep.Players[0];
-                    subs.Episodes.Add(ep);
-                }
-                dubDict[subs.Name] = subs;
-            }
-
-            // Populate series dubs collection
-            series.Dubs.Clear();
-            foreach (var dub in dubDict.Values.OrderByDescending(d => d.Episodes.Count).ThenBy(d => d.Name))
-            {
-                dub.AvailableEpisodesCount = dub.Episodes.Count;
-                if (series.TotalEpisodesCount > 0)
-                {
-                    dub.TotalEpisodesCount = series.TotalEpisodesCount;
-                }
-                else
-                {
-                    dub.TotalEpisodesCount = dub.Episodes.Count;
-                }
-                series.Dubs.Add(dub);
+                Debug.WriteLine($"Failed to fetch videos from API: {ex.Message}");
             }
         }
 
-        private void AddOrUpdateDub(Dictionary<string, AnimeDubInfo> dubDict, string dubName, string playerName, int episodeNum, string iframeUrl)
+        private void AddOrUpdateDubVideo(Dictionary<string, AnimeDubInfo> dubDict, string dubName, string playerName, int episodeNum, string iframeUrl)
         {
             if (!dubDict.TryGetValue(dubName, out var dub))
             {
@@ -360,9 +278,18 @@ namespace UniversalDownloader.Services
                 dub.Episodes.Add(episode);
             }
 
-            string quality = (playerName.Contains("CVH", StringComparison.OrdinalIgnoreCase) || playerName.Contains("Alloha", StringComparison.OrdinalIgnoreCase))
-                ? "1080p"
-                : "720p";
+            string quality = "720p";
+            if (playerName.Contains("Aksor", StringComparison.OrdinalIgnoreCase) ||
+                playerName.Contains("Sibnet", StringComparison.OrdinalIgnoreCase) ||
+                playerName.Contains("CVH", StringComparison.OrdinalIgnoreCase) ||
+                playerName.Contains("Alloha", StringComparison.OrdinalIgnoreCase))
+            {
+                quality = "1080p";
+            }
+            else if (playerName.Contains("Kodik", StringComparison.OrdinalIgnoreCase))
+            {
+                quality = "720p";
+            }
 
             var player = new AnimePlayerInfo
             {
@@ -374,10 +301,12 @@ namespace UniversalDownloader.Services
 
             episode.Players.Add(player);
 
-            // Apply Player Priority Rule: CVH/Alloha (1080p) > Kodik (720p)
-            var bestPlayer = episode.Players.FirstOrDefault(p => p.PlayerName.Contains("CVH", StringComparison.OrdinalIgnoreCase))
-                          ?? episode.Players.FirstOrDefault(p => p.PlayerName.Contains("Alloha", StringComparison.OrdinalIgnoreCase))
+            // Priority: Working download stream players: Aksor (1080p MPD) -> CVH (1080p MP4/HLS) -> Sibnet (1080p) -> Kodik (720p decrypted stream) -> Alloha -> others
+            var bestPlayer = episode.Players.FirstOrDefault(p => p.PlayerName.Contains("Aksor", StringComparison.OrdinalIgnoreCase))
+                          ?? episode.Players.FirstOrDefault(p => p.PlayerName.Contains("CVH", StringComparison.OrdinalIgnoreCase))
+                          ?? episode.Players.FirstOrDefault(p => p.PlayerName.Contains("Sibnet", StringComparison.OrdinalIgnoreCase))
                           ?? episode.Players.FirstOrDefault(p => p.PlayerName.Contains("Kodik", StringComparison.OrdinalIgnoreCase))
+                          ?? episode.Players.FirstOrDefault(p => p.PlayerName.Contains("Alloha", StringComparison.OrdinalIgnoreCase))
                           ?? episode.Players.FirstOrDefault();
 
             if (bestPlayer != null)
@@ -388,24 +317,338 @@ namespace UniversalDownloader.Services
             }
         }
 
-        private void ParseDubsFromHtml(Dictionary<string, AnimeDubInfo> dubDict, string html)
+        /// <summary>
+        /// Resolves an episode player iframe URL into a direct playable .m3u8 or video stream link for yt-dlp.
+        /// </summary>
+        public async Task<string> ResolveEpisodeDownloadUrlAsync(string playerUrl, CancellationToken cancellationToken = default)
         {
-            // Extract voice options from dropdown or data attributes
-            var voiceMatches = Regex.Matches(html, @"data-voice=""([^""]+)""|Озвучка\s+([^<""\n]+)", RegexOptions.IgnoreCase);
-            foreach (Match m in voiceMatches)
+            if (string.IsNullOrWhiteSpace(playerUrl)) return string.Empty;
+
+            if (playerUrl.StartsWith("//"))
             {
-                string vName = m.Groups[1].Value;
-                if (string.IsNullOrWhiteSpace(vName)) vName = m.Groups[2].Value.Trim();
-                if (!string.IsNullOrWhiteSpace(vName) && !dubDict.ContainsKey(vName))
+                playerUrl = "https:" + playerUrl;
+            }
+
+            // 1. Aksor Player (1080p MPD / HLS)
+            if (playerUrl.Contains("aksor.tv", StringComparison.OrdinalIgnoreCase))
+            {
+                var resolvedAksor = await ResolveAksorStreamAsync(playerUrl, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(resolvedAksor))
                 {
-                    var dub = new AnimeDubInfo
-                    {
-                        DubId = vName.ToLowerInvariant().Replace(" ", "_"),
-                        Name = vName
-                    };
-                    dubDict[vName] = dub;
+                    return resolvedAksor;
                 }
             }
+
+            // 2. CVH Player (CDNVideoHub - 1080p MP4 / HLS)
+            if (playerUrl.Contains("iframeCVH.html", StringComparison.OrdinalIgnoreCase) || playerUrl.Contains("cdnvideohub.com", StringComparison.OrdinalIgnoreCase))
+            {
+                var resolvedCvh = await ResolveCvhStreamAsync(playerUrl, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(resolvedCvh))
+                {
+                    return resolvedCvh;
+                }
+            }
+
+            // 3. Sibnet Player (1080p / 720p)
+            if (playerUrl.Contains("sibnet.ru", StringComparison.OrdinalIgnoreCase))
+            {
+                var resolvedSibnet = await ResolveSibnetStreamAsync(playerUrl, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(resolvedSibnet))
+                {
+                    return resolvedSibnet;
+                }
+            }
+
+            // 4. Kodik embed player URL
+            if (playerUrl.Contains("kodik", StringComparison.OrdinalIgnoreCase))
+            {
+                var resolvedKodik = await ResolveKodikStreamAsync(playerUrl, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(resolvedKodik))
+                {
+                    return resolvedKodik;
+                }
+            }
+
+            return playerUrl;
+        }
+
+        private async Task<string?> ResolveCvhStreamAsync(string cvhUrl, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var uri = new Uri(cvhUrl);
+                var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                string animeId = queryParams["anime_id"] ?? "";
+                string episodeStr = queryParams["episode"] ?? "1";
+                string dubbingCode = queryParams["dubbing_code"] ?? "";
+                string dubbingName = queryParams["dubbing"] ?? "";
+
+                if (string.IsNullOrWhiteSpace(animeId)) return null;
+
+                int.TryParse(episodeStr, out int episodeNum);
+                if (episodeNum <= 0) episodeNum = 1;
+
+                // 1. Fetch playlist from CDNVideoHub API
+                string playlistUrl = $"https://plapi.cdnvideohub.com/api/v1/player/sv/playlist?pub=745&id={animeId}&aggr=mali";
+                using var plReq = new HttpRequestMessage(HttpMethod.Get, playlistUrl);
+                plReq.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                plReq.Headers.Add("Origin", "https://ru.yummyani.me");
+                plReq.Headers.Add("Referer", "https://ru.yummyani.me/");
+                plReq.Headers.Add("x-origin", "https://ru.yummyani.me");
+                plReq.Headers.Add("Accept", "application/json");
+
+                using var plResp = await _httpClient.SendAsync(plReq, cancellationToken);
+                if (!plResp.IsSuccessStatusCode) return null;
+
+                string plJson = await plResp.Content.ReadAsStringAsync(cancellationToken);
+                var plToken = JToken.Parse(plJson);
+                var items = plToken["items"] as JArray;
+                if (items == null || items.Count == 0) return null;
+
+                JToken? matchingItem = null;
+                foreach (var item in items)
+                {
+                    int.TryParse(item["episode"]?.ToString(), out int ep);
+                    if (ep == episodeNum)
+                    {
+                        string studio = item["voiceStudio"]?.ToString() ?? "";
+                        if (!string.IsNullOrWhiteSpace(dubbingCode) && studio.Contains(dubbingCode, StringComparison.OrdinalIgnoreCase))
+                        {
+                            matchingItem = item;
+                            break;
+                        }
+                        if (!string.IsNullOrWhiteSpace(dubbingName) && (dubbingName.Contains(studio, StringComparison.OrdinalIgnoreCase) || studio.Contains(dubbingName, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            matchingItem = item;
+                            break;
+                        }
+                    }
+                }
+
+                if (matchingItem == null)
+                {
+                    matchingItem = items.FirstOrDefault(i => int.TryParse(i["episode"]?.ToString(), out int ep) && ep == episodeNum);
+                }
+
+                if (matchingItem == null) return null;
+
+                string vkId = matchingItem["vkId"]?.ToString() ?? "";
+                if (string.IsNullOrWhiteSpace(vkId)) return null;
+
+                // 2. Fetch video streams for this vkId
+                string videoApiUrl = $"https://plapi.cdnvideohub.com/api/v1/player/sv/video/{vkId}";
+                using var vidReq = new HttpRequestMessage(HttpMethod.Get, videoApiUrl);
+                vidReq.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                vidReq.Headers.Add("Origin", "https://ru.yummyani.me");
+                vidReq.Headers.Add("Referer", "https://ru.yummyani.me/");
+                vidReq.Headers.Add("x-origin", "https://ru.yummyani.me");
+                vidReq.Headers.Add("Accept", "application/json");
+
+                using var vidResp = await _httpClient.SendAsync(vidReq, cancellationToken);
+                if (!vidResp.IsSuccessStatusCode) return null;
+
+                string vidJson = await vidResp.Content.ReadAsStringAsync(cancellationToken);
+                var vidToken = JToken.Parse(vidJson);
+                var sources = vidToken["sources"];
+                if (sources == null) return null;
+
+                string mpegFullHd = sources["mpegFullHdUrl"]?.ToString() ?? "";
+                if (!string.IsNullOrWhiteSpace(mpegFullHd)) return mpegFullHd;
+
+                string hlsUrl = sources["hlsUrl"]?.ToString() ?? "";
+                if (!string.IsNullOrWhiteSpace(hlsUrl)) return hlsUrl;
+
+                string mpegHigh = sources["mpegHighUrl"]?.ToString() ?? "";
+                if (!string.IsNullOrWhiteSpace(mpegHigh)) return mpegHigh;
+
+                string dashUrl = sources["dashUrl"]?.ToString() ?? "";
+                if (!string.IsNullOrWhiteSpace(dashUrl)) return dashUrl;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to resolve CVH stream: {ex.Message}");
+            }
+            return null;
+        }
+
+        private async Task<string?> ResolveAksorStreamAsync(string aksorUrl, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var match = Regex.Match(aksorUrl, @"/video/([a-fA-F0-9]+)");
+                if (!match.Success) return null;
+                string hash = match.Groups[1].Value;
+
+                string apiUrl = $"https://player.aksor.tv/api/video/{hash}";
+                using var req = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+                req.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                req.Headers.Add("Referer", "https://player.aksor.tv/");
+
+                using var resp = await _httpClient.SendAsync(req, cancellationToken);
+                if (!resp.IsSuccessStatusCode) return null;
+
+                string json = await resp.Content.ReadAsStringAsync(cancellationToken);
+                var root = JObject.Parse(json);
+                var qualities = root["qualities"] as JObject;
+                if (qualities != null)
+                {
+                    string? stream = qualities["q1080"]?.ToString() 
+                                  ?? qualities["q2k"]?.ToString() 
+                                  ?? qualities["q4k"]?.ToString() 
+                                  ?? qualities["q720"]?.ToString() 
+                                  ?? qualities["q480"]?.ToString() 
+                                  ?? qualities["q360"]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(stream))
+                    {
+                        return stream;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to resolve Aksor stream: {ex.Message}");
+            }
+            return null;
+        }
+
+        private async Task<string?> ResolveSibnetStreamAsync(string sibnetUrl, CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (sibnetUrl.StartsWith("//")) sibnetUrl = "https:" + sibnetUrl;
+                return sibnetUrl;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to resolve Sibnet stream: {ex.Message}");
+            }
+            return null;
+        }
+
+        private async Task<string?> ResolveKodikStreamAsync(string kodikUrl, CancellationToken cancellationToken)
+        {
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Get, kodikUrl);
+                req.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                req.Headers.Add("Referer", "https://ru.yummyani.me/");
+
+                using var resp = await _httpClient.SendAsync(req, cancellationToken);
+                if (!resp.IsSuccessStatusCode) return null;
+
+                string html = await resp.Content.ReadAsStringAsync(cancellationToken);
+
+                var uri = new Uri(kodikUrl);
+                string netloc = uri.Host;
+
+                // Extract params
+                string d = Regex.Match(html, @"var\s+domain\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+                string d_sign = Regex.Match(html, @"var\s+d_sign\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+                string pd = Regex.Match(html, @"var\s+pd\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+                string pd_sign = Regex.Match(html, @"var\s+pd_sign\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+                string refUrl = Regex.Match(html, @"var\s+ref\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+                string ref_sign = Regex.Match(html, @"var\s+ref_sign\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+                
+                string type = Regex.Match(html, @"vInfo\.type\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+                if (string.IsNullOrWhiteSpace(type)) type = Regex.Match(html, @"var\s+type\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+                if (string.IsNullOrWhiteSpace(type)) type = "seria";
+                
+                string hash = Regex.Match(html, @"vInfo\.hash\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+                if (string.IsNullOrWhiteSpace(hash)) hash = Regex.Match(html, @"var\s+videoHash\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+                if (string.IsNullOrWhiteSpace(hash)) hash = Regex.Match(html, @"var\s+hash\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+
+                string id = Regex.Match(html, @"vInfo\.id\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+                if (string.IsNullOrWhiteSpace(id)) id = Regex.Match(html, @"var\s+videoId\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+                if (string.IsNullOrWhiteSpace(id)) id = Regex.Match(html, @"var\s+id\s*=\s*['""]([^'""]+)['""]").Groups[1].Value;
+
+                if (string.IsNullOrWhiteSpace(hash) || string.IsNullOrWhiteSpace(id))
+                {
+                    // Fallback to urlParams
+                    var matchParams = Regex.Match(html, @"var\s+urlParams\s*=\s*'([^']+)'");
+                    if (matchParams.Success)
+                    {
+                        try
+                        {
+                            var pObj = JObject.Parse(matchParams.Groups[1].Value);
+                            if (string.IsNullOrWhiteSpace(d)) d = pObj["d"]?.ToString() ?? "";
+                            if (string.IsNullOrWhiteSpace(d_sign)) d_sign = pObj["d_sign"]?.ToString() ?? "";
+                            if (string.IsNullOrWhiteSpace(pd)) pd = pObj["pd"]?.ToString() ?? "";
+                            if (string.IsNullOrWhiteSpace(pd_sign)) pd_sign = pObj["pd_sign"]?.ToString() ?? "";
+                            if (string.IsNullOrWhiteSpace(refUrl)) refUrl = pObj["ref"]?.ToString() ?? "";
+                            if (string.IsNullOrWhiteSpace(ref_sign)) ref_sign = pObj["ref_sign"]?.ToString() ?? "";
+                        }
+                        catch { }
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(type)) type = "seria";
+
+                var formData = new Dictionary<string, string>
+                {
+                    { "d", d },
+                    { "d_sign", d_sign },
+                    { "pd", pd },
+                    { "pd_sign", pd_sign },
+                    { "ref", refUrl },
+                    { "ref_sign", ref_sign },
+                    { "type", type },
+                    { "hash", hash },
+                    { "id", id }
+                };
+
+                using var postReq = new HttpRequestMessage(HttpMethod.Post, $"https://{netloc}/ftor");
+                postReq.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                postReq.Headers.Add("Referer", kodikUrl);
+                postReq.Headers.Add("Origin", $"https://{netloc}");
+                postReq.Content = new FormUrlEncodedContent(formData);
+
+                using var postResp = await _httpClient.SendAsync(postReq, cancellationToken);
+                if (!postResp.IsSuccessStatusCode) return null;
+
+                string respJson = await postResp.Content.ReadAsStringAsync(cancellationToken);
+                var root = JObject.Parse(respJson);
+                var links = root["links"] as JObject;
+                if (links == null) return null;
+
+                var srcToken = links["720"]?[0]?["src"] ?? links["480"]?[0]?["src"] ?? links["360"]?[0]?["src"] ?? links.Properties().FirstOrDefault()?.Value?[0]?["src"];
+                string encodedSrc = srcToken?.ToString() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(encodedSrc)) return null;
+
+                // Decode Caesar + Base64
+                for (int shift = 0; shift < 26; shift++)
+                {
+                    try
+                    {
+                        char[] shifted = encodedSrc.ToCharArray();
+                        for (int i = 0; i < shifted.Length; i++)
+                        {
+                            char c = shifted[i];
+                            if (c >= 'a' && c <= 'z')
+                            {
+                                shifted[i] = (char)('a' + (c - 'a' + shift) % 26);
+                            }
+                            else if (c >= 'A' && c <= 'Z')
+                            {
+                                shifted[i] = (char)('A' + (c - 'A' + shift) % 26);
+                            }
+                        }
+                        byte[] b = Convert.FromBase64String(new string(shifted));
+                        string decoded = System.Text.Encoding.UTF8.GetString(b);
+                        if (decoded.Contains("http") || decoded.Contains(".m3u8") || decoded.Contains(".mp4"))
+                        {
+                            if (decoded.StartsWith("//")) decoded = "https:" + decoded;
+                            return decoded;
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to resolve Kodik stream: {ex.Message}");
+            }
+
+            return null;
         }
     }
 }

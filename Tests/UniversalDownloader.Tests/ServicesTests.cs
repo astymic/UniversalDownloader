@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using UniversalDownloader.Models;
 using UniversalDownloader.Services;
@@ -74,6 +78,57 @@ namespace UniversalDownloader.Tests
         {
             string sanitized = Utilities.SanitizeFileName(input);
             Assert.Equal(expected, sanitized);
+        }
+
+        [Fact]
+        public async Task YummyAnimeService_Fetches_LiveAnime()
+        {
+            var service = new YummyAnimeService();
+
+            // 1. One Piece (1160+ episodes) - verify ascending sorting
+            var onepiece = await service.FetchAnimeSeriesAsync("https://ru.yummyani.me/catalog/item/neobyatnyy-okean-3");
+            Assert.NotNull(onepiece);
+            Assert.NotEmpty(onepiece.Dubs);
+            var dub = onepiece.Dubs[0];
+            Assert.True(dub.Episodes.Count >= 2);
+            Assert.Equal(1, dub.Episodes[0].EpisodeNumber);
+            Assert.Equal(2, dub.Episodes[1].EpisodeNumber);
+
+            // 2. Aksor (Josee the Tiger and the Fish)
+            var zhoze = await service.FetchAnimeSeriesAsync("https://ru.yummyani.me/catalog/item/zhoze-tigr-i-ryba");
+            Assert.NotNull(zhoze);
+            var reanimedia = zhoze.Dubs.FirstOrDefault(d => d.Name.Contains("Reanimedia"));
+            Assert.NotNull(reanimedia);
+            string aksorStream = await service.ResolveEpisodeDownloadUrlAsync(reanimedia.Episodes[0].Players.First(p => p.PlayerName.Contains("Aksor")).IframeUrl);
+            Assert.Contains("1080.mpd", aksorStream);
+
+            // 3. CVH (Grand Blue Season 3) - 1080p stream resolution
+            string cvhTestUrl = "https://ru.yummyani.me/iframeCVH.html?dubbing_code=AniBaza&anime_id=62542&episode=1&dubbing=%D0%9E%D0%B7%D0%B2%D1%83%D1%87%D0%BA%D0%B0+AniBaza";
+            string cvhResolved = await service.ResolveEpisodeDownloadUrlAsync(cvhTestUrl);
+            Assert.NotNull(cvhResolved);
+            Assert.Contains("okcdn.ru", cvhResolved);
+
+            // 4. Sibnet (Vakfu)
+            var vakfu = await service.FetchAnimeSeriesAsync("https://ru.yummyani.me/catalog/item/vakfu-legenda-ob-ogreste");
+            Assert.NotNull(vakfu);
+            Assert.NotEmpty(vakfu.Dubs);
+            Assert.Contains("Sibnet", vakfu.Dubs[0].Episodes[0].Players.First().PlayerName);
+        }
+
+        [Fact]
+        public async Task YummyAnimeService_Fetches_BlueLock()
+        {
+            var service = new YummyAnimeService();
+            var anime = await service.FetchAnimeSeriesAsync("https://ru.yummyani.me/catalog/item/sinyaya-tyurma-blyu-lok");
+            Assert.NotNull(anime);
+            Assert.NotEmpty(anime.Title);
+            Assert.NotEmpty(anime.PosterUrl);
+            Assert.NotEmpty(anime.Dubs);
+
+            // Blue Lock is 24 episodes completed
+            var aniLibria = anime.Dubs.FirstOrDefault(d => d.Name.Contains("AniLibria"));
+            Assert.NotNull(aniLibria);
+            Assert.Equal(24, aniLibria.Episodes.Count);
         }
     }
 }

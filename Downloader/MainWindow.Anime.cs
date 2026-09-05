@@ -57,12 +57,21 @@ namespace UniversalDownloader
 
                     if (AnimeDrawerMetaText != null)
                     {
-                        string meta = $"{series.Year} • {series.TotalEpisodesCount} серий";
-                        if (!string.IsNullOrWhiteSpace(series.Rating))
+                        string yearStr = !string.IsNullOrWhiteSpace(series.Year) && series.Year != "0" ? series.Year : "";
+                        if (series.Dubs.Count == 0)
                         {
-                            meta += $" • ⭐ {series.Rating}";
+                            AnimeDrawerMetaText.Text = !string.IsNullOrWhiteSpace(yearStr) ? $"{yearStr} • Анонс" : "Анонс";
                         }
-                        AnimeDrawerMetaText.Text = meta;
+                        else
+                        {
+                            int count = series.TotalEpisodesCount > 0 ? series.TotalEpisodesCount : series.Dubs.Max(d => d.Episodes.Count);
+                            string meta = yearStr;
+                            if (count > 0)
+                            {
+                                meta = !string.IsNullOrWhiteSpace(meta) ? $"{meta} • {count} серий" : $"{count} серий";
+                            }
+                            AnimeDrawerMetaText.Text = meta;
+                        }
                     }
 
                     if (AnimeDrawerPosterImage != null && !string.IsNullOrWhiteSpace(series.PosterUrl))
@@ -82,10 +91,33 @@ namespace UniversalDownloader
                     // Populate Dubs
                     if (AnimeDubsComboBox != null)
                     {
-                        AnimeDubsComboBox.ItemsSource = series.Dubs;
                         if (series.Dubs.Count > 0)
                         {
+                            AnimeDubsComboBox.ItemsSource = series.Dubs;
                             AnimeDubsComboBox.SelectedIndex = 0;
+                            if (AnimeDownloadSelectedButton != null)
+                            {
+                                AnimeDownloadSelectedButton.IsEnabled = true;
+                                AnimeDownloadSelectedButton.Content = "⬇ Скачать выбранные";
+                            }
+                        }
+                        else
+                        {
+                            _selectedAnimeDub = null;
+                            AnimeDubsComboBox.ItemsSource = null;
+                            if (AnimeEpisodesItemsControl != null)
+                            {
+                                AnimeEpisodesItemsControl.ItemsSource = null;
+                            }
+                            if (AnimeSelectedCountText != null)
+                            {
+                                AnimeSelectedCountText.Text = "Серии еще не вышли (Анонс)";
+                            }
+                            if (AnimeDownloadSelectedButton != null)
+                            {
+                                AnimeDownloadSelectedButton.IsEnabled = false;
+                                AnimeDownloadSelectedButton.Content = "❌ Серии не вышли";
+                            }
                         }
                     }
 
@@ -132,10 +164,10 @@ namespace UniversalDownloader
 
             if (AnimeDownloadSelectedButton != null)
             {
-                AnimeDownloadSelectedButton.IsEnabled = selectedCount > 0;
                 AnimeDownloadSelectedButton.Content = selectedCount == totalCount
                     ? $"⬇ Скачать все ({totalCount} серий)"
                     : $"⬇ Скачать выбранные ({selectedCount})";
+                AnimeDownloadSelectedButton.IsEnabled = selectedCount > 0;
             }
         }
 
@@ -159,9 +191,9 @@ namespace UniversalDownloader
             UpdateAnimeSelectionCount();
         }
 
-        private void AnimeDownloadSelected_Click(object sender, RoutedEventArgs e)
+        private async void AnimeDownloadSelected_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentAnimeSeries == null || _selectedAnimeDub == null) return;
+            if (_selectedAnimeDub == null || _currentAnimeSeries == null) return;
 
             var selectedEpisodes = _selectedAnimeDub.Episodes.Where(ep => ep.IsSelected).ToList();
             if (selectedEpisodes.Count == 0)
@@ -171,27 +203,51 @@ namespace UniversalDownloader
             }
 
             string downloadFolder = SelectedDirectory ?? System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+
             int enqueuedCount = 0;
 
             foreach (var ep in selectedEpisodes)
             {
                 string cleanSeriesTitle = SanitizeName(_currentAnimeSeries.Title);
                 string cleanDub = SanitizeName(_selectedAnimeDub.Name);
-                string quality = ep.BestQualityText;
-                string itemTitle = $"{cleanSeriesTitle} - E{ep.EpisodeNumber:D2} [{cleanDub}] [{quality}]";
+                string itemTitle = _selectedAnimeDub.Episodes.Count == 1 && ep.EpisodeNumber == 1
+                    ? $"{cleanSeriesTitle} [{cleanDub}]"
+                    : $"{cleanSeriesTitle} - E{ep.EpisodeNumber:D2} [{cleanDub}]";
 
-                // Build download target URL
-                string targetUrl = ep.SelectedPlayer?.IframeUrl ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(targetUrl))
+                // Build download target URL - prefer working streams: Aksor (1080p) -> CVH (1080p) -> Sibnet (1080p) -> Kodik (720p decrypted stream) -> others
+                var playerToUse = ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Aksor", StringComparison.OrdinalIgnoreCase))
+                               ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("CVH", StringComparison.OrdinalIgnoreCase))
+                               ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Sibnet", StringComparison.OrdinalIgnoreCase))
+                               ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Kodik", StringComparison.OrdinalIgnoreCase))
+                               ?? ep.SelectedPlayer
+                               ?? ep.Players.FirstOrDefault();
+
+                string rawUrl = playerToUse?.IframeUrl ?? string.Empty;
+                string resolvedUrl = string.Empty;
+
+                if (!string.IsNullOrWhiteSpace(rawUrl))
                 {
-                    // Fallback to series URL with episode marker
-                    targetUrl = $"https://ru.yummyani.me/catalog/item/{_currentAnimeSeries.Slug}?episode={ep.EpisodeNumber}&dub={Uri.EscapeDataString(_selectedAnimeDub.Name)}";
+                    try
+                    {
+                        resolvedUrl = await _yummyAnimeService.ResolveEpisodeDownloadUrlAsync(rawUrl);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Failed to resolve episode URL: {ex.Message}");
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(resolvedUrl))
+                {
+                    resolvedUrl = !string.IsNullOrWhiteSpace(rawUrl) 
+                        ? rawUrl 
+                        : $"https://ru.yummyani.me/catalog/item/{_currentAnimeSeries.Slug}?episode={ep.EpisodeNumber}&dub={Uri.EscapeDataString(_selectedAnimeDub.Name)}";
                 }
 
                 var qItem = new DownloadQueueItem
                 {
                     Title = itemTitle,
-                    Url = targetUrl,
+                    Url = resolvedUrl,
                     FormatCode = "bestvideo+bestaudio/best",
                     DestinationFolder = downloadFolder
                 };

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -62,6 +62,17 @@ namespace UniversalDownloader.Services
 
         private void ResolveItemTitleAsync(DownloadQueueItem item)
         {
+            // Only resolve title if it's currently a placeholder
+            if (!string.IsNullOrWhiteSpace(item.Title) &&
+                !item.Title.Contains("Resolving title") &&
+                !item.Title.StartsWith("YouTube Video #") &&
+                !item.Title.StartsWith("Media Item #") &&
+                !item.Title.StartsWith("http://") &&
+                !item.Title.StartsWith("https://"))
+            {
+                return;
+            }
+
             _ = Task.Run(async () =>
             {
                 try
@@ -242,6 +253,11 @@ namespace UniversalDownloader.Services
                                         nextItem.Title = resolved.Trim();
                                     });
                                 }
+                            }
+
+                            if (!isSpotify && !string.IsNullOrWhiteSpace(nextItem.Title) && !nextItem.Title.Contains("Resolving title"))
+                            {
+                                overrideTitle = nextItem.Title;
                             }
 
                             var itemProgress = new Progress<DownloadProgressArgs>(args =>

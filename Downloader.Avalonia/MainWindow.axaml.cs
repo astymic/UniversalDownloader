@@ -766,14 +766,53 @@ namespace UniversalDownloader.Avalonia
                     AnimeDrawerTitleText.Text = !string.IsNullOrWhiteSpace(series.Title) ? series.Title : series.Slug;
 
                 if (AnimeDrawerMetaText != null)
-                    AnimeDrawerMetaText.Text = $"{series.Year} • {series.TotalEpisodesCount} серий" + (!string.IsNullOrWhiteSpace(series.Rating) ? $" • ⭐ {series.Rating}" : "");
+                {
+                    string yearStr = !string.IsNullOrWhiteSpace(series.Year) && series.Year != "0" ? series.Year : "";
+                    if (series.Dubs.Count == 0)
+                    {
+                        AnimeDrawerMetaText.Text = !string.IsNullOrWhiteSpace(yearStr) ? $"{yearStr} • Анонс" : "Анонс";
+                    }
+                    else
+                    {
+                        int count = series.TotalEpisodesCount > 0 ? series.TotalEpisodesCount : series.Dubs.Max(d => d.Episodes.Count);
+                        string meta = yearStr;
+                        if (count > 0)
+                        {
+                            meta = !string.IsNullOrWhiteSpace(meta) ? $"{meta} • {count} серий" : $"{count} серий";
+                        }
+                        AnimeDrawerMetaText.Text = meta;
+                    }
+                }
 
                 if (AnimeDubsComboBox != null)
                 {
-                    AnimeDubsComboBox.ItemsSource = series.Dubs;
                     if (series.Dubs.Count > 0)
                     {
+                        AnimeDubsComboBox.ItemsSource = series.Dubs;
                         AnimeDubsComboBox.SelectedIndex = 0;
+                        if (AnimeDownloadSelectedButton != null)
+                        {
+                            AnimeDownloadSelectedButton.IsEnabled = true;
+                            AnimeDownloadSelectedButton.Content = "⬇ Скачать выбранные";
+                        }
+                    }
+                    else
+                    {
+                        _selectedAnimeDub = null;
+                        AnimeDubsComboBox.ItemsSource = null;
+                        if (AnimeEpisodesItemsControl != null)
+                        {
+                            AnimeEpisodesItemsControl.ItemsSource = null;
+                        }
+                        if (AnimeSelectedCountText != null)
+                        {
+                            AnimeSelectedCountText.Text = "Серии еще не вышли (Анонс)";
+                        }
+                        if (AnimeDownloadSelectedButton != null)
+                        {
+                            AnimeDownloadSelectedButton.IsEnabled = false;
+                            AnimeDownloadSelectedButton.Content = "❌ Серии не вышли";
+                        }
                     }
                 }
 
@@ -842,7 +881,7 @@ namespace UniversalDownloader.Avalonia
             UpdateAnimeSelectionCount();
         }
 
-        private void AnimeDownloadSelected_Click(object? sender, RoutedEventArgs e)
+        private async void AnimeDownloadSelected_Click(object? sender, RoutedEventArgs e)
         {
             if (_currentAnimeSeries == null || _selectedAnimeDub == null) return;
 
@@ -854,14 +893,30 @@ namespace UniversalDownloader.Avalonia
             int enqueuedCount = 0;
             foreach (var ep in selectedEpisodes)
             {
-                string targetUrl = ep.SelectedPlayer?.IframeUrl ?? $"https://ru.yummyani.me/catalog/item/{_currentAnimeSeries.Slug}?episode={ep.EpisodeNumber}";
-                string quality = ep.BestQualityText;
-                string itemTitle = $"{_currentAnimeSeries.Title} - E{ep.EpisodeNumber:D2} [{_selectedAnimeDub.Name}] [{quality}]";
+                var playerToUse = ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Aksor", StringComparison.OrdinalIgnoreCase))
+                               ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("CVH", StringComparison.OrdinalIgnoreCase))
+                               ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Sibnet", StringComparison.OrdinalIgnoreCase))
+                               ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Kodik", StringComparison.OrdinalIgnoreCase))
+                               ?? ep.SelectedPlayer
+                               ?? ep.Players.FirstOrDefault();
+
+                string rawUrl = playerToUse?.IframeUrl ?? $"https://ru.yummyani.me/catalog/item/{_currentAnimeSeries.Slug}?episode={ep.EpisodeNumber}";
+                string resolvedUrl = string.Empty;
+                try
+                {
+                    resolvedUrl = await _yummyAnimeService.ResolveEpisodeDownloadUrlAsync(rawUrl);
+                }
+                catch { }
+                if (string.IsNullOrWhiteSpace(resolvedUrl)) resolvedUrl = rawUrl;
+
+                string itemTitle = _selectedAnimeDub.Episodes.Count == 1 && ep.EpisodeNumber == 1
+                    ? $"{_currentAnimeSeries.Title} [{_selectedAnimeDub.Name}]"
+                    : $"{_currentAnimeSeries.Title} - E{ep.EpisodeNumber:D2} [{_selectedAnimeDub.Name}]";
 
                 var qItem = new DownloadQueueItem
                 {
                     Title = itemTitle,
-                    Url = targetUrl,
+                    Url = resolvedUrl,
                     FormatCode = "bestvideo+bestaudio/best",
                     DestinationFolder = _downloadFolder
                 };
