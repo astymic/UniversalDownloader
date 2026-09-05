@@ -610,6 +610,9 @@
             </Setter>
         </Style>
 
+        <!-- Default ComboBox Style based on ModernComboBox -->
+        <Style TargetType="ComboBox" BasedOn="{StaticResource ModernComboBox}"/>
+
         <!-- ComboBox Item Style with proper hover and selected states -->
         <Style TargetType="ComboBoxItem">
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
@@ -1097,7 +1100,8 @@
                                         </StackPanel>
                                         <ComboBox x:Name="LiveStreamHotkeyComboBox" 
                                                   Grid.Column="1" 
-                                                  Width="140" 
+                                                  Style="{StaticResource ModernComboBox}"
+                                                  Width="150" 
                                                   Height="36" 
                                                   SelectionChanged="LiveStreamHotkeyComboBox_SelectionChanged">
                                             <ComboBoxItem Content="F9 (Default)" Tag="F9" IsSelected="True"/>
