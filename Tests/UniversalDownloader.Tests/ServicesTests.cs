@@ -191,6 +191,48 @@ namespace UniversalDownloader.Tests
                 }
             }
         }
+
+        [Fact]
+        public async Task Test_YtDlp_Alloha_Stream()
+        {
+            var service = new YummyAnimeService();
+            var series = await service.FetchAnimeSeriesAsync("https://ru.yummyani.me/catalog/item/tvoe-imya");
+            Assert.NotNull(series);
+            var aniLibria = series.Dubs.FirstOrDefault(d => d.Name.Contains("AniLibria"));
+            Assert.NotNull(aniLibria);
+            var allohaPlayer = aniLibria.Episodes[0].Players.FirstOrDefault(p => p.PlayerName.Contains("Alloha"));
+            Assert.NotNull(allohaPlayer);
+
+            var resolvedUrl = await service.ResolveEpisodeDownloadUrlAsync(allohaPlayer.IframeUrl);
+            Assert.NotNull(resolvedUrl);
+
+            string ytdlpPath = @"C:\Users\maksym.mulkov\Desktop\UniversalDownloader\Downloader\bin\Debug\net8.0-windows\win-x64\yt-dlp.exe";
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = ytdlpPath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+            psi.ArgumentList.Add("--user-agent");
+            psi.ArgumentList.Add("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            psi.ArgumentList.Add("--referer");
+            psi.ArgumentList.Add("https://alloha.yani.tv/");
+            psi.ArgumentList.Add("--add-header");
+            psi.ArgumentList.Add("Origin:https://alloha.yani.tv");
+            psi.ArgumentList.Add("-f");
+            psi.ArgumentList.Add("bestvideo+bestaudio/best");
+            psi.ArgumentList.Add("--simulate");
+            psi.ArgumentList.Add("--no-warnings");
+            psi.ArgumentList.Add(resolvedUrl);
+
+            using var proc = System.Diagnostics.Process.Start(psi)!;
+            string stdout = await proc.StandardOutput.ReadToEndAsync();
+            string stderr = await proc.StandardError.ReadToEndAsync();
+            await proc.WaitForExitAsync();
+
+            Assert.True(proc.ExitCode == 0, $"yt-dlp download failed (code {proc.ExitCode}):\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        }
     }
 }
 

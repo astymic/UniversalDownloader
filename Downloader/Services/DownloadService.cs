@@ -216,6 +216,7 @@ namespace UniversalDownloader.Services
                 psi.ArgumentList.Add("--skip-download");
                 psi.ArgumentList.Add("--extractor-args");
                 psi.ArgumentList.Add("youtube:player_client=android,ios,mweb,web");
+                AppendStreamHeadersIfRequired(psi, url);
                 psi.ArgumentList.Add(url);
                 psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
 
@@ -303,6 +304,7 @@ namespace UniversalDownloader.Services
                 psi.ArgumentList.Add(cookiesFromBrowser);
             }
 
+            AppendStreamHeadersIfRequired(psi, url);
             psi.ArgumentList.Add(url);
             psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
 
@@ -568,7 +570,7 @@ namespace UniversalDownloader.Services
 
             try
             {
-                return await ExecuteYtDlpDownloadAsync(url, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, null);
+                return await ExecuteYtDlpDownloadAsync(url, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, null, progressCallback);
             }
             catch (OperationCanceledException)
             {
@@ -635,7 +637,7 @@ namespace UniversalDownloader.Services
                 try
                 {
                     string fallbackFormat = extractAudio ? "bestaudio/best" : "best";
-                    return await ExecuteYtDlpDownloadAsync(url, fallbackFormat, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, null);
+                    return await ExecuteYtDlpDownloadAsync(url, fallbackFormat, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, null, progressCallback);
                 }
                 catch (OperationCanceledException)
                 {
@@ -918,6 +920,7 @@ namespace UniversalDownloader.Services
                 psi.ArgumentList.Add(ffmpegDir);
             }
 
+            AppendStreamHeadersIfRequired(psi, url);
             psi.ArgumentList.Add(url);
             psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
 
@@ -1073,6 +1076,23 @@ namespace UniversalDownloader.Services
                     }
                 }
                 catch { }
+            }
+        }
+
+        private static void AppendStreamHeadersIfRequired(ProcessStartInfo psi, string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return;
+
+            if (url.Contains("vkvideo.cloud", StringComparison.OrdinalIgnoreCase) ||
+                url.Contains("allplay", StringComparison.OrdinalIgnoreCase) ||
+                url.Contains("alloha", StringComparison.OrdinalIgnoreCase))
+            {
+                psi.ArgumentList.Add("--user-agent");
+                psi.ArgumentList.Add("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                psi.ArgumentList.Add("--referer");
+                psi.ArgumentList.Add("https://alloha.yani.tv/");
+                psi.ArgumentList.Add("--add-header");
+                psi.ArgumentList.Add("Origin:https://alloha.yani.tv");
             }
         }
 
