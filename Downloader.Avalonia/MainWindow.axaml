@@ -312,7 +312,7 @@
                                 <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <TextBlock Text="Universal Downloader" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
-                                        <TextBlock x:Name="SettingsAppVersionText" Text=" (v1.0.10)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                        <TextBlock x:Name="SettingsAppVersionText" Text=" (v1.0.13)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
                                     </StackPanel>
                                     <TextBlock x:Name="SettingsUpdateStatusText" Text="Check for newer releases on GitHub" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
                                 </StackPanel>

@@ -24,6 +24,10 @@ namespace UniversalDownloader
             Task.Run(async () =>
             {
                 await Task.Delay(3000);
+                if (!AutoCheckUpdatesEnabled)
+                {
+                    return;
+                }
                 await CheckForAppUpdatesAsync(silent: true);
             });
         }

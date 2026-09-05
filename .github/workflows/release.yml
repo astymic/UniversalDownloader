@@ -26,11 +26,35 @@ jobs:
         run: |
           dotnet publish "Downloader/Universal Downloader.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish-win/
 
+      - name: Sign Executable & Package Zip
+        shell: pwsh
+        run: |
+          # 1. Create a code-signing certificate for Authenticode
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=astymic, O=UniversalDownloader" -CertStoreLocation "Cert:\CurrentUser\My" -HashAlgorithm SHA256 -NotAfter (Get-Date).AddYears(5)
+          $pfxPassword = ConvertTo-SecureString "UniversalDownloader" -AsPlainText -Force
+          Export-PfxCertificate -Cert $cert -FilePath "codesign.pfx" -Password $pfxPassword
+
+          # 2. Find signtool.exe and sign binary with RFC 3161 timestamp
+          $signtool = (Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Filter "signtool.exe" -Recurse | Where-Object { $_.FullName -match "x64" } | Select-Object -First 1).FullName
+          if ($signtool) {
+            Write-Host "Signing binary using: $signtool"
+            & $signtool sign /f "codesign.pfx" /p "UniversalDownloader" /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /d "Universal Downloader" "publish-win\Universal Downloader.exe"
+          } else {
+            Write-Warning "signtool.exe not found; signing skipped."
+          }
+
+          # 3. Create zip package and duplicate for compatibility
+          Copy-Item "publish-win\Universal Downloader.exe" "publish-win\Universal.Downloader.exe"
+          Compress-Archive -Path "publish-win\Universal Downloader.exe" -DestinationPath "publish-win\UniversalDownloader-windows-x64.zip" -Force
+
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-binary
-          path: publish-win/*.exe
+          path: |
+            publish-win/Universal Downloader.exe
+            publish-win/Universal.Downloader.exe
+            publish-win/UniversalDownloader-windows-x64.zip
 
   build-linux:
     name: Build Linux Executable & Arch Package
@@ -86,21 +110,31 @@ jobs:
 
             A modern, fast, multi-platform media downloader, converter, and audio identification workstation for **Windows** and **Linux**.
 
-            ### ✨ Key Features:
-            * 🔍 **Dual-Mode Search Hub** — Smart Multi-Source Hub (YouTube & SoundCloud) alongside authentic **Real YouTube Search** with instant 0ms switching.
-            * 🎙️ **Shazam Song Recognition** — Instant 5-second acoustic identification from system audio or microphone.
-            * 📥 **Multi-Platform Downloader** — High-speed downloads from YouTube, Spotify playlists, SoundCloud, TikTok, Instagram, Twitter/X, and 1,000+ sites.
-            * 📋 **Download Queue Manager** — Batch downloading with pause/resume, retry support, and live queue progress.
-            * 🔄 **Built-in Media Converter** — Fast FFmpeg conversion between MP4, MKV, MP3, AAC, FLAC, WAV, and OGG.
-            * 🐧 **Native Linux Support** — Cross-platform hardware-accelerated interface with dark glassmorphism and Arch Linux PKGBUILD.
-            * ⚡ **Zero Setup** — `yt-dlp`, `ffmpeg`, and `aria2c` dependencies are automatically managed in the background.
+            ### ✨ What's New in ${{ github.ref_name }}:
+            * 🎬 **Alloha Player 1080p Support** — High-definition stream decryption with built-in V8 engine resolver and automatic stream header injection.
+            * 🛡️ **Organization PC & SmartScreen Protection** — Authenticode digital signing with RFC 3161 timestamping, automatic Zone.Identifier unblocking, and ZIP package distribution.
+            * 🔄 **Enhanced Auto-Updater** — Toggle auto-updates on/off in Settings, automatic rollback backup (`.bak`), and seamless restart.
+            * ⚡ **Performance & Bug Fixes** — Instant queue progress reporting and robust media stream resolvers.
 
             ---
 
             ### 📦 Downloads:
-            * 🪟 **Windows**: Download `Universal Downloader.exe`
-            * 🐧 **Linux (Generic / Ubuntu / Debian / Fedora)**: Download `UniversalDownloader-linux-x64.tar.gz`
+            * 🪟 **Windows Portable**: `Universal Downloader.exe`
+            * 🪟 **Windows ZIP Archive**: `UniversalDownloader-windows-x64.zip`
+            * 🐧 **Linux (Generic / Ubuntu / Debian / Fedora)**: `UniversalDownloader-linux-x64.tar.gz`
             * 🏹 **Arch Linux / Manjaro**: Use the included `PKGBUILD` (`makepkg -si`)
+
+            ---
+
+            ### 🛡️ Windows Security & Corporate / Organization PCs:
+            If Windows SmartScreen shows *"Windows protected your PC"* on download:
+            1. **Unblock**: Right-click `Universal Downloader.exe` ➔ **Properties** ➔ Check **Unblock** at the bottom ➔ Click **Apply/OK**.
+            2. **PowerShell**:
+               ```powershell
+               Unblock-File -LiteralPath ".\Universal Downloader.exe"
+               ```
+            3. **Corporate Network**: If your organization blocks `.exe` downloads directly, download `UniversalDownloader-windows-x64.zip`.
+            4. **Auto-Updater**: In **Settings ➔ APPLICATION UPDATES**, you can toggle *Check for updates automatically on startup* on/off if your PC requires locally compiled builds.
           generate_release_notes: false
           draft: false
           prerelease: false

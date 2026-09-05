@@ -74,7 +74,7 @@ namespace UniversalDownloader.Services
             }
             catch { }
 
-            return "1.0.11";
+            return "1.0.13";
         }
 
         private static string NormalizeVersion(Version version)
@@ -206,6 +206,11 @@ namespace UniversalDownloader.Services
                 }
             }
 
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                UnblockFile(destinationPath);
+            }
+
             return destinationPath;
         }
 
@@ -216,6 +221,19 @@ namespace UniversalDownloader.Services
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
+                UnblockFile(downloadedFilePath);
+
+                string backupPath = currentExecutablePath + ".bak";
+                try
+                {
+                    if (File.Exists(currentExecutablePath))
+                    {
+                        File.Copy(currentExecutablePath, backupPath, true);
+                        UnblockFile(backupPath);
+                    }
+                }
+                catch { }
+
                 // Write a robust cmd script with admin fallback for Program Files / corporate permission environments
                 string cmdScriptPath = Path.Combine(Path.GetTempPath(), $"updater_{Guid.NewGuid():N}.cmd");
                 string scriptContent = $@"@echo off
@@ -229,9 +247,10 @@ if not errorlevel 1 (
 )
 copy /y ""{downloadedFilePath}"" ""{currentExecutablePath}"" >nul 2>&1
 if errorlevel 1 (
-    powershell -NoProfile -Command ""Start-Process cmd -ArgumentList '/c copy /y \""""{downloadedFilePath}\"""" \""""{currentExecutablePath}\"""" && start \""""\"""" \""""{currentExecutablePath}\""""' -Verb RunAs""
+    powershell -NoProfile -Command ""Start-Process cmd -ArgumentList '/c copy /y \""""{downloadedFilePath}\"""" \""""{currentExecutablePath}\"""" && powershell -NoProfile -Command Unblock-File -LiteralPath \""""{currentExecutablePath}\"""" && start \""""\"""" \""""{currentExecutablePath}\""""' -Verb RunAs""
     exit
 )
+powershell -NoProfile -Command ""Unblock-File -LiteralPath '{currentExecutablePath.Replace("'", "''")}'"" >nul 2>&1
 start """" ""{currentExecutablePath}""
 del ""%~f0""
 ";
@@ -282,8 +301,40 @@ rm -- ""$0""
                     CreateNoWindow = true
                 };
                 Process.Start(psi);
-                Environment.Exit(0);
             }
+        }
+
+        public static void UnblockFile(string filePath)
+        {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+                return;
+
+            try
+            {
+                // Delete Zone.Identifier alternate data stream
+                string zonePath = filePath + ":Zone.Identifier";
+                if (File.Exists(zonePath))
+                {
+                    File.Delete(zonePath);
+                }
+            }
+            catch { }
+
+            try
+            {
+                // Fallback to PowerShell Unblock-File
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = $"-NoProfile -NonInteractive -Command \"Unblock-File -LiteralPath '{filePath.Replace("'", "''")}'\"",
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    WindowStyle = ProcessWindowStyle.Hidden
+                };
+                using var p = Process.Start(psi);
+                p?.WaitForExit(3000);
+            }
+            catch { }
         }
     }
 }

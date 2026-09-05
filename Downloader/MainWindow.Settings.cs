@@ -21,12 +21,14 @@ namespace UniversalDownloader
         private const string SettingsKeyDownloadLyrics = "DownloadLyrics";
         private const string SettingsKeyFilenameTemplate = "FilenameTemplate";
         private const string SettingsKeyLiveStreamHotkey = "LiveStreamHotkey";
+        private const string SettingsKeyAutoCheckUpdates = "AutoCheckUpdates";
 
         public bool AutoDetectClipboardEnabled { get; set; } = true;
         public bool EmbedMetadataEnabled { get; set; } = true;
         public bool DownloadSubtitlesEnabled { get; set; } = false;
         public bool MultiConnectionAccelerationEnabled { get; set; } = true;
         public bool DownloadLyricsEnabled { get; set; } = false;
+        public bool AutoCheckUpdatesEnabled { get; set; } = true;
         public string FilenameTemplate { get; set; } = "{title}";
         public string LiveStreamHotkey { get; set; } = "F9";
 
@@ -115,6 +117,11 @@ namespace UniversalDownloader
                         }
                     }
 
+                    if (settings.TryGetValue(SettingsKeyAutoCheckUpdates, out JToken? updateToken) && updateToken != null)
+                    {
+                        AutoCheckUpdatesEnabled = updateToken.ToObject<bool>();
+                    }
+
                     if (_downloadService != null)
                     {
                         _downloadService.CustomFilenameTemplate = FilenameTemplate;
@@ -191,6 +198,7 @@ namespace UniversalDownloader
             if (MinimizeToTrayCheckBox != null) MinimizeToTrayCheckBox.IsChecked = MinimizeToTrayEnabled;
             if (MultiConnectionAccelerationCheckBox != null) MultiConnectionAccelerationCheckBox.IsChecked = MultiConnectionAccelerationEnabled;
             if (DownloadLyricsCheckBox != null) DownloadLyricsCheckBox.IsChecked = DownloadLyricsEnabled;
+            if (AutoCheckUpdatesCheckBox != null) AutoCheckUpdatesCheckBox.IsChecked = AutoCheckUpdatesEnabled;
             if (FilenameTemplateTextBox != null) FilenameTemplateTextBox.Text = FilenameTemplate;
 
             if (LiveStreamHotkeyComboBox != null)
@@ -263,6 +271,12 @@ namespace UniversalDownloader
             {
                 DownloadLyricsEnabled = DownloadLyricsCheckBox.IsChecked == true;
                 SaveSetting(SettingsKeyDownloadLyrics, DownloadLyricsEnabled.ToString().ToLower());
+            }
+
+            if (AutoCheckUpdatesCheckBox != null)
+            {
+                AutoCheckUpdatesEnabled = AutoCheckUpdatesCheckBox.IsChecked == true;
+                SaveSetting(SettingsKeyAutoCheckUpdates, AutoCheckUpdatesEnabled.ToString().ToLower());
             }
         }
 

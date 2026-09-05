@@ -13,10 +13,14 @@
 		<ApplicationIcon>akashi.ico</ApplicationIcon>
 		<CETCompat>false</CETCompat>
 		<AssemblyName>Universal Downloader</AssemblyName>
-		<Version>1.0.11</Version>
-		<AssemblyVersion>1.0.11.0</AssemblyVersion>
-		<FileVersion>1.0.11.0</FileVersion>
+		<Version>1.0.13</Version>
+		<AssemblyVersion>1.0.13.0</AssemblyVersion>
+		<FileVersion>1.0.13.0</FileVersion>
 		<Product>Universal Downloader</Product>
+		<Authors>astymic</Authors>
+		<Company>astymic</Company>
+		<Description>Universal Downloader - Multi-platform Media Downloader, Converter, and Recognition Workstation</Description>
+		<Copyright>Copyright © 2026 astymic</Copyright>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -9,9 +9,12 @@
     <AssemblyName>Universal Downloader</AssemblyName>
     <Product>Universal Downloader</Product>
     <Company>astymic</Company>
-    <Version>1.0.11</Version>
-    <AssemblyVersion>1.0.11.0</AssemblyVersion>
-    <FileVersion>1.0.11.0</FileVersion>
+    <Authors>astymic</Authors>
+    <Description>Universal Downloader - Multi-platform Media Downloader, Converter, and Recognition Workstation</Description>
+    <Copyright>Copyright © 2026 astymic</Copyright>
+    <Version>1.0.13</Version>
+    <AssemblyVersion>1.0.13.0</AssemblyVersion>
+    <FileVersion>1.0.13.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
