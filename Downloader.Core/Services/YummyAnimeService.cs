@@ -16,6 +16,7 @@ namespace UniversalDownloader.Services
     public class YummyAnimeService
     {
         private readonly HttpClient _httpClient;
+        private readonly AllohaResolverService _allohaResolver = new AllohaResolverService();
 
         public YummyAnimeService(HttpClient? httpClient = null)
         {
@@ -369,7 +370,30 @@ namespace UniversalDownloader.Services
                 }
             }
 
+            // 5. Alloha Player (1080p / 720p decrypted stream via in-memory V8)
+            if (playerUrl.Contains("alloha", StringComparison.OrdinalIgnoreCase))
+            {
+                var resolvedAlloha = await ResolveAllohaStreamAsync(playerUrl, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(resolvedAlloha))
+                {
+                    return resolvedAlloha;
+                }
+            }
+
             return playerUrl;
+        }
+
+        private async Task<string?> ResolveAllohaStreamAsync(string allohaUrl, CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await _allohaResolver.ResolveStreamUrlAsync(allohaUrl, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to resolve Alloha stream: {ex.Message}");
+                return null;
+            }
         }
 
         private async Task<string?> ResolveCvhStreamAsync(string cvhUrl, CancellationToken cancellationToken)

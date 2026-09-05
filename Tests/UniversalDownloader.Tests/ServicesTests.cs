@@ -130,5 +130,38 @@ namespace UniversalDownloader.Tests
             Assert.NotNull(aniLibria);
             Assert.Equal(24, aniLibria.Episodes.Count);
         }
+
+        [Fact]
+        public async Task AllohaResolverService_ResolvesStreamUrlAsync()
+        {
+            var resolver = new AllohaResolverService();
+            string allohaUrl = "https://alloha.yani.tv/?token_movie=d6f95967930bd041348068c263ef87&translation=10&season=1&episode=1&token=8b5512267a2a52e9de06d67d342e0c&hidden=translation,season,episode";
+            
+            string? m3u8Url = await resolver.ResolveStreamUrlAsync(allohaUrl);
+            Assert.NotNull(m3u8Url);
+            Assert.Contains(".m3u8", m3u8Url);
+
+            using var http = new HttpClient();
+            using var req = new HttpRequestMessage(HttpMethod.Get, m3u8Url);
+            req.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            req.Headers.Add("Referer", allohaUrl);
+            req.Headers.Add("Origin", "https://alloha.yani.tv");
+
+            using var resp = await http.SendAsync(req);
+            Assert.True(resp.IsSuccessStatusCode);
+            string manifest = await resp.Content.ReadAsStringAsync();
+            Assert.Contains("#EXTM3U", manifest);
+        }
+
+        [Fact]
+        public async Task YummyAnimeService_Resolves_AllohaEpisode()
+        {
+            var service = new YummyAnimeService();
+            string allohaUrl = "https://alloha.yani.tv/?token_movie=d6f95967930bd041348068c263ef87&translation=10&season=1&episode=1&token=8b5512267a2a52e9de06d67d342e0c&hidden=translation,season,episode";
+
+            string streamUrl = await service.ResolveEpisodeDownloadUrlAsync(allohaUrl);
+            Assert.NotNull(streamUrl);
+            Assert.Contains(".m3u8", streamUrl);
+        }
     }
 }
