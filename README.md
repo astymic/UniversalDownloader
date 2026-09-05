@@ -1,6 +1,6 @@
 # Universal Downloader
 
-A modern, high-performance, cross-platform desktop application (**Windows & Linux**) for searching, identifying, downloading, converting, and queuing media files from YouTube, Spotify, SoundCloud, TikTok, Instagram, Twitter/X, and over 1,000+ supported sites.
+A modern, high-performance, cross-platform desktop workstation (**Windows & Linux**) for searching, identifying, downloading, converting, and queuing media files from YouTube, Spotify, SoundCloud, TikTok, Instagram, Twitter/X, Anime portals, and over 1,000+ supported sites.
 
 ---
 
@@ -12,6 +12,13 @@ A modern, high-performance, cross-platform desktop application (**Windows & Linu
 ---
 
 ## 🌟 Key Features
+
+### ⛩️ Anime & Series Downloader (1080p & Multi-Voiceover)
+- **Deep Catalog Scraper (YummyAnime)** — Search and browse anime series, movies, and episodes with full cover art and episode listings.
+- **Multi-Dub & Voiceover Selection** — Seamlessly switch between popular dubbing studios (**AniLibria**, **SHIZA Project**, **Persona99**, **AniDUB**, Original Audio with Subtitles, etc.).
+- **High-Definition 1080p Stream Engine** — Prioritizes crystal-clear Full HD 1080p video streams with high-performance in-memory V8 JavaScript decryption.
+- **Multi-Player Fallback Waterfall** — Automatically falls back between **Alloha (1080p)**, **Kodik (720p)**, **Sibnet**, **CVH**, and **Aksor** resolvers.
+- **Bypass Stream Protections** — Automatically injects browser headers (`Referer`, `Origin`, and `User-Agent`) for hotlink-protected HLS media streams.
 
 ### 📻 Live Stream & DJ Scraper ("Passive DJ Mode")
 - **Continuous Ambient Listening** — 1-click start/stop toggle button (or press global hotkey `[F9]`) to passively listen to all music playing on your PC (streams, DJ sets, mixes, movies, podcasts, gaming).
@@ -62,12 +69,14 @@ A modern, high-performance, cross-platform desktop application (**Windows & Linu
 ### ⚡ Zero-Setup Dependency Manager
 - Automatically downloads, verifies, and updates `yt-dlp.exe`, `ffmpeg.exe`, `ffprobe.exe`, and `aria2c.exe` in the background with zero user setup required.
 
-### 🔄 In-App Auto-Updater (GitHub Releases)
+### 🔄 In-App Auto-Updater & Corporate PC Protection
 - **Automatic Background Version Checks** — Checks GitHub Releases for new updates on launch.
-- **Top Header Update Button** — When a new version is released, an `✨ Update (vX.X.X)` button dynamically appears in the top window bar next to Settings.
-- **Cross-Platform OS Detection** — Automatically detects Windows vs Linux and matches the correct platform package/binary asset.
+- **User-Controlled Startup Check** — Toggle `[✓] Check for updates automatically on startup` on/off in Settings.
+- **Automatic Unblocking (Zone.Identifier Removal)** — Automatically removes Windows Mark-of-the-Web alternate data streams (`ZoneId=3`) on downloaded updates so enterprise SmartScreen policies do not block them.
+- **Rollback Backup Protection** — Automatically creates a `.bak` backup copy of your working executable before applying updates.
+- **Authenticode Digital Signatures** — Windows release binaries are code-signed with RFC 3161 timestamps to prevent antivirus heuristic false positives.
+- **ZIP Distribution** — Standalone `.zip` archives are provided on GitHub Releases for corporate environments that restrict direct `.exe` downloads.
 - **1-Click In-App Modal** — View version comparison, changelog, and click `[⬇ Update & Restart]` to automatically download, install, and restart into the latest version.
-- **Manual Checks in Settings** — Always available `[🔄 Check for Updates]` button in the Settings menu.
 
 ---
 
@@ -76,6 +85,7 @@ A modern, high-performance, cross-platform desktop application (**Windows & Linu
 - Custom borderless dark glassmorphism theme with animated glow accents and drop shadows.
 - High-performance GPU-accelerated drawer transitions (`TranslateTransform`) ensuring silky 60/120/144Hz framerates.
 - Compact quick-access right navigation rail for **Search**, **Shazam**, **Live Stream / DJ Scraper**, **Spotify**, **History**, **Converter**, and **Queue**.
+- Fully theme-integrated UI controls, custom scrollbars, and styled dark dropdown menus.
 
 ---
 
@@ -84,6 +94,7 @@ A modern, high-performance, cross-platform desktop application (**Windows & Linu
 | Guide | Description |
 |---|---|
 | 📐 [docs/PROJECT.md](docs/PROJECT.md) | Full project architecture, modules, and codebase design |
+| 🗺️ [docs/ROADMAP.md](docs/ROADMAP.md) | Planned features and release roadmap (Full Season batching, Auto-Shutdown, WebP/GIF) |
 | 🛠️ [docs/BUILD.md](docs/BUILD.md) | How to build (Debug & Release) in Visual Studio and CLI |
 | 📦 [docs/PUBLISH.md](docs/PUBLISH.md) | How to publish a single-file portable executable |
 | 🎨 [docs/ICON.md](docs/ICON.md) | How to change application icons and assets |
@@ -114,6 +125,17 @@ A modern, high-performance, cross-platform desktop application (**Windows & Linu
    ```powershell
    dotnet run --project "Downloader/Universal Downloader.csproj"
    ```
+
+---
+
+## 🛡️ Windows Security & Corporate / Organization PCs
+If Windows SmartScreen shows *"Windows protected your PC"* when downloading from GitHub:
+1. **Unblock**: Right-click `Universal Downloader.exe` ➔ **Properties** ➔ Check **Unblock** at the bottom ➔ Click **Apply/OK**.
+2. **Or via PowerShell**:
+   ```powershell
+   Unblock-File -LiteralPath ".\Universal Downloader.exe"
+   ```
+3. **Corporate Proxy / Policy**: If your organization blocks direct `.exe` downloads, download `UniversalDownloader-windows-x64.zip` from [Releases](https://github.com/astymic/UniversalDownloader/releases).
 
 ---
 
