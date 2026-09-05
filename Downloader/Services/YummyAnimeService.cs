@@ -302,12 +302,12 @@ namespace UniversalDownloader.Services
 
             episode.Players.Add(player);
 
-            // Priority: Working download stream players: Aksor (1080p MPD) -> CVH (1080p MP4/HLS) -> Sibnet (1080p) -> Kodik (720p decrypted stream) -> Alloha -> others
+            // Priority: Working download stream players: Aksor (1080p MPD) -> CVH (1080p MP4/HLS) -> Sibnet (1080p) -> Alloha (1080p decrypted stream) -> Kodik (720p decrypted stream) -> others
             var bestPlayer = episode.Players.FirstOrDefault(p => p.PlayerName.Contains("Aksor", StringComparison.OrdinalIgnoreCase))
                           ?? episode.Players.FirstOrDefault(p => p.PlayerName.Contains("CVH", StringComparison.OrdinalIgnoreCase))
                           ?? episode.Players.FirstOrDefault(p => p.PlayerName.Contains("Sibnet", StringComparison.OrdinalIgnoreCase))
-                          ?? episode.Players.FirstOrDefault(p => p.PlayerName.Contains("Kodik", StringComparison.OrdinalIgnoreCase))
                           ?? episode.Players.FirstOrDefault(p => p.PlayerName.Contains("Alloha", StringComparison.OrdinalIgnoreCase))
+                          ?? episode.Players.FirstOrDefault(p => p.PlayerName.Contains("Kodik", StringComparison.OrdinalIgnoreCase))
                           ?? episode.Players.FirstOrDefault();
 
             if (bestPlayer != null)
@@ -360,23 +360,23 @@ namespace UniversalDownloader.Services
                 }
             }
 
-            // 4. Kodik embed player URL
-            if (playerUrl.Contains("kodik", StringComparison.OrdinalIgnoreCase))
-            {
-                var resolvedKodik = await ResolveKodikStreamAsync(playerUrl, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(resolvedKodik))
-                {
-                    return resolvedKodik;
-                }
-            }
-
-            // 5. Alloha Player (1080p / 720p decrypted stream via in-memory V8)
+            // 4. Alloha Player (1080p / 720p decrypted stream via in-memory V8)
             if (playerUrl.Contains("alloha", StringComparison.OrdinalIgnoreCase))
             {
                 var resolvedAlloha = await ResolveAllohaStreamAsync(playerUrl, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(resolvedAlloha))
                 {
                     return resolvedAlloha;
+                }
+            }
+
+            // 5. Kodik embed player URL
+            if (playerUrl.Contains("kodik", StringComparison.OrdinalIgnoreCase))
+            {
+                var resolvedKodik = await ResolveKodikStreamAsync(playerUrl, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(resolvedKodik))
+                {
+                    return resolvedKodik;
                 }
             }
 

@@ -214,10 +214,11 @@ namespace UniversalDownloader
                     ? $"{cleanSeriesTitle} [{cleanDub}]"
                     : $"{cleanSeriesTitle} - E{ep.EpisodeNumber:D2} [{cleanDub}]";
 
-                // Build download target URL - prefer working streams: Aksor (1080p) -> CVH (1080p) -> Sibnet (1080p) -> Kodik (720p decrypted stream) -> others
+                // Build download target URL - prefer working streams: Aksor (1080p) -> CVH (1080p) -> Sibnet (1080p) -> Alloha (1080p decrypted stream) -> Kodik (720p decrypted stream) -> others
                 var playerToUse = ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Aksor", StringComparison.OrdinalIgnoreCase))
                                ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("CVH", StringComparison.OrdinalIgnoreCase))
                                ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Sibnet", StringComparison.OrdinalIgnoreCase))
+                               ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Alloha", StringComparison.OrdinalIgnoreCase))
                                ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Kodik", StringComparison.OrdinalIgnoreCase))
                                ?? ep.SelectedPlayer
                                ?? ep.Players.FirstOrDefault();

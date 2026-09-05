@@ -163,5 +163,34 @@ namespace UniversalDownloader.Tests
             Assert.NotNull(streamUrl);
             Assert.Contains(".m3u8", streamUrl);
         }
+
+        [Fact]
+        public async Task YummyAnimeService_Fetches_TvoeImya_And_Prioritizes_Alloha()
+        {
+            var service = new YummyAnimeService();
+            var series = await service.FetchAnimeSeriesAsync("https://ru.yummyani.me/catalog/item/tvoe-imya");
+            Assert.NotNull(series);
+            Assert.NotEmpty(series.Dubs);
+
+            // Find a dub with Alloha player
+            var dubWithAlloha = series.Dubs.FirstOrDefault(d => d.Episodes.Any(e => e.Players.Any(p => p.PlayerName.Contains("Alloha", StringComparison.OrdinalIgnoreCase))));
+            if (dubWithAlloha != null)
+            {
+                var episode = dubWithAlloha.Episodes[0];
+                var hasAlloha = episode.Players.Any(p => p.PlayerName.Contains("Alloha", StringComparison.OrdinalIgnoreCase));
+                var hasKodik = episode.Players.Any(p => p.PlayerName.Contains("Kodik", StringComparison.OrdinalIgnoreCase));
+                if (hasAlloha && hasKodik)
+                {
+                    // Alloha must be prioritized above Kodik
+                    Assert.True(
+                        episode.BestPlayerName.Contains("Aksor", StringComparison.OrdinalIgnoreCase) ||
+                        episode.BestPlayerName.Contains("CVH", StringComparison.OrdinalIgnoreCase) ||
+                        episode.BestPlayerName.Contains("Sibnet", StringComparison.OrdinalIgnoreCase) ||
+                        episode.BestPlayerName.Contains("Alloha", StringComparison.OrdinalIgnoreCase),
+                        $"Expected 1080p player (Alloha/Sibnet/CVH/Aksor) to be prioritized over Kodik, but got: {episode.BestPlayerName}");
+                }
+            }
+        }
     }
 }
+
