@@ -1292,6 +1292,29 @@ namespace UniversalDownloader.Avalonia
                 if (AvaloniaCompressorCrfSlider != null) AvaloniaCompressorCrfSlider.Value = 28;
                 if (AvaloniaCompressorCrfText != null) AvaloniaCompressorCrfText.Text = "28 (Max Compression)";
             }
+
+            if (index == 3 || index == 4)
+            {
+                SetAvaloniaCompressorDropdownExpanded(true);
+            }
+        }
+
+        private void AvaloniaCompressorToggleSettings_Click(object? sender, RoutedEventArgs e)
+        {
+            bool isVisible = AvaloniaCompressorDetailedSettingsPanel?.IsVisible ?? false;
+            SetAvaloniaCompressorDropdownExpanded(!isVisible);
+        }
+
+        private void SetAvaloniaCompressorDropdownExpanded(bool expand)
+        {
+            if (AvaloniaCompressorDetailedSettingsPanel != null)
+            {
+                AvaloniaCompressorDetailedSettingsPanel.IsVisible = expand;
+            }
+            if (AvaloniaCompressorDropdownArrow != null)
+            {
+                AvaloniaCompressorDropdownArrow.Text = expand ? "▲" : "▼";
+            }
         }
 
         private void AvaloniaCompressorCrfSlider_ValueChanged(object? sender, RangeBaseValueChangedEventArgs e)

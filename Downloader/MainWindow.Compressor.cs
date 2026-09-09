@@ -267,6 +267,29 @@ namespace UniversalDownloader
                 if (idx == 0 || idx == 2) CompressorPresetSpeedComboBox.SelectedIndex = 1; // Slow
                 else CompressorPresetSpeedComboBox.SelectedIndex = 0; // Medium
             }
+
+            if (isTargetSize || isCustom)
+            {
+                SetCompressorDropdownExpanded(true);
+            }
+        }
+
+        private void CompressorToggleSettings_Click(object sender, RoutedEventArgs e)
+        {
+            bool isVisible = CompressorDetailedSettingsPanel?.Visibility == Visibility.Visible;
+            SetCompressorDropdownExpanded(!isVisible);
+        }
+
+        private void SetCompressorDropdownExpanded(bool expand)
+        {
+            if (CompressorDetailedSettingsPanel != null)
+            {
+                CompressorDetailedSettingsPanel.Visibility = expand ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (CompressorDropdownArrow != null)
+            {
+                CompressorDropdownArrow.Text = expand ? "▲" : "▼";
+            }
         }
 
         private void CompressorCrfSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
