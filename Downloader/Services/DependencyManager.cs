@@ -25,12 +25,44 @@ namespace UniversalDownloader.Services
         public bool IsYtDlpReady { get; private set; }
         public bool IsFfmpegReady { get; private set; }
 
+        private readonly TaskCompletionSource<bool> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task InitializationTask => _initializationTcs.Task;
+        public bool IsInitialized => _initializationTcs.Task.IsCompleted;
+
+        public async Task<bool> WaitForInitializationAsync(CancellationToken cancellationToken = default)
+        {
+            if (IsInitialized) return IsYtDlpReady;
+            try
+            {
+                await _initializationTcs.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                return IsYtDlpReady;
+            }
+            catch (OperationCanceledException)
+            {
+                return IsYtDlpReady;
+            }
+            catch (Exception)
+            {
+                return IsYtDlpReady;
+            }
+        }
+
         public event Action<string>? ProgressUpdated;
 
         public DependencyManager()
         {
             YtDlpExecutablePath = Path.Combine(AppContext.BaseDirectory, YtDlpFileName);
             FfmpegExecutablePath = Path.Combine(AppContext.BaseDirectory, FfmpegFileName);
+
+            if (File.Exists(YtDlpExecutablePath))
+            {
+                IsYtDlpReady = true;
+            }
+            if (File.Exists(FfmpegExecutablePath))
+            {
+                IsFfmpegReady = true;
+            }
         }
 
         private void ReportProgress(string status)
@@ -40,11 +72,22 @@ namespace UniversalDownloader.Services
 
         public async Task InitializeDependenciesAsync()
         {
-            // Run checks simultaneously silently
-            var ytDlpTask = CheckAndEnsureYtDlpExistsAsync();
-            var ffmpegTask = CheckAndEnsureFfmpegExistsAsync();
+            try
+            {
+                // Run checks simultaneously silently
+                var ytDlpTask = CheckAndEnsureYtDlpExistsAsync();
+                var ffmpegTask = CheckAndEnsureFfmpegExistsAsync();
 
-            await Task.WhenAll(ytDlpTask, ffmpegTask);
+                await Task.WhenAll(ytDlpTask, ffmpegTask);
+            }
+            catch (Exception ex)
+            {
+                ReportProgress($"Dependencies initialization error: {ex.Message}");
+            }
+            finally
+            {
+                _initializationTcs.TrySetResult(true);
+            }
         }
 
         private async Task CheckAndEnsureYtDlpExistsAsync()
@@ -56,11 +99,14 @@ namespace UniversalDownloader.Services
 
             if (fileExists)
             {
-                localVersion = await GetLocalYtDlpVersionAsync();
-                if (localVersion == null)
+                localVersion = await GetLocalYtDlpVersionFromPathAsync(YtDlpExecutablePath);
+                if (localVersion != null)
+                {
+                    IsYtDlpReady = true;
+                }
+                else
                 {
                     ReportProgress($"Status: Local {YtDlpFileName} seems corrupted. Re-downloading...");
-                    try { File.Delete(YtDlpExecutablePath); } catch { /* best effort */ }
                     fileExists = false;
                 }
             }
@@ -75,7 +121,6 @@ namespace UniversalDownloader.Services
                 {
                     // Auto-update silently!
                     ReportProgress($"Status: Updating {YtDlpFileName} to version {latestVersionTag}...");
-                    try { File.Delete(YtDlpExecutablePath); } catch { /* best effort */ }
                     needsDownload = true;
                 }
                 else
@@ -91,26 +136,40 @@ namespace UniversalDownloader.Services
                     ReportProgress($"Status: {YtDlpFileName} not found. Attempting to download...");
                 }
 
-                bool downloaded = await DownloadYtDlpAsync(CancellationToken.None);
+                string tempPath = YtDlpExecutablePath + ".tmp";
+                bool downloaded = await DownloadYtDlpToPathAsync(tempPath, CancellationToken.None);
 
                 if (downloaded)
                 {
-                    string newLocalVersion = await GetLocalYtDlpVersionAsync();
+                    string? newLocalVersion = await GetLocalYtDlpVersionFromPathAsync(tempPath);
                     if (newLocalVersion != null)
                     {
+                        try
+                        {
+                            if (File.Exists(YtDlpExecutablePath))
+                            {
+                                File.Delete(YtDlpExecutablePath);
+                            }
+                            File.Move(tempPath, YtDlpExecutablePath);
+                        }
+                        catch
+                        {
+                            try { File.Copy(tempPath, YtDlpExecutablePath, true); File.Delete(tempPath); } catch { }
+                        }
+
                         IsYtDlpReady = true;
                         ReportProgress($"Status: {YtDlpFileName} ready.");
                     }
                     else
                     {
-                        IsYtDlpReady = false;
+                        try { File.Delete(tempPath); } catch { }
+                        if (File.Exists(YtDlpExecutablePath)) IsYtDlpReady = true;
                         ReportProgress($"Status: Downloaded {YtDlpFileName} appears corrupted.");
-                        try { File.Delete(YtDlpExecutablePath); } catch { /* best effort */ }
                     }
                 }
                 else
                 {
-                    IsYtDlpReady = false;
+                    if (File.Exists(YtDlpExecutablePath)) IsYtDlpReady = true;
                     ReportProgress($"Status: Failed to download {YtDlpFileName}.");
                 }
             }
@@ -180,7 +239,7 @@ namespace UniversalDownloader.Services
             }
         }
 
-        private async Task<bool> DownloadYtDlpAsync(CancellationToken cancellationToken)
+        private async Task<bool> DownloadYtDlpToPathAsync(string destinationPath, CancellationToken cancellationToken)
         {
             try
             {
@@ -191,7 +250,7 @@ namespace UniversalDownloader.Services
                     response.EnsureSuccessStatusCode();
 
                     using (var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken))
-                    using (var fileStream = new FileStream(YtDlpExecutablePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+                    using (var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
                     {
                         await contentStream.CopyToAsync(fileStream, cancellationToken);
                     }
@@ -206,13 +265,18 @@ namespace UniversalDownloader.Services
 
         private async Task<string?> GetLocalYtDlpVersionAsync()
         {
-            if (!File.Exists(YtDlpExecutablePath)) return null;
+            return await GetLocalYtDlpVersionFromPathAsync(YtDlpExecutablePath);
+        }
+
+        private static async Task<string?> GetLocalYtDlpVersionFromPathAsync(string path)
+        {
+            if (!File.Exists(path)) return null;
 
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
-                    FileName = YtDlpExecutablePath,
+                    FileName = path,
                     Arguments = "--version",
                     RedirectStandardOutput = true,
                     UseShellExecute = false,
@@ -222,6 +286,7 @@ namespace UniversalDownloader.Services
 
                 using (Process process = Process.Start(psi))
                 {
+                    if (process == null) return null;
                     string versionOutput = await process.StandardOutput.ReadToEndAsync();
                     await process.WaitForExitAsync();
                     if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(versionOutput))

@@ -38,7 +38,6 @@ namespace UniversalDownloader
 
         public ObservableCollection<DownloadHistoryItem> HistoryItems => _historyService.Items;
 
-        private bool _isInitializing = false;
         private bool _isProcessingUrl = false;
         private bool _isDownloadingFile = false;
 
@@ -238,7 +237,10 @@ namespace UniversalDownloader
         {
             Dispatcher.InvokeAsync(() =>
             {
-                if (StatusTextBlock != null) StatusTextBlock.Text = status;
+                if (StatusTextBlock != null && !_isDownloadingFile && !_isProcessingUrl)
+                {
+                    StatusTextBlock.Text = status;
+                }
             });
         }
 
@@ -275,11 +277,8 @@ namespace UniversalDownloader
             });
         }
 
-        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            _isInitializing = true;
-            UpdateUiElementStates("Status: Initializing dependencies silently...");
-
             LoadSettings();
 
             if (DirectoryPathTextBox != null && string.IsNullOrEmpty(SelectedDirectory))
@@ -298,25 +297,39 @@ namespace UniversalDownloader
                 SearchQueryTextBox.Foreground = (Brush)FindResource("TextSecondaryBrush");
             }
 
-            try
-            {
-                await _dependencyManager.InitializeDependenciesAsync();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to initialize dependencies: {ex.Message}");
-            }
+            // Immediately ready for user interactions!
+            UpdateUiElementStates("Ready. Paste a URL to get started.");
 
-            _isInitializing = false;
-            UpdateUiElementStates();
+            // Run dependency check & update asynchronously in background
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _dependencyManager.InitializeDependenciesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to initialize dependencies: {ex.Message}");
+                }
+                finally
+                {
+                    Dispatcher.InvokeAsync(() =>
+                    {
+                        if (!_isDownloadingFile && !_isProcessingUrl)
+                        {
+                            UpdateUiElementStates(_dependencyManager.IsYtDlpReady ? "Ready. Paste a URL to get started." : "YouTube features unavailable — yt-dlp missing.");
+                        }
+                        else
+                        {
+                            UpdateUiElementStates();
+                        }
+                    });
+                }
+            });
 
             if (UrlTextBox != null && !string.IsNullOrWhiteSpace(UrlTextBox.Text) && UrlTextBox.Text != "Paste URL here...")
             {
-                await ProcessUrlChange(UrlTextBox.Text, CancellationToken.None);
-            }
-            else
-            {
-                UpdateUiElementStates(_dependencyManager.IsYtDlpReady ? "Ready. Paste a URL to get started." : "YouTube features unavailable — yt-dlp missing.");
+                _ = ProcessUrlChange(UrlTextBox.Text, CancellationToken.None);
             }
         }
 
@@ -445,9 +458,9 @@ namespace UniversalDownloader
         {
             Dispatcher.InvokeAsync(() =>
             {
-                bool isBusy = _isInitializing || _isProcessingUrl || _isDownloadingFile;
-                bool canBrowse = !isBusy;
-                bool canInputUrl = !isBusy;
+                bool isBusy = _isProcessingUrl || _isDownloadingFile;
+                bool canBrowse = !_isDownloadingFile;
+                bool canInputUrl = !_isDownloadingFile;
                 bool canDownloadAction = CanInitiateDownload() && !isBusy;
 
                 if (UrlTextBox != null) UrlTextBox.IsEnabled = canInputUrl && !_isSpotifyDrawerExpanded;
@@ -465,7 +478,7 @@ namespace UniversalDownloader
                     bool isYtDlpLink = _downloadService.IsYouTubeLink(currentUrl) || _downloadService.IsInstagramLink(currentUrl) || _downloadService.IsSocialVideoLink(currentUrl);
                     if (isYtDlpLink)
                     {
-                        youtubeSpecificConditionsMet = _dependencyManager.IsYtDlpReady && (YouTubeQualityComboBox?.SelectedItem != null) && (QualitySection?.Visibility == Visibility.Visible);
+                        youtubeSpecificConditionsMet = (_dependencyManager.IsYtDlpReady || !_dependencyManager.IsInitialized) && (YouTubeQualityComboBox?.SelectedItem != null) && (QualitySection?.Visibility == Visibility.Visible);
                     }
                     else if (TrimmingSection != null && TrimmingSection.Visibility == Visibility.Visible)
                     {
@@ -482,7 +495,7 @@ namespace UniversalDownloader
                 {
                     string currentUrl = UrlTextBox?.Text ?? string.Empty;
                     bool isYtDlpLink = _downloadService.IsYouTubeLink(currentUrl) || _downloadService.IsInstagramLink(currentUrl) || _downloadService.IsSocialVideoLink(currentUrl);
-                    YouTubeQualityComboBox.IsEnabled = canInputUrl && _dependencyManager.IsYtDlpReady && isYtDlpLink && YouTubeQualityComboBox.HasItems;
+                    YouTubeQualityComboBox.IsEnabled = canInputUrl && isYtDlpLink && YouTubeQualityComboBox.HasItems;
                 }
 
                 if (statusMessageUpdate != null && StatusTextBlock != null)
@@ -491,7 +504,7 @@ namespace UniversalDownloader
                 }
                 else if (StatusTextBlock != null && !isBusy)
                 {
-                    StatusTextBlock.Text = _dependencyManager.IsYtDlpReady ? "Ready. Paste a URL to get started." : "Media features unavailable.";
+                    StatusTextBlock.Text = (_dependencyManager.IsYtDlpReady || !_dependencyManager.IsInitialized) ? "Ready. Paste a URL to get started." : "Media features unavailable.";
                 }
             });
         }
@@ -863,7 +876,14 @@ namespace UniversalDownloader
             {
                 string platformName = _downloadService.IsInstagramLink(url) ? "Instagram" : (_downloadService.IsYouTubeLink(url) ? "YouTube" : "Video");
                 FileNameTextBlock.Text = $"Processing {platformName} URL...";
-                StatusTextBlock.Text = $"Status: Fetching {platformName} qualities...";
+                if (!_dependencyManager.IsYtDlpReady && !_dependencyManager.IsInitialized)
+                {
+                    StatusTextBlock.Text = "Updating tools in background... waiting to fetch qualities ⏳";
+                }
+                else
+                {
+                    StatusTextBlock.Text = $"Status: Fetching {platformName} qualities...";
+                }
                 
                 try
                 {

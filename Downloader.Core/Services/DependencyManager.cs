@@ -27,6 +27,29 @@ namespace UniversalDownloader.Services
         public bool IsYtDlpReady { get; private set; }
         public bool IsFfmpegReady { get; private set; }
 
+        private readonly TaskCompletionSource<bool> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task InitializationTask => _initializationTcs.Task;
+        public bool IsInitialized => _initializationTcs.Task.IsCompleted;
+
+        public async Task<bool> WaitForInitializationAsync(CancellationToken cancellationToken = default)
+        {
+            if (IsInitialized) return IsYtDlpReady;
+            try
+            {
+                await _initializationTcs.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                return IsYtDlpReady;
+            }
+            catch (OperationCanceledException)
+            {
+                return IsYtDlpReady;
+            }
+            catch (Exception)
+            {
+                return IsYtDlpReady;
+            }
+        }
+
         public event Action<string>? ProgressUpdated;
 
         public DependencyManager()
@@ -60,6 +83,15 @@ namespace UniversalDownloader.Services
 
                 string? sysFfmpeg = FindSystemBinary("ffmpeg");
                 if (sysFfmpeg != null) FfmpegExecutablePath = sysFfmpeg;
+            }
+
+            if (File.Exists(YtDlpExecutablePath))
+            {
+                IsYtDlpReady = true;
+            }
+            if (File.Exists(FfmpegExecutablePath))
+            {
+                IsFfmpegReady = true;
             }
         }
 
@@ -101,9 +133,20 @@ namespace UniversalDownloader.Services
 
         public async Task InitializeDependenciesAsync()
         {
-            var ytDlpTask = CheckAndEnsureYtDlpExistsAsync();
-            var ffmpegTask = CheckAndEnsureFfmpegExistsAsync();
-            await Task.WhenAll(ytDlpTask, ffmpegTask);
+            try
+            {
+                var ytDlpTask = CheckAndEnsureYtDlpExistsAsync();
+                var ffmpegTask = CheckAndEnsureFfmpegExistsAsync();
+                await Task.WhenAll(ytDlpTask, ffmpegTask);
+            }
+            catch (Exception ex)
+            {
+                ReportProgress($"Dependencies initialization error: {ex.Message}");
+            }
+            finally
+            {
+                _initializationTcs.TrySetResult(true);
+            }
         }
 
         private async Task CheckAndEnsureYtDlpExistsAsync()
@@ -116,11 +159,14 @@ namespace UniversalDownloader.Services
             if (fileExists)
             {
                 EnsureExecutablePermissions(YtDlpExecutablePath);
-                localVersion = await GetLocalYtDlpVersionAsync();
-                if (localVersion == null)
+                localVersion = await GetLocalYtDlpVersionFromPathAsync(YtDlpExecutablePath);
+                if (localVersion != null)
+                {
+                    IsYtDlpReady = true;
+                }
+                else
                 {
                     ReportProgress($"Status: Local {_ytDlpFileName} corrupted. Re-downloading...");
-                    try { File.Delete(YtDlpExecutablePath); } catch { }
                     fileExists = false;
                 }
             }
@@ -133,7 +179,6 @@ namespace UniversalDownloader.Services
                 if (!string.IsNullOrWhiteSpace(latestVersionTag) && localVersion != latestVersionTag)
                 {
                     ReportProgress($"Status: Updating {_ytDlpFileName} to version {latestVersionTag}...");
-                    try { File.Delete(YtDlpExecutablePath); } catch { }
                     needsDownload = true;
                 }
                 else
@@ -145,16 +190,40 @@ namespace UniversalDownloader.Services
             if (needsDownload)
             {
                 ReportProgress($"Status: Downloading {_ytDlpFileName}...");
-                bool downloaded = await DownloadYtDlpAsync(CancellationToken.None);
+                string tempPath = YtDlpExecutablePath + ".tmp";
+                bool downloaded = await DownloadYtDlpToPathAsync(tempPath, CancellationToken.None);
                 if (downloaded)
                 {
-                    EnsureExecutablePermissions(YtDlpExecutablePath);
-                    string? newLocalVersion = await GetLocalYtDlpVersionAsync();
+                    EnsureExecutablePermissions(tempPath);
+                    string? newLocalVersion = await GetLocalYtDlpVersionFromPathAsync(tempPath);
                     if (newLocalVersion != null)
                     {
+                        try
+                        {
+                            if (File.Exists(YtDlpExecutablePath))
+                            {
+                                File.Delete(YtDlpExecutablePath);
+                            }
+                            File.Move(tempPath, YtDlpExecutablePath);
+                        }
+                        catch
+                        {
+                            try { File.Copy(tempPath, YtDlpExecutablePath, true); File.Delete(tempPath); } catch { }
+                        }
+
+                        EnsureExecutablePermissions(YtDlpExecutablePath);
                         IsYtDlpReady = true;
                         ReportProgress($"Status: {_ytDlpFileName} ready (v{newLocalVersion}).");
                     }
+                    else
+                    {
+                        try { File.Delete(tempPath); } catch { }
+                        if (File.Exists(YtDlpExecutablePath)) IsYtDlpReady = true;
+                    }
+                }
+                else
+                {
+                    if (File.Exists(YtDlpExecutablePath)) IsYtDlpReady = true;
                 }
             }
         }
@@ -180,7 +249,7 @@ namespace UniversalDownloader.Services
             }
         }
 
-        private async Task<bool> DownloadYtDlpAsync(CancellationToken cancellationToken)
+        private async Task<bool> DownloadYtDlpToPathAsync(string destinationPath, CancellationToken cancellationToken)
         {
             try
             {
@@ -191,8 +260,8 @@ namespace UniversalDownloader.Services
                 response.EnsureSuccessStatusCode();
 
                 byte[] data = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-                await File.WriteAllBytesAsync(YtDlpExecutablePath, data, cancellationToken);
-                EnsureExecutablePermissions(YtDlpExecutablePath);
+                await File.WriteAllBytesAsync(destinationPath, data, cancellationToken);
+                EnsureExecutablePermissions(destinationPath);
                 return true;
             }
             catch (Exception ex)
@@ -204,11 +273,18 @@ namespace UniversalDownloader.Services
 
         private async Task<string?> GetLocalYtDlpVersionAsync()
         {
+            return await GetLocalYtDlpVersionFromPathAsync(YtDlpExecutablePath);
+        }
+
+        private static async Task<string?> GetLocalYtDlpVersionFromPathAsync(string path)
+        {
             try
             {
+                if (!File.Exists(path)) return null;
+
                 var psi = new ProcessStartInfo
                 {
-                    FileName = YtDlpExecutablePath,
+                    FileName = path,
                     Arguments = "--version",
                     RedirectStandardOutput = true,
                     UseShellExecute = false,

@@ -18,6 +18,16 @@ namespace UniversalDownloader.Services
         public string? Filename { get; set; }
         public double Percentage { get; set; }
         public bool IsIndeterminate { get; set; }
+
+        public DownloadProgressArgs() { }
+
+        public DownloadProgressArgs(double percentage, bool isIndeterminate = false, string? statusMessage = null, string? filename = null)
+        {
+            Percentage = percentage;
+            IsIndeterminate = isIndeterminate;
+            StatusMessage = statusMessage;
+            Filename = filename;
+        }
     }
 
     public partial class DownloadService
@@ -194,7 +204,11 @@ namespace UniversalDownloader.Services
                 catch { }
             }
 
-            if (!_dependencyManager.IsYtDlpReady) return null;
+            if (!_dependencyManager.IsYtDlpReady)
+            {
+                await _dependencyManager.WaitForInitializationAsync();
+                if (!_dependencyManager.IsYtDlpReady) return null;
+            }
 
             // 3. Robust yt-dlp print title fallback
             try
@@ -249,7 +263,11 @@ namespace UniversalDownloader.Services
 
         public async Task<(string? Title, string? FormatsJson)> GetYouTubeInfoAsync(string url)
         {
-            if (!_dependencyManager.IsYtDlpReady) return (null, null);
+            if (!_dependencyManager.IsYtDlpReady)
+            {
+                await _dependencyManager.WaitForInitializationAsync();
+                if (!_dependencyManager.IsYtDlpReady) return (null, null);
+            }
             url = CleanUrl(url);
 
             try
@@ -330,7 +348,11 @@ namespace UniversalDownloader.Services
         /// </summary>
         public async Task<string?> GetPlaylistInfoAsync(string url)
         {
-            if (!_dependencyManager.IsYtDlpReady) return null;
+            if (!_dependencyManager.IsYtDlpReady)
+            {
+                await _dependencyManager.WaitForInitializationAsync();
+                if (!_dependencyManager.IsYtDlpReady) return null;
+            }
 
             try
             {
@@ -500,7 +522,13 @@ namespace UniversalDownloader.Services
         {
             if (!_dependencyManager.IsYtDlpReady)
             {
-                throw new Exception("yt-dlp is not available.");
+                progressCallback?.Report(new DownloadProgressArgs(0, isIndeterminate: true, statusMessage: "Waiting for tools update to complete..."));
+                ProgressChanged?.Invoke(this, new DownloadProgressArgs(0, isIndeterminate: true, statusMessage: "Waiting for tools update to complete..."));
+                await _dependencyManager.WaitForInitializationAsync(cancellationToken);
+                if (!_dependencyManager.IsYtDlpReady)
+                {
+                    throw new Exception("yt-dlp is not available.");
+                }
             }
 
             url = CleanUrl(url);

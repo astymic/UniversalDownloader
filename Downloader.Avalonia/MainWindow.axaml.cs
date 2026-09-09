@@ -104,7 +104,7 @@ namespace UniversalDownloader.Avalonia
             }
         }
 
-        private async void MainWindow_Loaded(object? sender, RoutedEventArgs e)
+        private void MainWindow_Loaded(object? sender, RoutedEventArgs e)
         {
             _dependencyManager.ProgressUpdated += status =>
             {
@@ -114,8 +114,26 @@ namespace UniversalDownloader.Avalonia
                 });
             };
 
-            await _dependencyManager.InitializeDependenciesAsync();
             if (StatusBadgeTextBlock != null) StatusBadgeTextBlock.Text = "Ready";
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _dependencyManager.InitializeDependenciesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to initialize dependencies: {ex.Message}");
+                }
+                finally
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        if (StatusBadgeTextBlock != null) StatusBadgeTextBlock.Text = "Ready";
+                    });
+                }
+            });
         }
 
         #region Navigation
