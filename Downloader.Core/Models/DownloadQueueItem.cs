@@ -177,6 +177,16 @@ namespace UniversalDownloader.Models
             set { _downloadedFilePath = value; OnPropertyChanged(); }
         }
 
+        private bool _downloadSubtitles;
+        public bool DownloadSubtitles
+        {
+            get => _downloadSubtitles;
+            set { _downloadSubtitles = value; OnPropertyChanged(); }
+        }
+
+        public System.Collections.Generic.List<SubtitleTrackInfo> SubtitleTracks { get; set; } = new();
+
+
         public void UpdatePlatformFromUrl()
         {
             if (string.IsNullOrWhiteSpace(_url)) return;

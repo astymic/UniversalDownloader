@@ -233,6 +233,77 @@ namespace UniversalDownloader.Tests
 
             Assert.True(proc.ExitCode == 0, $"yt-dlp download failed (code {proc.ExitCode}):\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
         }
+
+        [Theory]
+        [InlineData("https://kinogo.online/multserialy/32400-lilo-i-stich.html", true)]
+        [InlineData("https://kinogo.online/multfilmy/31814-lilo-i-stich.html", true)]
+        [InlineData("https://kinogo.la/film/123-avatar.html", true)]
+        [InlineData("http://kinogo.biz/series/456.html", true)]
+        [InlineData("https://youtube.com/watch?v=123", false)]
+        [InlineData("https://ru.yummyani.me/catalog/item/tvoe-imya", false)]
+        public void KinogoService_IsKinogoUrl_MatchesCorrectly(string url, bool expected)
+        {
+            bool result = KinogoService.IsKinogoUrl(url);
+            Assert.Equal(expected, result);
+        }
+
+        [Fact]
+        public async Task KinogoService_FetchesSeries_ExtractsAllDubs_LiloAndStitch()
+        {
+            var service = new KinogoService();
+            var series = await service.FetchSeriesAsync("https://kinogo.online/multserialy/32400-lilo-i-stich.html");
+            Assert.NotNull(series);
+            Assert.False(series.IsMovie);
+            Assert.Contains("Лило и Стич", series.Title);
+            Assert.NotEmpty(series.Dubs);
+
+            // Must detect dubs across multiple players ("Дубляж (Невафильм)", "Рус. Дублированный", "Eng.Original", "Дублированный")
+            var dubNames = series.Dubs.Select(d => d.Name).ToList();
+            Assert.Contains(dubNames, n => n.Contains("Невафильм") || n.Contains("Дубляж"));
+            Assert.Contains(dubNames, n => n.Contains("Рус. Дублированный") || n.Contains("Eng.Original") || n.Contains("Дублированный"));
+
+            // Check that episodes are sorted and have players
+            var firstDub = series.Dubs[0];
+            Assert.NotEmpty(firstDub.Episodes);
+            Assert.Equal(1, firstDub.Episodes[0].EpisodeNumber);
+            Assert.NotEmpty(firstDub.Episodes[0].Players);
+        }
+
+        [Fact]
+        public async Task KinogoService_FetchesMovie_ExtractsDubsAndSubtitles()
+        {
+            var service = new KinogoService();
+            var movie = await service.FetchSeriesAsync("https://kinogo.online/multfilmy/31814-lilo-i-stich.html");
+            Assert.NotNull(movie);
+            Assert.True(movie.IsMovie);
+            Assert.Contains("Лило и Стич", movie.Title);
+            Assert.NotEmpty(movie.Dubs);
+
+            var firstEp = movie.Dubs[0].Episodes[0];
+            var player = firstEp.Players[0];
+            var streamUrl = await service.ResolveEpisodeDownloadUrlAsync(player);
+            Assert.NotNull(streamUrl);
+            Assert.StartsWith("http", streamUrl);
+
+            // After resolving, verify subtitles were extracted
+            Assert.NotEmpty(player.Subtitles);
+            Assert.Contains(player.Subtitles, s => s.Language.Contains("Рус") || s.Language.Contains("Eng") || s.Language.Contains("Укр"));
+        }
+
+        [Fact]
+        public async Task KinogoService_ResolvesStreamUrl()
+        {
+            var service = new KinogoService();
+            var series = await service.FetchSeriesAsync("https://kinogo.online/multserialy/32400-lilo-i-stich.html");
+            Assert.NotNull(series);
+
+            var firstEp = series.Dubs[0].Episodes[0];
+            var player = firstEp.Players[0];
+            var resolvedStream = await service.ResolveEpisodeDownloadUrlAsync(player);
+            Assert.NotNull(resolvedStream);
+            Assert.StartsWith("http", resolvedStream);
+            Assert.True(resolvedStream.Contains(".m3u8") || resolvedStream.Contains(".mp4"));
+        }
     }
 }
 

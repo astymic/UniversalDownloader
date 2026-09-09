@@ -685,12 +685,18 @@ namespace UniversalDownloader
             _playlistItems.Clear();
             if (FindName("PlaylistSection") is Border playlistBorder2) playlistBorder2.Visibility = Visibility.Collapsed;
 
-            // ── Anime Series Catalog check ──
+            // ── Anime / Film / Series Catalog check ──
+            if (KinogoService.IsKinogoUrl(url))
+            {
+                await LoadKinogoSeriesAsync(url);
+                return;
+            }
             if (YummyAnimeService.IsYummyAnimeUrl(url))
             {
                 await LoadAnimeSeriesAsync(url);
                 return;
             }
+
 
             // ── Playlist check FIRST (before single video) ──
             if (_downloadService.IsSpotifyPlaylistOrAlbumLink(url))
@@ -1193,11 +1199,17 @@ namespace UniversalDownloader
             }
 
             string url = UrlTextBox.Text?.Trim() ?? string.Empty;
+            if (KinogoService.IsKinogoUrl(url))
+            {
+                await LoadKinogoSeriesAsync(url);
+                return;
+            }
             if (YummyAnimeService.IsYummyAnimeUrl(url))
             {
                 await LoadAnimeSeriesAsync(url);
                 return;
             }
+
 
             bool hasSpotifyCsvTracks = _playlistItems.Count > 0 && _isPlaylistMode && 
                 (_playlistItems[0].VideoUrl.StartsWith("ytsearch1:", StringComparison.OrdinalIgnoreCase));

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using UniversalDownloader.Models;
@@ -331,6 +333,44 @@ namespace UniversalDownloader.Services
                                     QueueChanged?.Invoke();
                                 });
 
+                                // Download subtitles if requested
+                                if (nextItem.DownloadSubtitles && nextItem.SubtitleTracks != null && nextItem.SubtitleTracks.Count > 0)
+                                {
+                                    try
+                                    {
+                                        string baseFileName = !string.IsNullOrWhiteSpace(nextItem.DownloadedFilePath) && File.Exists(nextItem.DownloadedFilePath)
+                                            ? Path.GetFileNameWithoutExtension(nextItem.DownloadedFilePath)
+                                            : SanitizeFileName(nextItem.Title);
+
+                                        using var subClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+                                        subClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+
+                                        foreach (var track in nextItem.SubtitleTracks)
+                                        {
+                                            if (string.IsNullOrWhiteSpace(track.Url)) continue;
+                                            try
+                                            {
+                                                string ext = Path.GetExtension(track.Url).Split('?')[0];
+                                                if (string.IsNullOrWhiteSpace(ext)) ext = ".vtt";
+                                                string langSuffix = !string.IsNullOrWhiteSpace(track.Language) ? $".{SanitizeFileName(track.Language)}" : "";
+                                                string subFileName = $"{baseFileName}{langSuffix}{ext}";
+                                                string subPath = Path.Combine(nextItem.DestinationFolder, subFileName);
+
+                                                var subBytes = await subClient.GetByteArrayAsync(track.Url, cts.Token);
+                                                await File.WriteAllBytesAsync(subPath, subBytes, cts.Token);
+                                            }
+                                            catch (Exception subEx)
+                                            {
+                                                Debug.WriteLine($"[DownloadQueueManager] Subtitle download error for {track.Language}: {subEx.Message}");
+                                            }
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.WriteLine($"[DownloadQueueManager] Subtitles overall download error: {ex.Message}");
+                                    }
+                                }
+
                                 ItemCompleted?.Invoke(nextItem);
                             }
                             else
@@ -380,5 +420,13 @@ namespace UniversalDownloader.Services
                 _isProcessing = false;
             }
         }
+
+        private static string SanitizeFileName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return "subtitle";
+            char[] invalid = Path.GetInvalidFileNameChars();
+            return string.Concat(name.Select(c => invalid.Contains(c) ? '_' : c)).Trim();
+        }
     }
 }
+

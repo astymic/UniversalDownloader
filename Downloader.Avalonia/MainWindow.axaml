@@ -342,7 +342,7 @@
                             </Border>
 
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                                <TextBlock Text="🎬 АНИМЕ СЕРИИ" Foreground="#F43F5E" FontSize="11" FontWeight="Bold"/>
+                                <TextBlock x:Name="AnimeDrawerCategoryText" Text="🎬 СЕРИАЛ / ФИЛЬМ" Foreground="#F43F5E" FontSize="11" FontWeight="Bold"/>
                                 <TextBlock x:Name="AnimeDrawerTitleText" Text="Название Аниме" FontSize="17" FontWeight="Bold" Foreground="White" TextTrimming="CharacterEllipsis"/>
                                 <TextBlock x:Name="AnimeDrawerMetaText" Text="2024 • 24 серий • ⭐ 8.5" Foreground="#10B981" FontSize="11" FontWeight="SemiBold"/>
                             </StackPanel>
@@ -391,10 +391,20 @@
 
                         <!-- Footer Actions -->
                         <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,8,0,0">
-                            <TextBlock Grid.Column="0" Text="Авто: 1080p (CVH/Alloha) ➔ 720p (Kodik)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock x:Name="AnimeDrawerFallbackText" Text="Авто: 1080p (Cinemar/VideoCDN/Alloha)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5"/>
+                                <CheckBox x:Name="AnimeDownloadSubsCheckBox" 
+                                          Content="Скачивать субтитры" 
+                                          FontSize="10.5" 
+                                          Foreground="{StaticResource TextSecondaryBrush}" 
+                                          IsChecked="True" 
+                                          Margin="0,2,0,0"
+                                          ToolTip.Tip="Автоматически скачивает файл субтитров (.vtt / .srt) при наличии"/>
+                            </StackPanel>
                             <Button Grid.Column="1" Classes="secondary" Content="Отмена" Height="36" Padding="14,0" FontSize="11" Margin="0,0,8,0" Click="AnimeDrawerClose_Click"/>
                             <Button x:Name="AnimeDownloadSelectedButton" Grid.Column="2" Classes="primary" Content="⬇ Скачать выбранные" Height="36" Padding="16,0" FontSize="11.5" FontWeight="Bold" Background="#E11D48" BorderBrush="#F43F5E" Click="AnimeDownloadSelected_Click"/>
                         </Grid>
+
                     </StackPanel>
                 </Border>
             </Grid>

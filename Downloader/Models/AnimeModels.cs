@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -5,6 +6,14 @@ using System.Runtime.CompilerServices;
 
 namespace UniversalDownloader.Models
 {
+    public class SubtitleTrackInfo
+    {
+        public string Language { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
+
+        public override string ToString() => string.IsNullOrWhiteSpace(Language) ? Url : Language;
+    }
+
     public class AnimeSeriesInfo
     {
         public string AnimeId { get; set; } = string.Empty;
@@ -16,6 +25,8 @@ namespace UniversalDownloader.Models
         public string Rating { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public int TotalEpisodesCount { get; set; }
+        public bool IsMovie { get; set; }
+        public string SourceService { get; set; } = "YummyAnime"; // "YummyAnime", "Kinogo", etc.
         public ObservableCollection<AnimeDubInfo> Dubs { get; set; } = new();
     }
 
@@ -36,17 +47,25 @@ namespace UniversalDownloader.Models
         private bool _isSelected = true;
 
         public int EpisodeNumber { get; set; }
+        public int SeasonNumber { get; set; } = 1;
+        public string SeasonTitle { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;
 
         public string DisplayTitle
         {
             get
             {
-                if (string.IsNullOrWhiteSpace(Title) || Title.Equals($"Серия {EpisodeNumber}", StringComparison.OrdinalIgnoreCase) || Title.Equals($"{EpisodeNumber}", StringComparison.OrdinalIgnoreCase))
+                string epText = !string.IsNullOrWhiteSpace(Title) && 
+                                !Title.Equals($"Серия {EpisodeNumber}", StringComparison.OrdinalIgnoreCase) && 
+                                !Title.Equals($"{EpisodeNumber}", StringComparison.OrdinalIgnoreCase)
+                    ? $"Серия {EpisodeNumber}: {Title}"
+                    : $"Серия {EpisodeNumber}";
+
+                if (!string.IsNullOrWhiteSpace(SeasonTitle))
                 {
-                    return $"Серия {EpisodeNumber}";
+                    return $"{SeasonTitle} • {epText}";
                 }
-                return $"Серия {EpisodeNumber}: {Title}";
+                return epText;
             }
         }
         
@@ -70,6 +89,7 @@ namespace UniversalDownloader.Models
 
         public AnimePlayerInfo? SelectedPlayer { get; set; }
         public List<AnimePlayerInfo> Players { get; set; } = new();
+        public List<SubtitleTrackInfo> Subtitles { get; set; } = new();
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -80,11 +100,16 @@ namespace UniversalDownloader.Models
 
     public class AnimePlayerInfo
     {
-        public string PlayerName { get; set; } = string.Empty; // "CVH", "Alloha", "Kodik", etc.
+        public string PlayerName { get; set; } = string.Empty; // "CVH", "Alloha", "Cinemar", "VideoCDN", etc.
         public string Quality { get; set; } = "1080p"; // "1080p", "720p", etc.
         public int EpisodeNumber { get; set; }
+        public int SeasonNumber { get; set; } = 1;
         public string IframeUrl { get; set; } = string.Empty;
         public string StreamUrl { get; set; } = string.Empty;
+        public string DownloadUrl { get; set; } = string.Empty;
+        public string DataToken { get; set; } = string.Empty;
+        public List<SubtitleTrackInfo> Subtitles { get; set; } = new();
         public Dictionary<string, string> Headers { get; set; } = new();
     }
 }
+

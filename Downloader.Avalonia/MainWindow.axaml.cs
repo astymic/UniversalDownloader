@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -167,11 +168,18 @@ namespace UniversalDownloader.Avalonia
             string url = UrlTextBox.Text?.Trim() ?? "";
             if (string.IsNullOrWhiteSpace(url)) return;
 
+            if (KinogoService.IsKinogoUrl(url))
+            {
+                await LoadKinogoSeriesAsync(url);
+                return;
+            }
+
             if (YummyAnimeService.IsYummyAnimeUrl(url))
             {
                 await LoadAnimeSeriesAsync(url);
                 return;
             }
+
 
             _downloadCts?.Cancel();
             _downloadCts = new CancellationTokenSource();
@@ -738,10 +746,37 @@ namespace UniversalDownloader.Avalonia
         }
         #endregion
 
-        #region Anime
+        #region Anime & Kinogo
         private readonly YummyAnimeService _yummyAnimeService = new();
+        private readonly KinogoService _kinogoService = new();
         private AnimeSeriesInfo? _currentAnimeSeries;
         private AnimeDubInfo? _selectedAnimeDub;
+
+        private async Task LoadKinogoSeriesAsync(string url)
+        {
+            if (ProgressBorder != null)
+            {
+                ProgressBorder.IsVisible = true;
+                ProgressStatusTextBlock.Text = "Loading film / series and dubs... 🍿";
+            }
+
+            try
+            {
+                var series = await _kinogoService.FetchSeriesAsync(url);
+                if (series == null)
+                {
+                    if (ProgressStatusTextBlock != null) ProgressStatusTextBlock.Text = "Failed to load movie/series info.";
+                    return;
+                }
+
+                _currentAnimeSeries = series;
+                DisplaySeriesInDrawer(series);
+            }
+            catch (Exception ex)
+            {
+                if (ProgressStatusTextBlock != null) ProgressStatusTextBlock.Text = $"Error: {ex.Message}";
+            }
+        }
 
         private async Task LoadAnimeSeriesAsync(string url)
         {
@@ -761,69 +796,96 @@ namespace UniversalDownloader.Avalonia
                 }
 
                 _currentAnimeSeries = series;
-
-                if (AnimeDrawerTitleText != null)
-                    AnimeDrawerTitleText.Text = !string.IsNullOrWhiteSpace(series.Title) ? series.Title : series.Slug;
-
-                if (AnimeDrawerMetaText != null)
-                {
-                    string yearStr = !string.IsNullOrWhiteSpace(series.Year) && series.Year != "0" ? series.Year : "";
-                    if (series.Dubs.Count == 0)
-                    {
-                        AnimeDrawerMetaText.Text = !string.IsNullOrWhiteSpace(yearStr) ? $"{yearStr} • Анонс" : "Анонс";
-                    }
-                    else
-                    {
-                        int count = series.TotalEpisodesCount > 0 ? series.TotalEpisodesCount : series.Dubs.Max(d => d.Episodes.Count);
-                        string meta = yearStr;
-                        if (count > 0)
-                        {
-                            meta = !string.IsNullOrWhiteSpace(meta) ? $"{meta} • {count} серий" : $"{count} серий";
-                        }
-                        AnimeDrawerMetaText.Text = meta;
-                    }
-                }
-
-                if (AnimeDubsComboBox != null)
-                {
-                    if (series.Dubs.Count > 0)
-                    {
-                        AnimeDubsComboBox.ItemsSource = series.Dubs;
-                        AnimeDubsComboBox.SelectedIndex = 0;
-                        if (AnimeDownloadSelectedButton != null)
-                        {
-                            AnimeDownloadSelectedButton.IsEnabled = true;
-                            AnimeDownloadSelectedButton.Content = "⬇ Скачать выбранные";
-                        }
-                    }
-                    else
-                    {
-                        _selectedAnimeDub = null;
-                        AnimeDubsComboBox.ItemsSource = null;
-                        if (AnimeEpisodesItemsControl != null)
-                        {
-                            AnimeEpisodesItemsControl.ItemsSource = null;
-                        }
-                        if (AnimeSelectedCountText != null)
-                        {
-                            AnimeSelectedCountText.Text = "Серии еще не вышли (Анонс)";
-                        }
-                        if (AnimeDownloadSelectedButton != null)
-                        {
-                            AnimeDownloadSelectedButton.IsEnabled = false;
-                            AnimeDownloadSelectedButton.Content = "❌ Серии не вышли";
-                        }
-                    }
-                }
-
-                if (AnimeDrawerGrid != null)
-                {
-                    AnimeDrawerGrid.IsVisible = true;
-                }
+                DisplaySeriesInDrawer(series);
             }
             catch (Exception ex)
             {
                 if (ProgressStatusTextBlock != null) ProgressStatusTextBlock.Text = $"Error: {ex.Message}";
+            }
+        }
+
+        private void DisplaySeriesInDrawer(AnimeSeriesInfo series)
+        {
+            if (AnimeDrawerCategoryText != null)
+            {
+                if (series.SourceService == "Kinogo")
+                {
+                    AnimeDrawerCategoryText.Text = series.IsMovie ? "🎬 ФИЛЬМ (КИНОГО)" : "🎬 СЕРИАЛ (КИНОГО)";
+                }
+                else
+                {
+                    AnimeDrawerCategoryText.Text = "🎬 АНИМЕ СЕРИИ";
+                }
+            }
+
+            if (AnimeDrawerFallbackText != null)
+            {
+                AnimeDrawerFallbackText.Text = series.SourceService == "Kinogo"
+                    ? "Авто: 1080p (Cinemar/VideoCDN/Alloha)"
+                    : "Авто: 1080p (CVH/Alloha) ➔ 720p (Kodik)";
+            }
+
+            if (AnimeDrawerTitleText != null)
+                AnimeDrawerTitleText.Text = !string.IsNullOrWhiteSpace(series.Title) ? series.Title : series.Slug;
+
+            if (AnimeDrawerMetaText != null)
+            {
+                string yearStr = !string.IsNullOrWhiteSpace(series.Year) && series.Year != "0" ? series.Year : "";
+                if (series.Dubs.Count == 0)
+                {
+                    AnimeDrawerMetaText.Text = !string.IsNullOrWhiteSpace(yearStr) ? $"{yearStr} • Анонс" : "Анонс";
+                }
+                else
+                {
+                    int count = series.TotalEpisodesCount > 0 ? series.TotalEpisodesCount : series.Dubs.Max(d => d.Episodes.Count);
+                    string meta = yearStr;
+                    if (series.IsMovie)
+                    {
+                        meta = !string.IsNullOrWhiteSpace(meta) ? $"{meta} • Фильм" : "Фильм";
+                    }
+                    else if (count > 0)
+                    {
+                        meta = !string.IsNullOrWhiteSpace(meta) ? $"{meta} • {count} серий" : $"{count} серий";
+                    }
+                    AnimeDrawerMetaText.Text = meta;
+                }
+            }
+
+            if (AnimeDubsComboBox != null)
+            {
+                if (series.Dubs.Count > 0)
+                {
+                    AnimeDubsComboBox.ItemsSource = series.Dubs;
+                    AnimeDubsComboBox.SelectedIndex = 0;
+                    if (AnimeDownloadSelectedButton != null)
+                    {
+                        AnimeDownloadSelectedButton.IsEnabled = true;
+                        AnimeDownloadSelectedButton.Content = series.IsMovie ? "⬇ Скачать фильм" : "⬇ Скачать выбранные";
+                    }
+                }
+                else
+                {
+                    _selectedAnimeDub = null;
+                    AnimeDubsComboBox.ItemsSource = null;
+                    if (AnimeEpisodesItemsControl != null)
+                    {
+                        AnimeEpisodesItemsControl.ItemsSource = null;
+                    }
+                    if (AnimeSelectedCountText != null)
+                    {
+                        AnimeSelectedCountText.Text = "Серии еще не вышли (Анонс)";
+                    }
+                    if (AnimeDownloadSelectedButton != null)
+                    {
+                        AnimeDownloadSelectedButton.IsEnabled = false;
+                        AnimeDownloadSelectedButton.Content = "❌ Серии не вышли";
+                    }
+                }
+            }
+
+            if (AnimeDrawerGrid != null)
+            {
+                AnimeDrawerGrid.IsVisible = true;
             }
         }
 
@@ -849,15 +911,30 @@ namespace UniversalDownloader.Avalonia
 
             if (AnimeSelectedCountText != null)
             {
-                AnimeSelectedCountText.Text = $"Выбрано: {selectedCount} из {totalCount}";
+                if (_currentAnimeSeries?.IsMovie == true)
+                {
+                    AnimeSelectedCountText.Text = "Фильм готов к скачиванию";
+                }
+                else
+                {
+                    AnimeSelectedCountText.Text = $"Выбрано: {selectedCount} из {totalCount}";
+                }
             }
 
             if (AnimeDownloadSelectedButton != null)
             {
-                AnimeDownloadSelectedButton.IsEnabled = selectedCount > 0;
-                AnimeDownloadSelectedButton.Content = selectedCount == totalCount
-                    ? $"⬇ Скачать все ({totalCount} серий)"
-                    : $"⬇ Скачать выбранные ({selectedCount})";
+                if (_currentAnimeSeries?.IsMovie == true)
+                {
+                    AnimeDownloadSelectedButton.Content = "⬇ Скачать фильм";
+                    AnimeDownloadSelectedButton.IsEnabled = true;
+                }
+                else
+                {
+                    AnimeDownloadSelectedButton.Content = selectedCount == totalCount
+                        ? $"⬇ Скачать все ({totalCount} серий)"
+                        : $"⬇ Скачать выбранные ({selectedCount})";
+                    AnimeDownloadSelectedButton.IsEnabled = selectedCount > 0;
+                }
             }
         }
 
@@ -890,36 +967,82 @@ namespace UniversalDownloader.Avalonia
 
             if (AnimeDrawerGrid != null) AnimeDrawerGrid.IsVisible = false;
 
+            bool downloadSubs = AnimeDownloadSubsCheckBox?.IsChecked == true;
             int enqueuedCount = 0;
+
             foreach (var ep in selectedEpisodes)
             {
-                var playerToUse = ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Aksor", StringComparison.OrdinalIgnoreCase))
+                AnimePlayerInfo? playerToUse;
+                if (_currentAnimeSeries.SourceService == "Kinogo")
+                {
+                    playerToUse = ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Cinemar", StringComparison.OrdinalIgnoreCase))
+                               ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("VideoCDN", StringComparison.OrdinalIgnoreCase))
+                               ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Alloha", StringComparison.OrdinalIgnoreCase))
+                               ?? ep.SelectedPlayer
+                               ?? ep.Players.FirstOrDefault();
+                }
+                else
+                {
+                    playerToUse = ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Aksor", StringComparison.OrdinalIgnoreCase))
                                ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("CVH", StringComparison.OrdinalIgnoreCase))
                                ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Sibnet", StringComparison.OrdinalIgnoreCase))
                                ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Alloha", StringComparison.OrdinalIgnoreCase))
                                ?? ep.Players.FirstOrDefault(p => p.PlayerName.Contains("Kodik", StringComparison.OrdinalIgnoreCase))
                                ?? ep.SelectedPlayer
                                ?? ep.Players.FirstOrDefault();
-
-                string rawUrl = playerToUse?.IframeUrl ?? $"https://ru.yummyani.me/catalog/item/{_currentAnimeSeries.Slug}?episode={ep.EpisodeNumber}";
-                string resolvedUrl = string.Empty;
-                try
-                {
-                    resolvedUrl = await _yummyAnimeService.ResolveEpisodeDownloadUrlAsync(rawUrl);
                 }
-                catch { }
-                if (string.IsNullOrWhiteSpace(resolvedUrl)) resolvedUrl = rawUrl;
 
-                string itemTitle = _selectedAnimeDub.Episodes.Count == 1 && ep.EpisodeNumber == 1
-                    ? $"{_currentAnimeSeries.Title} [{_selectedAnimeDub.Name}]"
-                    : $"{_currentAnimeSeries.Title} - E{ep.EpisodeNumber:D2} [{_selectedAnimeDub.Name}]";
+                string rawUrl = playerToUse?.IframeUrl ?? string.Empty;
+                string resolvedUrl = string.Empty;
+
+                if (_currentAnimeSeries.SourceService == "Kinogo" && playerToUse != null)
+                {
+                    try
+                    {
+                        resolvedUrl = await _kinogoService.ResolveEpisodeDownloadUrlAsync(playerToUse) ?? "";
+                    }
+                    catch { }
+                }
+                else if (!string.IsNullOrWhiteSpace(rawUrl))
+                {
+                    try
+                    {
+                        resolvedUrl = await _yummyAnimeService.ResolveEpisodeDownloadUrlAsync(rawUrl);
+                    }
+                    catch { }
+                }
+
+                if (string.IsNullOrWhiteSpace(resolvedUrl))
+                {
+                    resolvedUrl = !string.IsNullOrWhiteSpace(rawUrl) 
+                        ? rawUrl 
+                        : $"https://ru.yummyani.me/catalog/item/{_currentAnimeSeries.Slug}?episode={ep.EpisodeNumber}";
+                }
+
+                string itemTitle;
+                if (_currentAnimeSeries.IsMovie || (_selectedAnimeDub.Episodes.Count == 1 && ep.EpisodeNumber == 1))
+                {
+                    itemTitle = $"{_currentAnimeSeries.Title} [{_selectedAnimeDub.Name}]";
+                }
+                else if (ep.SeasonNumber > 1 || !string.IsNullOrWhiteSpace(ep.SeasonTitle))
+                {
+                    itemTitle = $"{_currentAnimeSeries.Title} - S{ep.SeasonNumber:D2}E{ep.EpisodeNumber:D2} [{_selectedAnimeDub.Name}]";
+                }
+                else
+                {
+                    itemTitle = $"{_currentAnimeSeries.Title} - E{ep.EpisodeNumber:D2} [{_selectedAnimeDub.Name}]";
+                }
 
                 var qItem = new DownloadQueueItem
                 {
                     Title = itemTitle,
                     Url = resolvedUrl,
                     FormatCode = "bestvideo+bestaudio/best",
-                    DestinationFolder = _downloadFolder
+                    DestinationFolder = _downloadFolder,
+                    DownloadSubtitles = downloadSubs,
+                    SubtitleTracks = playerToUse?.Subtitles != null && playerToUse.Subtitles.Count > 0
+                        ? new List<SubtitleTrackInfo>(playerToUse.Subtitles)
+                        : new List<SubtitleTrackInfo>(ep.Subtitles)
                 };
 
                 _queueManager.Enqueue(qItem);
@@ -929,9 +1052,11 @@ namespace UniversalDownloader.Avalonia
             if (ProgressBorder != null)
             {
                 ProgressBorder.IsVisible = true;
-                ProgressStatusTextBlock.Text = $"Added {enqueuedCount} episodes to Download Queue! 🍿";
+                string label = _currentAnimeSeries.IsMovie ? "Added movie to Download Queue! 🍿" : $"Added {enqueuedCount} episodes to Download Queue! 🍿";
+                ProgressStatusTextBlock.Text = label;
             }
         }
+
 
         private void AnimeDrawerClose_Click(object? sender, RoutedEventArgs e)
         {
