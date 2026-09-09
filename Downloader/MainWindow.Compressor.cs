@@ -22,6 +22,7 @@ namespace UniversalDownloader
         public ObservableCollection<VideoCompressorItem> CompressorItems { get; } = new();
         private CancellationTokenSource? _compressorCts;
         private bool _isCompressingActive = false;
+        private string? _manualDestinationFolder = null;
 
         private void InitializeVideoCompressor()
         {
@@ -51,10 +52,7 @@ namespace UniversalDownloader
             if (CompressorScrollViewer != null)
             {
                 CompressorScrollViewer.Visibility = Visibility.Visible;
-                if (CompressorDestinationTextBox != null && !string.IsNullOrEmpty(SelectedDirectory))
-                {
-                    CompressorDestinationTextBox.Text = SelectedDirectory;
-                }
+                UpdateCompressorDestinationText();
             }
         }
 
@@ -127,6 +125,7 @@ namespace UniversalDownloader
                 }
             }
 
+            UpdateCompressorDestinationText();
             UpdateCompressorUiStates();
         }
 
@@ -135,6 +134,7 @@ namespace UniversalDownloader
             if (sender is Button btn && btn.Tag is VideoCompressorItem item)
             {
                 CompressorItems.Remove(item);
+                UpdateCompressorDestinationText();
                 UpdateCompressorUiStates();
             }
         }
@@ -142,6 +142,7 @@ namespace UniversalDownloader
         private void CompressorClearAll_Click(object sender, RoutedEventArgs e)
         {
             CompressorItems.Clear();
+            UpdateCompressorDestinationText();
             UpdateCompressorUiStates();
         }
 
@@ -151,14 +152,57 @@ namespace UniversalDownloader
             {
                 Description = "Select Compressed Videos Output Folder",
                 UseDescriptionForTitle = true,
-                SelectedPath = CompressorDestinationTextBox?.Text ?? SelectedDirectory ?? ""
+                SelectedPath = _manualDestinationFolder ?? (CompressorItems.Count > 0 ? Path.GetDirectoryName(CompressorItems[0].InputPath) ?? "" : SelectedDirectory ?? "")
             };
-            if (dialog.ShowDialog(this) == true)
+            if (dialog.ShowDialog(this) == true && !string.IsNullOrWhiteSpace(dialog.SelectedPath))
             {
-                if (CompressorDestinationTextBox != null)
+                _manualDestinationFolder = dialog.SelectedPath;
+                if (CompressorAutoSubfolderCheckBox != null)
                 {
-                    CompressorDestinationTextBox.Text = dialog.SelectedPath;
+                    CompressorAutoSubfolderCheckBox.IsChecked = false;
                 }
+                UpdateCompressorDestinationText();
+            }
+        }
+
+        private void CompressorResetDestination_Click(object sender, RoutedEventArgs e)
+        {
+            _manualDestinationFolder = null;
+            if (CompressorAutoSubfolderCheckBox != null)
+            {
+                CompressorAutoSubfolderCheckBox.IsChecked = true;
+            }
+            UpdateCompressorDestinationText();
+        }
+
+        private void CompressorAutoSubfolderCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (CompressorAutoSubfolderCheckBox?.IsChecked == true)
+            {
+                _manualDestinationFolder = null;
+            }
+            UpdateCompressorDestinationText();
+        }
+
+        private void UpdateCompressorDestinationText()
+        {
+            if (CompressorDestinationTextBox == null) return;
+
+            bool useAuto = CompressorAutoSubfolderCheckBox?.IsChecked ?? true;
+            if (!useAuto && !string.IsNullOrWhiteSpace(_manualDestinationFolder))
+            {
+                CompressorDestinationTextBox.Text = _manualDestinationFolder;
+            }
+            else if (CompressorItems.Count > 0)
+            {
+                string firstDir = Path.GetDirectoryName(CompressorItems[0].InputPath) ?? "";
+                CompressorDestinationTextBox.Text = !string.IsNullOrEmpty(firstDir)
+                    ? Path.Combine(firstDir, "Compressed")
+                    : "Automatic: [Source Directory]\\Compressed";
+            }
+            else
+            {
+                CompressorDestinationTextBox.Text = "Automatic: [Source Directory]\\Compressed";
             }
         }
 
@@ -262,10 +306,34 @@ namespace UniversalDownloader
 
             if (CompressorItems.Count == 0) return;
 
-            string targetFolder = CompressorDestinationTextBox?.Text?.Trim() ?? SelectedDirectory ?? "";
-            if (string.IsNullOrWhiteSpace(targetFolder) || !Directory.Exists(targetFolder))
+            bool useAuto = CompressorAutoSubfolderCheckBox?.IsChecked ?? true;
+            string targetFolder = "";
+
+            if (!useAuto && !string.IsNullOrWhiteSpace(_manualDestinationFolder))
             {
-                ModernMessageBox.Show("Please select a valid output folder for compressed videos.", "Output Folder Required", MessageBoxButton.OK, MessageBoxImage.Warning, this);
+                targetFolder = _manualDestinationFolder;
+            }
+            else if (CompressorItems.Count > 0)
+            {
+                string sourceDir = Path.GetDirectoryName(CompressorItems[0].InputPath) ?? "";
+                targetFolder = Path.Combine(sourceDir, "Compressed");
+            }
+
+            if (string.IsNullOrWhiteSpace(targetFolder))
+            {
+                targetFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "Compressed");
+            }
+
+            try
+            {
+                if (!Directory.Exists(targetFolder))
+                {
+                    Directory.CreateDirectory(targetFolder);
+                }
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Could not create output folder '{targetFolder}': {ex.Message}", "Folder Error", MessageBoxButton.OK, MessageBoxImage.Error, this);
                 return;
             }
 
@@ -352,15 +420,24 @@ namespace UniversalDownloader
                     _compressorCts.Token.ThrowIfCancellationRequested();
 
                     string originalBaseName = Path.GetFileNameWithoutExtension(item.InputPath);
-                    string extension = codec == VideoCodec.AV1 ? ".mp4" : ".mp4";
-                    string outputFileName = $"{originalBaseName}_compressed{extension}";
+                    string extension = ".mp4";
+                    string outputFileName = $"{originalBaseName}{extension}";
                     string finalOutputPath = Path.Combine(targetFolder, outputFileName);
 
-                    int counter = 1;
-                    while (File.Exists(finalOutputPath))
+                    // If target path happens to collide with original input file, append _compressed to avoid self-overwrite
+                    if (string.Equals(Path.GetFullPath(finalOutputPath), Path.GetFullPath(item.InputPath), StringComparison.OrdinalIgnoreCase))
                     {
-                        finalOutputPath = Path.Combine(targetFolder, $"{originalBaseName}_compressed_{counter}{extension}");
-                        counter++;
+                        outputFileName = $"{originalBaseName}_compressed{extension}";
+                        finalOutputPath = Path.Combine(targetFolder, outputFileName);
+                    }
+                    else
+                    {
+                        int counter = 1;
+                        while (File.Exists(finalOutputPath))
+                        {
+                            finalOutputPath = Path.Combine(targetFolder, $"{originalBaseName}_{counter}{extension}");
+                            counter++;
+                        }
                     }
 
                     item.OutputPath = finalOutputPath;

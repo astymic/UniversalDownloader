@@ -472,11 +472,18 @@
                             </Grid>
 
                             <!-- Output Folder -->
-                            <StackPanel Spacing="4">
+                            <StackPanel Spacing="6">
+                                <CheckBox x:Name="AvaloniaCompressorAutoFolderCheckBox" 
+                                          Content="📁 Save into 'Compressed' subfolder in source directory (Default)" 
+                                          IsChecked="True" 
+                                          FontSize="12" 
+                                          FontWeight="SemiBold"
+                                          IsCheckedChanged="AvaloniaCompressorAutoFolder_CheckedChanged"/>
                                 <TextBlock Text="Output Folder:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBox x:Name="AvaloniaCompressorFolderTextBox" Grid.Column="0" IsReadOnly="True" Height="40" CornerRadius="8"/>
-                                    <Button Grid.Column="1" Classes="secondary" Content="Browse..." Margin="8,0,0,0" Height="40" Click="AvaloniaCompressorBrowseFolder_Click"/>
+                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                    <TextBox x:Name="AvaloniaCompressorFolderTextBox" Grid.Column="0" IsReadOnly="True" Text="Automatic: [Source Directory]/Compressed" Height="40" CornerRadius="8"/>
+                                    <Button Grid.Column="1" Classes="secondary" Content="Browse Custom..." Margin="8,0,0,0" Height="40" Click="AvaloniaCompressorBrowseFolder_Click"/>
+                                    <Button Grid.Column="2" Classes="secondary" Content="Reset" Margin="8,0,0,0" Height="40" Click="AvaloniaCompressorResetFolder_Click"/>
                                 </Grid>
                             </StackPanel>
 

@@ -37,6 +37,7 @@ namespace UniversalDownloader.Avalonia
         public ObservableCollection<VideoCompressorItem> AvaloniaCompressorItems { get; } = new();
         private CancellationTokenSource? _avaloniaCompressorCts;
         private bool _isAvaloniaCompressing = false;
+        private string? _manualAvaloniaFolder = null;
 
         private string _downloadFolder;
         private SearchMode _currentSearchMode = SearchMode.SmartMusic;
@@ -98,7 +99,7 @@ namespace UniversalDownloader.Avalonia
             QueueItemsControl.ItemsSource = _queueManager.Items;
             HistoryItemsControl.ItemsSource = _historyService.Items;
             if (AvaloniaCompressorItemsControl != null) AvaloniaCompressorItemsControl.ItemsSource = AvaloniaCompressorItems;
-            if (AvaloniaCompressorFolderTextBox != null) AvaloniaCompressorFolderTextBox.Text = _downloadFolder;
+            UpdateAvaloniaCompressorDestinationText();
             if (AvaloniaCompressorDropZone != null)
             {
                 DragDrop.SetAllowDrop(AvaloniaCompressorDropZone, true);
@@ -167,7 +168,7 @@ namespace UniversalDownloader.Avalonia
         private void NavMain_Click(object? sender, RoutedEventArgs e) { HideAllViews(); MainScrollViewer.IsVisible = true; }
         private void NavSearch_Click(object? sender, RoutedEventArgs e) { HideAllViews(); SearchScrollViewer.IsVisible = true; }
         private void NavQueue_Click(object? sender, RoutedEventArgs e) { HideAllViews(); QueueScrollViewer.IsVisible = true; }
-        private void NavCompressor_Click(object? sender, RoutedEventArgs e) { HideAllViews(); if (CompressorScrollViewer != null) CompressorScrollViewer.IsVisible = true; }
+        private void NavCompressor_Click(object? sender, RoutedEventArgs e) { HideAllViews(); if (CompressorScrollViewer != null) { CompressorScrollViewer.IsVisible = true; UpdateAvaloniaCompressorDestinationText(); } }
         private void NavHistory_Click(object? sender, RoutedEventArgs e) { _historyService.LoadHistory(); HideAllViews(); HistoryScrollViewer.IsVisible = true; }
         private void NavSettings_Click(object? sender, RoutedEventArgs e) { HideAllViews(); SettingsScrollViewer.IsVisible = true; }
         private void NavLiveStream_Click(object? sender, RoutedEventArgs e) { HideAllViews(); LiveStreamScrollViewer.IsVisible = true; UpdateLiveStreamUI(); }
@@ -1151,6 +1152,8 @@ namespace UniversalDownloader.Avalonia
                     OriginalSizeFormatted = Utilities.FormatBytesOutput(fi.Length),
                     Status = "Ready to compress"
                 });
+
+                UpdateAvaloniaCompressorDestinationText();
             }
         }
 
@@ -1181,6 +1184,7 @@ namespace UniversalDownloader.Avalonia
         private void AvaloniaCompressorClear_Click(object? sender, RoutedEventArgs e)
         {
             AvaloniaCompressorItems.Clear();
+            UpdateAvaloniaCompressorDestinationText();
             UpdateAvaloniaCompressorEmptyState();
         }
 
@@ -1189,6 +1193,7 @@ namespace UniversalDownloader.Avalonia
             if (sender is Button btn && btn.Tag is VideoCompressorItem item)
             {
                 AvaloniaCompressorItems.Remove(item);
+                UpdateAvaloniaCompressorDestinationText();
                 UpdateAvaloniaCompressorEmptyState();
             }
         }
@@ -1214,10 +1219,53 @@ namespace UniversalDownloader.Avalonia
 
             if (folders != null && folders.Count > 0)
             {
-                if (AvaloniaCompressorFolderTextBox != null)
+                _manualAvaloniaFolder = folders[0].Path.LocalPath;
+                if (AvaloniaCompressorAutoFolderCheckBox != null)
                 {
-                    AvaloniaCompressorFolderTextBox.Text = folders[0].Path.LocalPath;
+                    AvaloniaCompressorAutoFolderCheckBox.IsChecked = false;
                 }
+                UpdateAvaloniaCompressorDestinationText();
+            }
+        }
+
+        private void AvaloniaCompressorAutoFolder_CheckedChanged(object? sender, RoutedEventArgs e)
+        {
+            if (AvaloniaCompressorAutoFolderCheckBox?.IsChecked == true)
+            {
+                _manualAvaloniaFolder = null;
+            }
+            UpdateAvaloniaCompressorDestinationText();
+        }
+
+        private void AvaloniaCompressorResetFolder_Click(object? sender, RoutedEventArgs e)
+        {
+            _manualAvaloniaFolder = null;
+            if (AvaloniaCompressorAutoFolderCheckBox != null)
+            {
+                AvaloniaCompressorAutoFolderCheckBox.IsChecked = true;
+            }
+            UpdateAvaloniaCompressorDestinationText();
+        }
+
+        private void UpdateAvaloniaCompressorDestinationText()
+        {
+            if (AvaloniaCompressorFolderTextBox == null) return;
+
+            bool useAuto = AvaloniaCompressorAutoFolderCheckBox?.IsChecked ?? true;
+            if (!useAuto && !string.IsNullOrWhiteSpace(_manualAvaloniaFolder))
+            {
+                AvaloniaCompressorFolderTextBox.Text = _manualAvaloniaFolder;
+            }
+            else if (AvaloniaCompressorItems.Count > 0)
+            {
+                string firstDir = Path.GetDirectoryName(AvaloniaCompressorItems[0].InputPath) ?? "";
+                AvaloniaCompressorFolderTextBox.Text = !string.IsNullOrEmpty(firstDir)
+                    ? Path.Combine(firstDir, "Compressed")
+                    : "Automatic: [Source Directory]/Compressed";
+            }
+            else
+            {
+                AvaloniaCompressorFolderTextBox.Text = "Automatic: [Source Directory]/Compressed";
             }
         }
 
@@ -1276,10 +1324,22 @@ namespace UniversalDownloader.Avalonia
                 return;
             }
 
-            string outFolder = AvaloniaCompressorFolderTextBox?.Text?.Trim() ?? _downloadFolder;
+            bool useAuto = AvaloniaCompressorAutoFolderCheckBox?.IsChecked ?? true;
+            string outFolder = "";
+
+            if (!useAuto && !string.IsNullOrWhiteSpace(_manualAvaloniaFolder))
+            {
+                outFolder = _manualAvaloniaFolder;
+            }
+            else if (AvaloniaCompressorItems.Count > 0)
+            {
+                string sourceDir = Path.GetDirectoryName(AvaloniaCompressorItems[0].InputPath) ?? "";
+                outFolder = Path.Combine(sourceDir, "Compressed");
+            }
+
             if (string.IsNullOrWhiteSpace(outFolder))
             {
-                outFolder = _downloadFolder;
+                outFolder = Path.Combine(_downloadFolder, "Compressed");
             }
 
             try
@@ -1372,13 +1432,25 @@ namespace UniversalDownloader.Avalonia
                     item.Status = "Compressing...";
                     item.Progress = 0;
 
-                    string fileNameWithoutExt = Path.GetFileNameWithoutExtension(item.InputPath);
-                    string outPath = Path.Combine(outFolder, $"{fileNameWithoutExt}_compressed.mp4");
-                    int counter = 1;
-                    while (File.Exists(outPath))
+                    string originalBaseName = Path.GetFileNameWithoutExtension(item.InputPath);
+                    string extension = ".mp4";
+                    string outputFileName = $"{originalBaseName}{extension}";
+                    string outPath = Path.Combine(outFolder, outputFileName);
+
+                    // If target path happens to collide with original input file, append _compressed to avoid self-overwrite
+                    if (string.Equals(Path.GetFullPath(outPath), Path.GetFullPath(item.InputPath), StringComparison.OrdinalIgnoreCase))
                     {
-                        outPath = Path.Combine(outFolder, $"{fileNameWithoutExt}_compressed_{counter}.mp4");
-                        counter++;
+                        outputFileName = $"{originalBaseName}_compressed{extension}";
+                        outPath = Path.Combine(outFolder, outputFileName);
+                    }
+                    else
+                    {
+                        int counter = 1;
+                        while (File.Exists(outPath))
+                        {
+                            outPath = Path.Combine(outFolder, $"{originalBaseName}_{counter}{extension}");
+                            counter++;
+                        }
                     }
                     item.OutputPath = outPath;
 

@@ -1793,15 +1793,27 @@
                                 </Grid>
 
                                 <!-- Output Folder Destination -->
-                                <TextBlock Text="Output Destination:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,6"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="CompressorDestinationTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" IsReadOnly="True" Text="Select output folder..." Margin="0,0,12,0"/>
-                                    <Button Grid.Column="1" Content="Browse" Style="{StaticResource SecondaryButton}" Padding="20,10" Click="CompressorBrowseDestination_Click"/>
-                                </Grid>
+                                <StackPanel Margin="0,0,0,4">
+                                    <CheckBox x:Name="CompressorAutoSubfolderCheckBox" 
+                                              Content="📁 Save into 'Compressed' subfolder in source directory (Default)" 
+                                              IsChecked="True" 
+                                              Foreground="{StaticResource TextPrimaryBrush}" 
+                                              FontSize="12.5" 
+                                              FontWeight="SemiBold"
+                                              Click="CompressorAutoSubfolderCheckBox_Click"
+                                              Margin="0,0,0,8"/>
+                                    <TextBlock Text="Output Destination:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,6"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="CompressorDestinationTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" IsReadOnly="True" Text="Automatic: [Source Directory]\Compressed" Margin="0,0,8,0"/>
+                                        <Button Grid.Column="1" Content="Browse Custom..." Style="{StaticResource SecondaryButton}" Padding="14,10" Click="CompressorBrowseDestination_Click" Margin="0,0,8,0"/>
+                                        <Button x:Name="CompressorResetDestinationButton" Grid.Column="2" Content="Reset" Style="{StaticResource SecondaryButton}" Padding="12,10" Click="CompressorResetDestination_Click" ToolTip="Reset to automatic source subfolder"/>
+                                    </Grid>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
