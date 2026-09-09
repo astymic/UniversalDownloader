@@ -1,6 +1,6 @@
 # Universal Downloader
 
-A modern, high-performance, cross-platform desktop workstation (**Windows & Linux**) for searching, identifying, downloading, converting, and queuing media files from YouTube, Spotify, SoundCloud, TikTok, Instagram, Twitter/X, Anime portals, and over 1,000+ supported sites.
+A modern, high-performance, cross-platform desktop workstation (**Windows & Linux**) for searching, identifying, downloading, converting, compressing, and queuing media files from YouTube, Spotify, SoundCloud, TikTok, Instagram, Twitter/X, Anime portals, and over 1,000+ supported sites.
 
 ---
 
@@ -63,12 +63,16 @@ A modern, high-performance, cross-platform desktop workstation (**Windows & Linu
 
 ### 🗜️ Smart Video Compressor (Right Sidebar Tab)
 - **Visually Lossless by Default** — Reduces video file sizes massively with zero noticeable visual quality degradation using tuned Constant Rate Factor (`CRF 20`) and high-efficiency encoder presets.
-- **Target File Size Optimization (e.g. 25MB Discord)** — Automated two-pass bitrate calculation and allocation with safety margin for container overhead, perfectly sizing videos for Discord, email, or web upload limits.
-- **Multiple Compression Presets** — Visually Lossless, Balanced (Web & Discord), Maximum Compression (Smallest size), Target File Size, and full Custom parameters.
-- **Next-Gen Codec Support** — Encode with **H.264 / AVC** (universal compatibility), **H.265 / HEVC** (high efficiency), or **AV1** (`libsvtav1`, ultra compression).
+- **GPU & CPU Hardware Acceleration** — High-speed hardware-accelerated encoding with support for **NVIDIA NVENC**, **Intel QuickSync (QSV)**, and **AMD AMF** (defaulting to GPU), with automatic runtime detection and seamless CPU software fallback.
+- **Multi-File Batch Queue & Drag-and-Drop** — Multi-select dialog or drag-and-drop multiple video files simultaneously. Sequential queue processing with per-item and total batch progress indicators.
+- **Live ETA & Time Spent Tracking** — Real-time time remaining estimation ("Time Left") for active files and the total batch, accompanied by persistent elapsed time recording per completed video.
+- **Target File Size Optimization (e.g. 25MB Discord)** — Automated two-pass bitrate calculation with container overhead safety margins, perfectly sizing videos for Discord, email, or web upload limits.
+- **Smart Directory Organization** — Automatically exports compressed files into a dedicated `Compressed/` subfolder at the source location, preserving original filenames without renaming or overwriting, with an optional manual custom destination path.
+- **Instant Process Tree Termination & Cleanup** — Removing a running file from the queue, stopping compression, or clearing all items immediately terminates the underlying `ffmpeg` process tree (with `taskkill` fallback) and wipes incomplete partial files, seamlessly continuing the rest of the queue.
+- **Multiple Compression Presets** — Visually Lossless, Balanced (Web & Discord), Maximum Compression (Smallest size), Target File Size, and full Custom parameters housed in a clean collapsible settings drawer.
+- **Next-Gen Codec Support** — Encode with **H.264 / AVC** (universal compatibility), **H.265 / HEVC** (high efficiency), or **AV1** (`libsvtav1`, `av1_nvenc`, `av1_qsv`, `av1_amf`, ultra compression).
 - **Flexible Downscaling & FPS Capping** — Downscale 4K/2K to 1080p, 720p, or 480p, and optionally cap framerates to 60, 30, or 24 FPS.
 - **Audio Modes** — Lossless passthrough stream copy, compact AAC 128 kbps, HQ AAC 192 kbps, or strip audio entirely (Mute).
-- **Drag & Drop Batch Queue** — Drop multiple video files directly into the compressor zone, track real-time multi-pass progress, and see instant percentage savings comparisons.
 
 ### 📜 Download History & Metadata
 - Filterable and searchable history log with direct file opening, folder navigation, and URL copying.

@@ -111,10 +111,14 @@ jobs:
             A modern, fast, multi-platform media downloader, converter, and audio identification workstation for **Windows** and **Linux**.
 
             ### ✨ What's New in ${{ github.ref_name }}:
+            * 🗜️ **Smart Video Compressor** — High-performance video compression with visually lossless defaults (`CRF 20`), target file size optimizer (e.g. Discord 25MB), and custom parameter presets.
+            * ⚡ **GPU & CPU Hardware Acceleration** — Accelerated encoding with NVIDIA NVENC, Intel QSV, and AMD AMF (defaulting to GPU), with automatic runtime detection and seamless CPU software fallback.
+            * 📋 **Multi-File Batch Queue & Live ETA** — Batch drag-and-drop and multi-selection, real-time "Time Left" countdown for active files and batch, and completed time spent tracking.
+            * 📁 **Smart Output Folder Organization** — Automatically exports compressed videos into a dedicated `Compressed/` subfolder at source with original filenames preserved, plus optional manual path selection.
+            * 🛑 **Instant Process Tree Termination & Cleanup** — Deleting an active video or stopping compression immediately kills the underlying ffmpeg process tree (with `taskkill` fallback) and cleans up partial files without interrupting the rest of the queue.
             * 🎬 **Alloha Player 1080p Support** — High-definition stream decryption with built-in V8 engine resolver and automatic stream header injection.
             * 🛡️ **Organization PC & SmartScreen Protection** — Authenticode digital signing with RFC 3161 timestamping, automatic Zone.Identifier unblocking, and ZIP package distribution.
             * 🔄 **Enhanced Auto-Updater** — Toggle auto-updates on/off in Settings, automatic rollback backup (`.bak`), and seamless restart.
-            * ⚡ **Performance & Bug Fixes** — Instant queue progress reporting and robust media stream resolvers.
 
             ---
 

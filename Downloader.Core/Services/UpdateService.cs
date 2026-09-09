@@ -74,7 +74,7 @@ namespace UniversalDownloader.Services
             }
             catch { }
 
-            return "1.0.13";
+            return "1.0.14";
         }
 
         private static string NormalizeVersion(Version version)
