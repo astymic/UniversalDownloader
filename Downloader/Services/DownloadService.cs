@@ -1111,9 +1111,21 @@ namespace UniversalDownloader.Services
         {
             if (string.IsNullOrWhiteSpace(url)) return;
 
-            if (url.Contains("vkvideo.cloud", StringComparison.OrdinalIgnoreCase) ||
-                url.Contains("allplay", StringComparison.OrdinalIgnoreCase) ||
-                url.Contains("alloha", StringComparison.OrdinalIgnoreCase))
+            if (url.Contains("interkh.com", StringComparison.OrdinalIgnoreCase) ||
+                url.Contains("ortified.ws", StringComparison.OrdinalIgnoreCase) ||
+                url.Contains("cinemar.cc", StringComparison.OrdinalIgnoreCase) ||
+                url.Contains("showvid.ws", StringComparison.OrdinalIgnoreCase))
+            {
+                psi.ArgumentList.Add("--user-agent");
+                psi.ArgumentList.Add("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36");
+                psi.ArgumentList.Add("--referer");
+                psi.ArgumentList.Add("https://api.ortified.ws/");
+                psi.ArgumentList.Add("--add-header");
+                psi.ArgumentList.Add("Origin:https://api.ortified.ws");
+            }
+            else if (url.Contains("vkvideo.cloud", StringComparison.OrdinalIgnoreCase) ||
+                     url.Contains("allplay", StringComparison.OrdinalIgnoreCase) ||
+                     url.Contains("alloha", StringComparison.OrdinalIgnoreCase))
             {
                 psi.ArgumentList.Add("--user-agent");
                 psi.ArgumentList.Add("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
@@ -1121,6 +1133,11 @@ namespace UniversalDownloader.Services
                 psi.ArgumentList.Add("https://alloha.yani.tv/");
                 psi.ArgumentList.Add("--add-header");
                 psi.ArgumentList.Add("Origin:https://alloha.yani.tv");
+            }
+            else
+            {
+                psi.ArgumentList.Add("--user-agent");
+                psi.ArgumentList.Add("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36");
             }
         }
 
@@ -1821,6 +1838,10 @@ namespace UniversalDownloader.Services
                 else if (dlContent.Contains("has already been downloaded"))
                 {
                     EmitProgress("File already downloaded.", null, 100, false);
+                }
+                else if (dlContent.Contains("Got error:") || dlContent.Contains("Retrying"))
+                {
+                    EmitProgress("Retrying stream connection...", null, lastPercentage, true);
                 }
                 else
                 {

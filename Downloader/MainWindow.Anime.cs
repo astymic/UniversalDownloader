@@ -353,11 +353,40 @@ namespace UniversalDownloader
                         : $"https://ru.yummyani.me/catalog/item/{_currentAnimeSeries.Slug}?episode={ep.EpisodeNumber}&dub={Uri.EscapeDataString(_selectedAnimeDub.Name)}";
                 }
 
+                string formatCode = playerToUse?.FormatCode ?? "bestvideo+bestaudio/best";
+                if (formatCode == "bestvideo+bestaudio/best" && !string.IsNullOrWhiteSpace(_selectedAnimeDub.Name))
+                {
+                    string dubName = _selectedAnimeDub.Name;
+                    if (dubName.Contains("Eng", StringComparison.OrdinalIgnoreCase) ||
+                        dubName.Contains("Original", StringComparison.OrdinalIgnoreCase) ||
+                        dubName.Contains("English", StringComparison.OrdinalIgnoreCase) ||
+                        dubName.Contains("Англ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        formatCode = "bestvideo+bestaudio[language^=en]/bestvideo+bestaudio[format_id*=eng]/bestvideo+bestaudio/best";
+                    }
+                    else if (dubName.Contains("Рус", StringComparison.OrdinalIgnoreCase) ||
+                             dubName.Contains("Дубл", StringComparison.OrdinalIgnoreCase) ||
+                             dubName.Contains("Rus", StringComparison.OrdinalIgnoreCase))
+                    {
+                        formatCode = "bestvideo+bestaudio[language^=ru]/bestvideo+bestaudio[format_id*=rus]/bestvideo+bestaudio/best";
+                    }
+                    else if (dubName.Contains("Укр", StringComparison.OrdinalIgnoreCase) ||
+                             dubName.Contains("Ukr", StringComparison.OrdinalIgnoreCase))
+                    {
+                        formatCode = "bestvideo+bestaudio[language^=uk]/bestvideo+bestaudio[format_id*=ukr]/bestvideo+bestaudio/best";
+                    }
+                    else if (dubName.Contains("Япон", StringComparison.OrdinalIgnoreCase) ||
+                             dubName.Contains("Jap", StringComparison.OrdinalIgnoreCase))
+                    {
+                        formatCode = "bestvideo+bestaudio[language^=ja]/bestvideo+bestaudio[format_id*=jap]/bestvideo+bestaudio/best";
+                    }
+                }
+
                 var qItem = new DownloadQueueItem
                 {
                     Title = itemTitle,
                     Url = resolvedUrl,
-                    FormatCode = "bestvideo+bestaudio/best",
+                    FormatCode = formatCode,
                     DestinationFolder = downloadFolder,
                     DownloadSubtitles = downloadSubs,
                     SubtitleTracks = playerToUse?.Subtitles != null && playerToUse.Subtitles.Count > 0

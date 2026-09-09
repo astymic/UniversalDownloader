@@ -583,8 +583,44 @@ namespace UniversalDownloader.Services
                             audioNames.Add("Рус. Дублированный");
                         }
 
-                        foreach (var dubName in audioNames)
+                        for (int aIdx = 0; aIdx < audioNames.Count; aIdx++)
                         {
+                            string dubName = audioNames[aIdx];
+                            string formatCode;
+                            string langCode = string.Empty;
+
+                            if (dubName.Contains("Eng", StringComparison.OrdinalIgnoreCase) ||
+                                dubName.Contains("Original", StringComparison.OrdinalIgnoreCase) ||
+                                dubName.Contains("English", StringComparison.OrdinalIgnoreCase) ||
+                                dubName.Contains("Англ", StringComparison.OrdinalIgnoreCase))
+                            {
+                                langCode = "en";
+                                formatCode = "bestvideo+bestaudio[language^=en]/bestvideo+bestaudio[format_id*=eng]/bestvideo+bestaudio/best";
+                            }
+                            else if (dubName.Contains("Рус", StringComparison.OrdinalIgnoreCase) ||
+                                     dubName.Contains("Дубл", StringComparison.OrdinalIgnoreCase) ||
+                                     dubName.Contains("Rus", StringComparison.OrdinalIgnoreCase))
+                            {
+                                langCode = "ru";
+                                formatCode = "bestvideo+bestaudio[language^=ru]/bestvideo+bestaudio[format_id*=rus]/bestvideo+bestaudio/best";
+                            }
+                            else if (dubName.Contains("Укр", StringComparison.OrdinalIgnoreCase) ||
+                                     dubName.Contains("Ukr", StringComparison.OrdinalIgnoreCase))
+                            {
+                                langCode = "uk";
+                                formatCode = "bestvideo+bestaudio[language^=uk]/bestvideo+bestaudio[format_id*=ukr]/bestvideo+bestaudio/best";
+                            }
+                            else if (dubName.Contains("Япон", StringComparison.OrdinalIgnoreCase) ||
+                                     dubName.Contains("Jap", StringComparison.OrdinalIgnoreCase))
+                            {
+                                langCode = "ja";
+                                formatCode = "bestvideo+bestaudio[language^=ja]/bestvideo+bestaudio[format_id*=jap]/bestvideo+bestaudio/best";
+                            }
+                            else
+                            {
+                                formatCode = "bestvideo+bestaudio/best";
+                            }
+
                             var epInfo = new AnimeEpisodeInfo
                             {
                                 EpisodeNumber = epNum,
@@ -603,7 +639,10 @@ namespace UniversalDownloader.Services
                                 SeasonNumber = sNum,
                                 IframeUrl = embedUrl,
                                 StreamUrl = hlsUrl,
-                                DownloadUrl = downloadUrl
+                                DownloadUrl = downloadUrl,
+                                AudioTrackName = dubName,
+                                AudioLanguage = langCode,
+                                FormatCode = formatCode
                             };
 
                             epInfo.Players.Add(player);

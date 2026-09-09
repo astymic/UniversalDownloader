@@ -266,7 +266,7 @@ namespace UniversalDownloader.Services
                             {
                                 if (nextItem.Status != QueueItemStatus.Downloading) return;
 
-                                if (args.Percentage > 0)
+                                if (args.Percentage >= 0)
                                 {
                                     nextItem.Progress = args.Percentage;
                                 }
@@ -276,9 +276,27 @@ namespace UniversalDownloader.Services
                                 }
                             });
 
+                            string effectiveFormat = nextItem.IsAudioOnly ? "bestaudio/best" : nextItem.FormatCode;
+                            if (!nextItem.IsAudioOnly && (string.IsNullOrWhiteSpace(effectiveFormat) || effectiveFormat == "best" || effectiveFormat == "bestvideo+bestaudio/best"))
+                            {
+                                if (nextItem.Title.Contains("[Eng", StringComparison.OrdinalIgnoreCase) ||
+                                    nextItem.Title.Contains("[English", StringComparison.OrdinalIgnoreCase) ||
+                                    nextItem.Title.Contains("[Original", StringComparison.OrdinalIgnoreCase) ||
+                                    nextItem.Title.Contains("[Англ", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    effectiveFormat = "bestvideo+bestaudio[language^=en]/bestvideo+bestaudio[format_id*=eng]/bestvideo+bestaudio/best";
+                                }
+                                else if (nextItem.Title.Contains("[Рус", StringComparison.OrdinalIgnoreCase) ||
+                                         nextItem.Title.Contains("[Дубл", StringComparison.OrdinalIgnoreCase) ||
+                                         nextItem.Title.Contains("[Rus", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    effectiveFormat = "bestvideo+bestaudio[language^=ru]/bestvideo+bestaudio[format_id*=rus]/bestvideo+bestaudio/best";
+                                }
+                            }
+
                             bool success = await _downloadService.DownloadWithYtDlpAsync(
                                 downloadUrl,
-                                nextItem.IsAudioOnly ? "bestaudio/best" : nextItem.FormatCode,
+                                effectiveFormat,
                                 tempDir,
                                 nextItem.DestinationFolder,
                                 nextItem.IsAudioOnly,

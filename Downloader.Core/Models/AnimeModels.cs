@@ -108,6 +108,9 @@ namespace UniversalDownloader.Models
         public string StreamUrl { get; set; } = string.Empty;
         public string DownloadUrl { get; set; } = string.Empty;
         public string DataToken { get; set; } = string.Empty;
+        public string? AudioTrackName { get; set; }
+        public string? AudioLanguage { get; set; }
+        public string? FormatCode { get; set; }
         public List<SubtitleTrackInfo> Subtitles { get; set; } = new();
         public Dictionary<string, string> Headers { get; set; } = new();
     }
