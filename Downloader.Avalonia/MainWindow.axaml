@@ -334,6 +334,21 @@
                         <Button Grid.Column="1" Classes="secondary" Content="✖ Close" Click="BackToMain_Click"/>
                     </Grid>
 
+                    <!-- Drag & Drop Zone -->
+                    <Border x:Name="AvaloniaCompressorDropZone" 
+                            Background="#141418" 
+                            BorderBrush="{StaticResource BorderBrush}" 
+                            BorderThickness="2" 
+                            CornerRadius="16" 
+                            Padding="28,20" 
+                            Cursor="Hand">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
+                            <TextBlock Text="🗜️" FontSize="32" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Drag &amp; Drop video files here to compress" Foreground="White" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="or click 'Add Video Files' below (MP4, MKV, MOV, WebM, AVI, FLV, TS, WMV)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Add Files & Actions Card -->
                     <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                         <StackPanel Spacing="12">

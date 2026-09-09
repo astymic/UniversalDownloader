@@ -99,6 +99,13 @@ namespace UniversalDownloader.Avalonia
             HistoryItemsControl.ItemsSource = _historyService.Items;
             if (AvaloniaCompressorItemsControl != null) AvaloniaCompressorItemsControl.ItemsSource = AvaloniaCompressorItems;
             if (AvaloniaCompressorFolderTextBox != null) AvaloniaCompressorFolderTextBox.Text = _downloadFolder;
+            if (AvaloniaCompressorDropZone != null)
+            {
+                DragDrop.SetAllowDrop(AvaloniaCompressorDropZone, true);
+                AvaloniaCompressorDropZone.AddHandler(DragDrop.DragOverEvent, AvaloniaCompressorDropZone_DragOver);
+                AvaloniaCompressorDropZone.AddHandler(DragDrop.DropEvent, AvaloniaCompressorDropZone_Drop);
+                AvaloniaCompressorDropZone.PointerPressed += (s, e) => AvaloniaCompressorBrowse_Click(s, e);
+            }
 
             InitializeAutoUpdater();
             Loaded += MainWindow_Loaded;
@@ -1119,24 +1126,56 @@ namespace UniversalDownloader.Avalonia
                 {
                     try
                     {
-                        string localPath = file.Path.LocalPath;
-                        if (File.Exists(localPath) && !AvaloniaCompressorItems.Any(i => i.InputPath.Equals(localPath, StringComparison.OrdinalIgnoreCase)))
-                        {
-                            var fi = new FileInfo(localPath);
-                            AvaloniaCompressorItems.Add(new VideoCompressorItem
-                            {
-                                InputPath = localPath,
-                                FileName = fi.Name,
-                                OriginalSizeBytes = fi.Length,
-                                OriginalSizeFormatted = Utilities.FormatBytesOutput(fi.Length),
-                                Status = "Ready to compress"
-                            });
-                        }
+                        AddSingleFileToAvaloniaCompressor(file.Path.LocalPath);
                     }
                     catch { }
                 }
                 UpdateAvaloniaCompressorEmptyState();
             }
+        }
+
+        private void AddSingleFileToAvaloniaCompressor(string localPath)
+        {
+            if (File.Exists(localPath) && !AvaloniaCompressorItems.Any(i => i.InputPath.Equals(localPath, StringComparison.OrdinalIgnoreCase)))
+            {
+                var fi = new FileInfo(localPath);
+                string ext = fi.Extension.ToLowerInvariant();
+                bool isVideo = ext is ".mp4" or ".mkv" or ".mov" or ".webm" or ".avi" or ".flv" or ".wmv" or ".ts" or ".m4v";
+                if (!isVideo) return;
+
+                AvaloniaCompressorItems.Add(new VideoCompressorItem
+                {
+                    InputPath = localPath,
+                    FileName = fi.Name,
+                    OriginalSizeBytes = fi.Length,
+                    OriginalSizeFormatted = Utilities.FormatBytesOutput(fi.Length),
+                    Status = "Ready to compress"
+                });
+            }
+        }
+
+        private void AvaloniaCompressorDropZone_DragOver(object? sender, DragEventArgs e)
+        {
+            e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None;
+            e.Handled = true;
+        }
+
+        private void AvaloniaCompressorDropZone_Drop(object? sender, DragEventArgs e)
+        {
+            var files = e.Data.GetFiles();
+            if (files != null)
+            {
+                foreach (var file in files)
+                {
+                    try
+                    {
+                        AddSingleFileToAvaloniaCompressor(file.Path.LocalPath);
+                    }
+                    catch { }
+                }
+                UpdateAvaloniaCompressorEmptyState();
+            }
+            e.Handled = true;
         }
 
         private void AvaloniaCompressorClear_Click(object? sender, RoutedEventArgs e)
