@@ -323,6 +323,155 @@
                 </StackPanel>
             </ScrollViewer>
 
+            <!-- SMART VIDEO COMPRESSOR VIEW -->
+            <ScrollViewer x:Name="CompressorScrollViewer" IsVisible="False" Margin="24,20,12,20">
+                <StackPanel Spacing="16" MaxWidth="800">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Text="🗜️ Smart Video Compressor" FontSize="20" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="Visually lossless compression by default (zero quality loss), or custom limits &amp; codecs." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="secondary" Content="✖ Close" Click="BackToMain_Click"/>
+                    </Grid>
+
+                    <!-- Add Files & Actions Card -->
+                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="VIDEOS TO COMPRESS" FontWeight="Bold" FontSize="13" Foreground="White" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="primary" Content="📂 Add Video Files" Click="AvaloniaCompressorBrowse_Click"/>
+                                    <Button Classes="secondary" Content="Clear List" Click="AvaloniaCompressorClear_Click"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Items List -->
+                            <TextBlock x:Name="AvaloniaCompressorEmptyText" Text="Drop or click 'Add Video Files' to select videos to compress." FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,16"/>
+                            <ItemsControl x:Name="AvaloniaCompressorItemsControl">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#16161E" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,8">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <StackPanel Grid.Column="0" Spacing="4">
+                                                    <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" FontSize="13" Foreground="White"/>
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Text="{Binding OriginalSizeFormatted}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                        <TextBlock Text="➔" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" IsVisible="{Binding IsCompleted}"/>
+                                                        <TextBlock Text="{Binding CompressedSizeFormatted}" FontSize="11" FontWeight="Bold" Foreground="#10B981" IsVisible="{Binding IsCompleted}"/>
+                                                        <TextBlock Text="{Binding SavingsFormatted}" FontSize="11" FontWeight="Bold" Foreground="#10B981" IsVisible="{Binding IsCompleted}"/>
+                                                        <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                        <TextBlock Text="{Binding Status}" FontSize="11" Foreground="#818CF8"/>
+                                                    </StackPanel>
+                                                    <ProgressBar Value="{Binding Progress}" Maximum="100" Height="4" Background="#262630" Foreground="#06B6D4" CornerRadius="2" IsVisible="{Binding IsCompressing}"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Classes="secondary" Content="✕" Width="28" Height="28" Padding="0" Click="AvaloniaCompressorRemove_Click" Tag="{Binding}" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Compression Settings Card -->
+                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="⚙️ Compression Parameters" FontWeight="Bold" FontSize="14" Foreground="White"/>
+
+                            <!-- Preset Mode -->
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Compression Mode:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <ComboBox x:Name="AvaloniaCompressorPresetComboBox" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="AvaloniaCompressorPreset_Changed">
+                                    <ComboBoxItem Content="✨ Visually Lossless (Zero Noticeable Quality Loss - Default)"/>
+                                    <ComboBoxItem Content="⚖️ Balanced (Web &amp; Discord Sharing)"/>
+                                    <ComboBoxItem Content="🗜️ Maximum Compression (Smallest File Size)"/>
+                                    <ComboBoxItem Content="🎯 Target File Size Limit (e.g. 25MB Discord)"/>
+                                    <ComboBoxItem Content="⚙️ Custom Parameters"/>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- Target Size Box -->
+                            <StackPanel x:Name="AvaloniaCompressorTargetSizePanel" Spacing="6" IsVisible="False">
+                                <TextBlock Text="Target File Size (MB):" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <Grid ColumnDefinitions="120,Auto,*">
+                                    <TextBox x:Name="AvaloniaCompressorTargetSizeTextBox" Grid.Column="0" Text="25" Height="36" CornerRadius="8"/>
+                                    <TextBlock Grid.Column="1" Text="MB per video" VerticalAlignment="Center" Margin="10,0,16,0" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                                        <Button Classes="secondary" Content="25 MB" Tag="25" Click="AvaloniaTargetSizePreset_Click"/>
+                                        <Button Classes="secondary" Content="50 MB" Tag="50" Click="AvaloniaTargetSizePreset_Click"/>
+                                        <Button Classes="secondary" Content="100 MB" Tag="100" Click="AvaloniaTargetSizePreset_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- CRF Quality Slider -->
+                            <StackPanel x:Name="AvaloniaCompressorCrfPanel" Spacing="4">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="Quality Level (CRF):" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Grid.Column="1" x:Name="AvaloniaCompressorCrfText" Text="20 (Visually Lossless)" FontSize="12" FontWeight="SemiBold" Foreground="#06B6D4"/>
+                                </Grid>
+                                <Slider x:Name="AvaloniaCompressorCrfSlider" Minimum="16" Maximum="36" Value="20" TickFrequency="1" IsSnapToTickEnabled="True" ValueChanged="AvaloniaCompressorCrfSlider_ValueChanged"/>
+                            </StackPanel>
+
+                            <!-- Codec & Resolution -->
+                            <Grid ColumnDefinitions="*,*">
+                                <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                                    <TextBlock Text="Video Codec:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <ComboBox x:Name="AvaloniaCompressorCodecComboBox" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                        <ComboBoxItem Content="H.264 / AVC (Universal)"/>
+                                        <ComboBoxItem Content="H.265 / HEVC (High Efficiency)"/>
+                                        <ComboBoxItem Content="AV1 (Ultra Compression)"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4" Margin="8,0,0,0">
+                                    <TextBlock Text="Resolution Limit:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <ComboBox x:Name="AvaloniaCompressorResolutionComboBox" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                        <ComboBoxItem Content="Original Resolution"/>
+                                        <ComboBoxItem Content="1080p Full HD"/>
+                                        <ComboBoxItem Content="720p HD"/>
+                                        <ComboBoxItem Content="480p SD"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- FPS & Audio -->
+                            <Grid ColumnDefinitions="*,*">
+                                <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                                    <TextBlock Text="Frame Rate (FPS):" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <ComboBox x:Name="AvaloniaCompressorFpsComboBox" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                        <ComboBoxItem Content="Original FPS"/>
+                                        <ComboBoxItem Content="Cap 60 FPS"/>
+                                        <ComboBoxItem Content="Cap 30 FPS"/>
+                                        <ComboBoxItem Content="Cap 24 FPS"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4" Margin="8,0,0,0">
+                                    <TextBlock Text="Audio Handling:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <ComboBox x:Name="AvaloniaCompressorAudioComboBox" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                        <ComboBoxItem Content="Passthrough (Lossless Copy)"/>
+                                        <ComboBoxItem Content="AAC 128 kbps (Compact)"/>
+                                        <ComboBoxItem Content="AAC 192 kbps (HQ Audio)"/>
+                                        <ComboBoxItem Content="Mute (Strip Audio)"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Output Folder -->
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Output Folder:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBox x:Name="AvaloniaCompressorFolderTextBox" Grid.Column="0" IsReadOnly="True" Height="40" CornerRadius="8"/>
+                                    <Button Grid.Column="1" Classes="secondary" Content="Browse..." Margin="8,0,0,0" Height="40" Click="AvaloniaCompressorBrowseFolder_Click"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Start Button -->
+                            <Button x:Name="AvaloniaStartCompressButton" Classes="primary" Content="🗜️ Start Video Compression" Height="44" HorizontalAlignment="Center" Width="260" Click="AvaloniaStartCompress_Click"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
             <!-- ANIME SERIES BATCH DOWNLOAD OVERLAY -->
             <Grid x:Name="AnimeDrawerGrid" Background="#B3000000" IsVisible="False" ZIndex="998">
                 <Border Background="{StaticResource SurfaceBrush}" 
@@ -492,6 +641,9 @@
                 </Button>
                 <Button Classes="secondary" Width="46" Height="46" ToolTip.Tip="Queue Manager" Click="NavQueue_Click">
                     <TextBlock Text="📋" FontSize="18" HorizontalAlignment="Center"/>
+                </Button>
+                <Button Classes="secondary" Width="46" Height="46" ToolTip.Tip="Smart Video Compressor" Click="NavCompressor_Click">
+                    <TextBlock Text="🗜️" FontSize="18" HorizontalAlignment="Center"/>
                 </Button>
                 <Button Classes="secondary" Width="46" Height="46" ToolTip.Tip="Download History" Click="NavHistory_Click">
                     <TextBlock Text="📜" FontSize="18" HorizontalAlignment="Center"/>

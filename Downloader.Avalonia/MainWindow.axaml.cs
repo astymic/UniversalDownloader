@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
@@ -26,11 +28,15 @@ namespace UniversalDownloader.Avalonia
         private readonly SearchService _searchService;
         private readonly FfmpegAudioCaptureService _audioCaptureService;
         private readonly ShazamRecognitionService _shazamService;
+        private readonly VideoCompressorService _videoCompressorService;
 
         private readonly LiveStreamRecognitionService _liveStreamService;
 
         public ObservableCollection<SearchResultItem> SearchResults { get; } = new();
         public ObservableCollection<DownloadHistoryItem> HistoryItems { get; } = new();
+        public ObservableCollection<VideoCompressorItem> AvaloniaCompressorItems { get; } = new();
+        private CancellationTokenSource? _avaloniaCompressorCts;
+        private bool _isAvaloniaCompressing = false;
 
         private string _downloadFolder;
         private SearchMode _currentSearchMode = SearchMode.SmartMusic;
@@ -56,6 +62,7 @@ namespace UniversalDownloader.Avalonia
             _audioCaptureService = new FfmpegAudioCaptureService(_dependencyManager);
             _shazamService = new ShazamRecognitionService(_audioCaptureService);
             _liveStreamService = new LiveStreamRecognitionService(_audioCaptureService, _shazamService);
+            _videoCompressorService = new VideoCompressorService(_dependencyManager);
 
             _liveStreamService.ListeningStateChanged += isListening => Dispatcher.UIThread.Post(() =>
             {
@@ -90,6 +97,8 @@ namespace UniversalDownloader.Avalonia
             SearchResultsItemsControl.ItemsSource = SearchResults;
             QueueItemsControl.ItemsSource = _queueManager.Items;
             HistoryItemsControl.ItemsSource = _historyService.Items;
+            if (AvaloniaCompressorItemsControl != null) AvaloniaCompressorItemsControl.ItemsSource = AvaloniaCompressorItems;
+            if (AvaloniaCompressorFolderTextBox != null) AvaloniaCompressorFolderTextBox.Text = _downloadFolder;
 
             InitializeAutoUpdater();
             Loaded += MainWindow_Loaded;
@@ -145,11 +154,13 @@ namespace UniversalDownloader.Avalonia
             HistoryScrollViewer.IsVisible = false;
             SettingsScrollViewer.IsVisible = false;
             LiveStreamScrollViewer.IsVisible = false;
+            if (CompressorScrollViewer != null) CompressorScrollViewer.IsVisible = false;
         }
 
         private void NavMain_Click(object? sender, RoutedEventArgs e) { HideAllViews(); MainScrollViewer.IsVisible = true; }
         private void NavSearch_Click(object? sender, RoutedEventArgs e) { HideAllViews(); SearchScrollViewer.IsVisible = true; }
         private void NavQueue_Click(object? sender, RoutedEventArgs e) { HideAllViews(); QueueScrollViewer.IsVisible = true; }
+        private void NavCompressor_Click(object? sender, RoutedEventArgs e) { HideAllViews(); if (CompressorScrollViewer != null) CompressorScrollViewer.IsVisible = true; }
         private void NavHistory_Click(object? sender, RoutedEventArgs e) { _historyService.LoadHistory(); HideAllViews(); HistoryScrollViewer.IsVisible = true; }
         private void NavSettings_Click(object? sender, RoutedEventArgs e) { HideAllViews(); SettingsScrollViewer.IsVisible = true; }
         private void NavLiveStream_Click(object? sender, RoutedEventArgs e) { HideAllViews(); LiveStreamScrollViewer.IsVisible = true; UpdateLiveStreamUI(); }
@@ -1079,6 +1090,338 @@ namespace UniversalDownloader.Avalonia
         private void AnimeDrawerClose_Click(object? sender, RoutedEventArgs e)
         {
             if (AnimeDrawerGrid != null) AnimeDrawerGrid.IsVisible = false;
+        }
+        #endregion
+
+        #region Smart Video Compressor
+        private async void AvaloniaCompressorBrowse_Click(object? sender, RoutedEventArgs e)
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return;
+
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Select Videos to Compress",
+                AllowMultiple = true,
+                FileTypeFilter = new[]
+                {
+                    new FilePickerFileType("Video Files")
+                    {
+                        Patterns = new[] { "*.mp4", "*.mkv", "*.mov", "*.avi", "*.webm", "*.flv", "*.ts", "*.wmv", "*.m4v" }
+                    },
+                    new FilePickerFileType("All Files") { Patterns = new[] { "*.*" } }
+                }
+            });
+
+            if (files != null && files.Count > 0)
+            {
+                foreach (var file in files)
+                {
+                    try
+                    {
+                        string localPath = file.Path.LocalPath;
+                        if (File.Exists(localPath) && !AvaloniaCompressorItems.Any(i => i.InputPath.Equals(localPath, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            var fi = new FileInfo(localPath);
+                            AvaloniaCompressorItems.Add(new VideoCompressorItem
+                            {
+                                InputPath = localPath,
+                                FileName = fi.Name,
+                                OriginalSizeBytes = fi.Length,
+                                OriginalSizeFormatted = Utilities.FormatBytesOutput(fi.Length),
+                                Status = "Ready to compress"
+                            });
+                        }
+                    }
+                    catch { }
+                }
+                UpdateAvaloniaCompressorEmptyState();
+            }
+        }
+
+        private void AvaloniaCompressorClear_Click(object? sender, RoutedEventArgs e)
+        {
+            AvaloniaCompressorItems.Clear();
+            UpdateAvaloniaCompressorEmptyState();
+        }
+
+        private void AvaloniaCompressorRemove_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is VideoCompressorItem item)
+            {
+                AvaloniaCompressorItems.Remove(item);
+                UpdateAvaloniaCompressorEmptyState();
+            }
+        }
+
+        private void UpdateAvaloniaCompressorEmptyState()
+        {
+            if (AvaloniaCompressorEmptyText != null)
+            {
+                AvaloniaCompressorEmptyText.IsVisible = AvaloniaCompressorItems.Count == 0;
+            }
+        }
+
+        private async void AvaloniaCompressorBrowseFolder_Click(object? sender, RoutedEventArgs e)
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return;
+
+            var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Select Compressed Videos Output Folder",
+                AllowMultiple = false
+            });
+
+            if (folders != null && folders.Count > 0)
+            {
+                if (AvaloniaCompressorFolderTextBox != null)
+                {
+                    AvaloniaCompressorFolderTextBox.Text = folders[0].Path.LocalPath;
+                }
+            }
+        }
+
+        private void AvaloniaCompressorPreset_Changed(object? sender, SelectionChangedEventArgs e)
+        {
+            if (AvaloniaCompressorPresetComboBox == null || AvaloniaCompressorTargetSizePanel == null || AvaloniaCompressorCrfPanel == null) return;
+
+            int index = AvaloniaCompressorPresetComboBox.SelectedIndex;
+            AvaloniaCompressorTargetSizePanel.IsVisible = index == 3; // Target Size
+            AvaloniaCompressorCrfPanel.IsVisible = index != 3;
+
+            if (index == 0)
+            {
+                if (AvaloniaCompressorCrfSlider != null) AvaloniaCompressorCrfSlider.Value = 20;
+                if (AvaloniaCompressorCrfText != null) AvaloniaCompressorCrfText.Text = "20 (Visually Lossless)";
+            }
+            else if (index == 1)
+            {
+                if (AvaloniaCompressorCrfSlider != null) AvaloniaCompressorCrfSlider.Value = 24;
+                if (AvaloniaCompressorCrfText != null) AvaloniaCompressorCrfText.Text = "24 (Balanced)";
+            }
+            else if (index == 2)
+            {
+                if (AvaloniaCompressorCrfSlider != null) AvaloniaCompressorCrfSlider.Value = 28;
+                if (AvaloniaCompressorCrfText != null) AvaloniaCompressorCrfText.Text = "28 (Max Compression)";
+            }
+        }
+
+        private void AvaloniaCompressorCrfSlider_ValueChanged(object? sender, RangeBaseValueChangedEventArgs e)
+        {
+            if (AvaloniaCompressorCrfText == null) return;
+            int val = (int)Math.Round(e.NewValue);
+            string desc = val <= 20 ? "Visually Lossless" : val <= 25 ? "Balanced" : "High Compression";
+            AvaloniaCompressorCrfText.Text = $"{val} ({desc})";
+        }
+
+        private void AvaloniaTargetSizePreset_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string sizeStr && AvaloniaCompressorTargetSizeTextBox != null)
+            {
+                AvaloniaCompressorTargetSizeTextBox.Text = sizeStr;
+            }
+        }
+
+        private async void AvaloniaStartCompress_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_isAvaloniaCompressing)
+            {
+                _avaloniaCompressorCts?.Cancel();
+                if (AvaloniaStartCompressButton != null) AvaloniaStartCompressButton.Content = "Stopping...";
+                return;
+            }
+
+            if (AvaloniaCompressorItems.Count == 0)
+            {
+                return;
+            }
+
+            string outFolder = AvaloniaCompressorFolderTextBox?.Text?.Trim() ?? _downloadFolder;
+            if (string.IsNullOrWhiteSpace(outFolder))
+            {
+                outFolder = _downloadFolder;
+            }
+
+            try
+            {
+                if (!Directory.Exists(outFolder))
+                {
+                    Directory.CreateDirectory(outFolder);
+                }
+            }
+            catch { }
+
+            int presetIdx = AvaloniaCompressorPresetComboBox?.SelectedIndex ?? 0;
+            VideoCompressionPreset preset = presetIdx switch
+            {
+                0 => VideoCompressionPreset.VisuallyLossless,
+                1 => VideoCompressionPreset.Balanced,
+                2 => VideoCompressionPreset.MaxCompression,
+                3 => VideoCompressionPreset.TargetSize,
+                _ => VideoCompressionPreset.Custom
+            };
+
+            int codecIdx = AvaloniaCompressorCodecComboBox?.SelectedIndex ?? 0;
+            VideoCodec codec = codecIdx switch
+            {
+                1 => VideoCodec.H265,
+                2 => VideoCodec.AV1,
+                _ => VideoCodec.H264
+            };
+
+            int crf = AvaloniaCompressorCrfSlider != null ? (int)Math.Round(AvaloniaCompressorCrfSlider.Value) : 20;
+
+            double? targetSizeMb = null;
+            if (preset == VideoCompressionPreset.TargetSize &&
+                double.TryParse(AvaloniaCompressorTargetSizeTextBox?.Text?.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double sz))
+            {
+                targetSizeMb = sz;
+            }
+
+            int resIdx = AvaloniaCompressorResolutionComboBox?.SelectedIndex ?? 0;
+            string resolution = resIdx switch
+            {
+                1 => "1080p",
+                2 => "720p",
+                3 => "480p",
+                _ => "Original"
+            };
+
+            int fpsIdx = AvaloniaCompressorFpsComboBox?.SelectedIndex ?? 0;
+            string fps = fpsIdx switch
+            {
+                1 => "60",
+                2 => "30",
+                3 => "24",
+                _ => "Original"
+            };
+
+            int audioIdx = AvaloniaCompressorAudioComboBox?.SelectedIndex ?? 0;
+            VideoAudioMode audio = audioIdx switch
+            {
+                1 => VideoAudioMode.Aac128,
+                2 => VideoAudioMode.Aac192,
+                3 => VideoAudioMode.Mute,
+                _ => VideoAudioMode.Copy
+            };
+
+            var options = new VideoCompressorOptions
+            {
+                Preset = preset,
+                Codec = codec,
+                Crf = crf,
+                TargetSizeMb = targetSizeMb,
+                Resolution = resolution,
+                Fps = fps,
+                AudioMode = audio,
+                EncoderPreset = preset == VideoCompressionPreset.VisuallyLossless ? "slow" : "medium"
+            };
+
+            _isAvaloniaCompressing = true;
+            _avaloniaCompressorCts = new CancellationTokenSource();
+            if (AvaloniaStartCompressButton != null) AvaloniaStartCompressButton.Content = "⏹️ Cancel Compression";
+
+            try
+            {
+                foreach (var item in AvaloniaCompressorItems.ToList())
+                {
+                    if (item.IsCompleted) continue;
+                    if (_avaloniaCompressorCts.IsCancellationRequested) break;
+
+                    item.IsCompressing = true;
+                    item.Status = "Compressing...";
+                    item.Progress = 0;
+
+                    string fileNameWithoutExt = Path.GetFileNameWithoutExtension(item.InputPath);
+                    string outPath = Path.Combine(outFolder, $"{fileNameWithoutExt}_compressed.mp4");
+                    int counter = 1;
+                    while (File.Exists(outPath))
+                    {
+                        outPath = Path.Combine(outFolder, $"{fileNameWithoutExt}_compressed_{counter}.mp4");
+                        counter++;
+                    }
+                    item.OutputPath = outPath;
+
+                    var progress = new Progress<VideoCompressionProgress>(p =>
+                    {
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            item.Progress = p.Percentage;
+                            item.Status = p.StatusMessage;
+                        });
+                    });
+
+                    try
+                    {
+                        bool success = await _videoCompressorService.CompressVideoAsync(item.InputPath, outPath, options, progress, _avaloniaCompressorCts.Token);
+
+                        item.IsCompressing = false;
+                        if (success && File.Exists(outPath))
+                        {
+                            var outFi = new FileInfo(outPath);
+                            item.IsCompleted = true;
+                            item.Progress = 100;
+                            item.CompressedSizeBytes = outFi.Length;
+                            item.CompressedSizeFormatted = Utilities.FormatBytesOutput(outFi.Length);
+
+                            double savings = 0;
+                            if (item.OriginalSizeBytes > 0)
+                            {
+                                savings = ((double)(item.OriginalSizeBytes - outFi.Length) / item.OriginalSizeBytes) * 100.0;
+                            }
+
+                            if (savings >= 0)
+                            {
+                                item.SavingsFormatted = $"-{savings:F0}%";
+                                item.Status = $"Complete (-{savings:F0}% smaller)";
+                            }
+                            else
+                            {
+                                item.SavingsFormatted = $"+{Math.Abs(savings):F0}%";
+                                item.Status = "Complete (already ultra-compact)";
+                            }
+
+                            try
+                            {
+                                await _historyService.AddItemAsync(new DownloadHistoryItem
+                                {
+                                    Title = Path.GetFileNameWithoutExtension(outPath),
+                                    Url = item.InputPath,
+                                    FileSizeBytes = outFi.Length,
+                                    FormattedSize = item.CompressedSizeFormatted,
+                                    Platform = "Video Compressor",
+                                    FormatExtension = Path.GetExtension(outPath).TrimStart('.'),
+                                    FilePath = outPath,
+                                    DownloadDate = DateTime.Now,
+                                    IsAudio = false
+                                });
+                            }
+                            catch { }
+                        }
+                        else
+                        {
+                            item.Status = "Compression failed";
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        item.Status = "Cancelled";
+                        item.IsCompressing = false;
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        item.Status = $"Error: {ex.Message}";
+                        item.IsCompressing = false;
+                    }
+                }
+            }
+            finally
+            {
+                _isAvaloniaCompressing = false;
+                if (AvaloniaStartCompressButton != null) AvaloniaStartCompressButton.Content = "🗜️ Start Video Compression";
+            }
         }
         #endregion
     }

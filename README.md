@@ -61,6 +61,15 @@ A modern, high-performance, cross-platform desktop workstation (**Windows & Linu
 - Convert local or downloaded files between **MP4, MKV, AVI, MOV, WebM, MP3, AAC, FLAC, WAV, and OGG**.
 - Select target video/audio quality, format presets, and automatic FFmpeg conversion pipelines.
 
+### 🗜️ Smart Video Compressor (Right Sidebar Tab)
+- **Visually Lossless by Default** — Reduces video file sizes massively with zero noticeable visual quality degradation using tuned Constant Rate Factor (`CRF 20`) and high-efficiency encoder presets.
+- **Target File Size Optimization (e.g. 25MB Discord)** — Automated two-pass bitrate calculation and allocation with safety margin for container overhead, perfectly sizing videos for Discord, email, or web upload limits.
+- **Multiple Compression Presets** — Visually Lossless, Balanced (Web & Discord), Maximum Compression (Smallest size), Target File Size, and full Custom parameters.
+- **Next-Gen Codec Support** — Encode with **H.264 / AVC** (universal compatibility), **H.265 / HEVC** (high efficiency), or **AV1** (`libsvtav1`, ultra compression).
+- **Flexible Downscaling & FPS Capping** — Downscale 4K/2K to 1080p, 720p, or 480p, and optionally cap framerates to 60, 30, or 24 FPS.
+- **Audio Modes** — Lossless passthrough stream copy, compact AAC 128 kbps, HQ AAC 192 kbps, or strip audio entirely (Mute).
+- **Drag & Drop Batch Queue** — Drop multiple video files directly into the compressor zone, track real-time multi-pass progress, and see instant percentage savings comparisons.
+
 ### 📜 Download History & Metadata
 - Filterable and searchable history log with direct file opening, folder navigation, and URL copying.
 - Automatic ID3 tag embedding (Artist, Title, Album, Thumbnail Artwork).
@@ -84,7 +93,7 @@ A modern, high-performance, cross-platform desktop workstation (**Windows & Linu
 
 - Custom borderless dark glassmorphism theme with animated glow accents and drop shadows.
 - High-performance GPU-accelerated drawer transitions (`TranslateTransform`) ensuring silky 60/120/144Hz framerates.
-- Compact quick-access right navigation rail for **Search**, **Shazam**, **Live Stream / DJ Scraper**, **Spotify**, **History**, **Converter**, and **Queue**.
+- Compact quick-access right navigation rail for **Search**, **Shazam**, **Live Stream / DJ Scraper**, **Spotify**, **Queue**, **Smart Video Compressor**, **Converter**, and **History**.
 - Fully theme-integrated UI controls, custom scrollbars, and styled dark dropdown menus.
 
 ---

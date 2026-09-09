@@ -105,6 +105,7 @@ namespace UniversalDownloader
             InitializeTrayIcon();
             InitializeHistoryBindings();
             InitializeMediaConverter();
+            InitializeVideoCompressor();
             InitializeQueueBindings();
             InitializeSearchBindings();
             InitializeLiveStreamFeature();

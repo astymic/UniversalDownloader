@@ -304,6 +304,106 @@ namespace UniversalDownloader.Tests
             Assert.StartsWith("http", resolvedStream);
             Assert.True(resolvedStream.Contains(".m3u8") || resolvedStream.Contains(".mp4"));
         }
+
+        [Fact]
+        public void VideoCompressor_CalculateTargetBitrates_CalculatesReasonableBitrates()
+        {
+            // 25 MB file for 2 minutes (120s) with AAC 128k
+            var (videoKbps, audioKbps) = VideoCompressorService.CalculateTargetBitrates(25, TimeSpan.FromMinutes(2), VideoAudioMode.Aac128);
+            
+            Assert.Equal(128, audioKbps);
+            Assert.True(videoKbps > 1000 && videoKbps < 1600, $"Expected video bitrate between 1000 and 1600 kbps, got {videoKbps}");
+        }
+
+        [Fact]
+        public void VideoCompressor_BuildFfmpegArguments_VisuallyLossless_ContainsExpectedFlags()
+        {
+            var options = VideoCompressorOptions.CreateVisuallyLossless();
+            var args = VideoCompressorService.BuildFfmpegArguments(
+                "input.mp4",
+                "output.mp4",
+                options,
+                TimeSpan.FromMinutes(1));
+
+            // Must contain libx264, -crf 20, -preset slow, -c:a copy, +faststart
+            Assert.Contains("-c:v", args);
+            int cvIndex = args.IndexOf("-c:v");
+            Assert.Equal("libx264", args[cvIndex + 1]);
+
+            Assert.Contains("-crf", args);
+            int crfIndex = args.IndexOf("-crf");
+            Assert.Equal("20", args[crfIndex + 1]);
+
+            Assert.Contains("-preset", args);
+            int presetIndex = args.IndexOf("-preset");
+            Assert.Equal("slow", args[presetIndex + 1]);
+
+            Assert.Contains("-c:a", args);
+            int caIndex = args.IndexOf("-c:a");
+            Assert.Equal("copy", args[caIndex + 1]);
+
+            Assert.Contains("+faststart", args);
+        }
+
+        [Fact]
+        public void VideoCompressor_BuildFfmpegArguments_ResolutionAndFpsFilters()
+        {
+            var options = new VideoCompressorOptions
+            {
+                Preset = VideoCompressionPreset.Balanced,
+                Codec = VideoCodec.H265,
+                Resolution = "720p",
+                Fps = "30",
+                AudioMode = VideoAudioMode.Aac128
+            };
+
+            var args = VideoCompressorService.BuildFfmpegArguments(
+                "input.mkv",
+                "output.mp4",
+                options,
+                TimeSpan.FromMinutes(2));
+
+            Assert.Contains("-c:v", args);
+            int cvIndex = args.IndexOf("-c:v");
+            Assert.Equal("libx265", args[cvIndex + 1]);
+
+            Assert.Contains("-vf", args);
+            int vfIndex = args.IndexOf("-vf");
+            string filterStr = args[vfIndex + 1];
+            Assert.Contains("scale=-2:720", filterStr);
+
+            Assert.Contains("-r", args);
+            int rIndex = args.IndexOf("-r");
+            Assert.Equal("30", args[rIndex + 1]);
+
+            Assert.Contains("-c:a", args);
+            int caIndex = args.IndexOf("-c:a");
+            Assert.Equal("aac", args[caIndex + 1]);
+        }
+
+        [Fact]
+        public void VideoCompressor_BuildFfmpegArguments_AV1Codec()
+        {
+            var options = new VideoCompressorOptions
+            {
+                Preset = VideoCompressionPreset.MaxCompression,
+                Codec = VideoCodec.AV1,
+                Crf = 28,
+                AudioMode = VideoAudioMode.Mute
+            };
+
+            var args = VideoCompressorService.BuildFfmpegArguments(
+                "input.mp4",
+                "output.mp4",
+                options,
+                TimeSpan.FromMinutes(1));
+
+            Assert.Contains("-c:v", args);
+            int cvIndex = args.IndexOf("-c:v");
+            Assert.Equal("libsvtav1", args[cvIndex + 1]);
+
+            Assert.Contains("-an", args);
+        }
     }
 }
 
