@@ -1204,6 +1204,63 @@ namespace UniversalDownloader.Avalonia
             {
                 AvaloniaCompressorEmptyText.IsVisible = AvaloniaCompressorItems.Count == 0;
             }
+            if (AvaloniaCompressorItems.Count == 0 && AvaloniaCompressorTotalEtaText != null)
+            {
+                AvaloniaCompressorTotalEtaText.Text = string.Empty;
+            }
+        }
+
+        private void UpdateAvaloniaCompressorBatchEta(int currentFileIndex, double currentPercentage, TimeSpan batchElapsed, long totalInputBytes)
+        {
+            if (AvaloniaCompressorTotalEtaText == null || AvaloniaCompressorItems.Count == 0) return;
+
+            if (AvaloniaCompressorItems.Count == 1)
+            {
+                if (currentPercentage > 1 && batchElapsed.TotalSeconds > 1)
+                {
+                    double remainingSec = (batchElapsed.TotalSeconds / (currentPercentage / 100.0)) - batchElapsed.TotalSeconds;
+                    if (remainingSec > 0)
+                    {
+                        AvaloniaCompressorTotalEtaText.Text = $"Total ETA: {VideoCompressorService.FormatDurationShort(TimeSpan.FromSeconds(remainingSec))}";
+                    }
+                }
+                return;
+            }
+
+            double totalCompletedSec = batchElapsed.TotalSeconds;
+            if (totalCompletedSec <= 1) return;
+
+            if (totalInputBytes > 0)
+            {
+                long completedBytes = 0;
+                for (int j = 0; j < currentFileIndex; j++)
+                {
+                    completedBytes += AvaloniaCompressorItems[j].OriginalSizeBytes;
+                }
+                var currentItem = AvaloniaCompressorItems[currentFileIndex];
+                completedBytes += (long)(currentItem.OriginalSizeBytes * (currentPercentage / 100.0));
+
+                long remainingBytes = Math.Max(0, totalInputBytes - completedBytes);
+                if (completedBytes > 0)
+                {
+                    double bytesPerSec = completedBytes / totalCompletedSec;
+                    if (bytesPerSec > 0)
+                    {
+                        double remainingSec = remainingBytes / bytesPerSec;
+                        var remainingTime = TimeSpan.FromSeconds(remainingSec);
+                        AvaloniaCompressorTotalEtaText.Text = $"Total ETA: {VideoCompressorService.FormatDurationShort(remainingTime)} (File {currentFileIndex + 1}/{AvaloniaCompressorItems.Count})";
+                        return;
+                    }
+                }
+            }
+
+            double overallFraction = (currentFileIndex + (currentPercentage / 100.0)) / AvaloniaCompressorItems.Count;
+            if (overallFraction > 0.01)
+            {
+                double totalEstimatedSec = totalCompletedSec / overallFraction;
+                double remainingSec = Math.Max(0, totalEstimatedSec - totalCompletedSec);
+                AvaloniaCompressorTotalEtaText.Text = $"Total ETA: {VideoCompressorService.FormatDurationShort(TimeSpan.FromSeconds(remainingSec))} (File {currentFileIndex + 1}/{AvaloniaCompressorItems.Count})";
+            }
         }
 
         private async void AvaloniaCompressorBrowseFolder_Click(object? sender, RoutedEventArgs e)
@@ -1428,8 +1485,12 @@ namespace UniversalDownloader.Avalonia
                 _ => VideoAudioMode.Copy
             };
 
+            int deviceIdx = AvaloniaCompressorDeviceComboBox?.SelectedIndex ?? 0;
+            VideoEncodingDevice device = deviceIdx == 1 ? VideoEncodingDevice.Cpu : VideoEncodingDevice.Gpu;
+
             var options = new VideoCompressorOptions
             {
+                Device = device,
                 Preset = preset,
                 Codec = codec,
                 Crf = crf,
@@ -1444,16 +1505,21 @@ namespace UniversalDownloader.Avalonia
             _avaloniaCompressorCts = new CancellationTokenSource();
             if (AvaloniaStartCompressButton != null) AvaloniaStartCompressButton.Content = "⏹️ Cancel Compression";
 
+            var batchWatch = Stopwatch.StartNew();
+            long totalInputBytes = AvaloniaCompressorItems.Sum(x => x.OriginalSizeBytes);
+
             try
             {
-                foreach (var item in AvaloniaCompressorItems.ToList())
+                for (int i = 0; i < AvaloniaCompressorItems.Count; i++)
                 {
+                    var item = AvaloniaCompressorItems[i];
                     if (item.IsCompleted) continue;
                     if (_avaloniaCompressorCts.IsCancellationRequested) break;
 
                     item.IsCompressing = true;
                     item.Status = "Compressing...";
                     item.Progress = 0;
+                    item.TimeRemainingFormatted = string.Empty;
 
                     string originalBaseName = Path.GetFileNameWithoutExtension(item.InputPath);
                     string extension = ".mp4";
@@ -1477,12 +1543,25 @@ namespace UniversalDownloader.Avalonia
                     }
                     item.OutputPath = outPath;
 
+                    var fileWatch = Stopwatch.StartNew();
+
                     var progress = new Progress<VideoCompressionProgress>(p =>
                     {
                         Dispatcher.UIThread.Post(() =>
                         {
                             item.Progress = p.Percentage;
                             item.Status = p.StatusMessage;
+
+                            if (p.EstimatedRemainingTime.HasValue)
+                            {
+                                item.TimeRemainingFormatted = $"ETA: {VideoCompressorService.FormatDurationShort(p.EstimatedRemainingTime.Value)}";
+                            }
+                            else
+                            {
+                                item.TimeRemainingFormatted = string.Empty;
+                            }
+
+                            UpdateAvaloniaCompressorBatchEta(i, p.Percentage, batchWatch.Elapsed, totalInputBytes);
                         });
                     });
 
@@ -1490,7 +1569,13 @@ namespace UniversalDownloader.Avalonia
                     {
                         bool success = await _videoCompressorService.CompressVideoAsync(item.InputPath, outPath, options, progress, _avaloniaCompressorCts.Token);
 
+                        fileWatch.Stop();
+                        item.ElapsedSeconds = fileWatch.Elapsed.TotalSeconds;
+                        string elapsedStr = VideoCompressorService.FormatDurationShort(fileWatch.Elapsed);
+                        item.DurationFormatted = $"⏱️ {elapsedStr}";
+                        item.TimeRemainingFormatted = string.Empty;
                         item.IsCompressing = false;
+
                         if (success && File.Exists(outPath))
                         {
                             var outFi = new FileInfo(outPath);
@@ -1508,12 +1593,12 @@ namespace UniversalDownloader.Avalonia
                             if (savings >= 0)
                             {
                                 item.SavingsFormatted = $"-{savings:F0}%";
-                                item.Status = $"Complete (-{savings:F0}% smaller)";
+                                item.Status = $"Complete (-{savings:F0}% in {elapsedStr})";
                             }
                             else
                             {
                                 item.SavingsFormatted = $"+{Math.Abs(savings):F0}%";
-                                item.Status = "Complete (already ultra-compact)";
+                                item.Status = $"Complete in {elapsedStr}";
                             }
 
                             try
@@ -1542,6 +1627,11 @@ namespace UniversalDownloader.Avalonia
                     {
                         item.Status = "Cancelled";
                         item.IsCompressing = false;
+                        item.TimeRemainingFormatted = string.Empty;
+                        if (AvaloniaCompressorTotalEtaText != null)
+                        {
+                            AvaloniaCompressorTotalEtaText.Text = "Canceled";
+                        }
                         break;
                     }
                     catch (Exception ex)
@@ -1549,6 +1639,13 @@ namespace UniversalDownloader.Avalonia
                         item.Status = $"Error: {ex.Message}";
                         item.IsCompressing = false;
                     }
+                }
+
+                batchWatch.Stop();
+                string totalElapsed = VideoCompressorService.FormatDurationShort(batchWatch.Elapsed);
+                if (AvaloniaCompressorTotalEtaText != null)
+                {
+                    AvaloniaCompressorTotalEtaText.Text = $"✓ Completed {AvaloniaCompressorItems.Count} files in {totalElapsed}";
                 }
             }
             finally

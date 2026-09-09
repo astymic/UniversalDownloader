@@ -18,6 +18,9 @@ namespace UniversalDownloader.Models
         private string _status = "Ready to compress";
         private bool _isCompressing = false;
         private bool _isCompleted = false;
+        private string _durationFormatted = "";
+        private string _timeRemainingFormatted = "";
+        private double _elapsedSeconds = 0;
 
         public string InputPath
         {
@@ -89,6 +92,24 @@ namespace UniversalDownloader.Models
         {
             get => _isCompleted;
             set { _isCompleted = value; OnPropertyChanged(); }
+        }
+
+        public string DurationFormatted
+        {
+            get => _durationFormatted;
+            set { _durationFormatted = value; OnPropertyChanged(); }
+        }
+
+        public string TimeRemainingFormatted
+        {
+            get => _timeRemainingFormatted;
+            set { _timeRemainingFormatted = value; OnPropertyChanged(); }
+        }
+
+        public double ElapsedSeconds
+        {
+            get => _elapsedSeconds;
+            set { _elapsedSeconds = value; OnPropertyChanged(); }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

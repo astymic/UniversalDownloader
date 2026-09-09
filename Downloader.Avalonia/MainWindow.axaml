@@ -353,7 +353,10 @@
                     <Border Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                         <StackPanel Spacing="12">
                             <Grid ColumnDefinitions="*,Auto">
-                                <TextBlock Grid.Column="0" Text="VIDEOS TO COMPRESS" FontWeight="Bold" FontSize="13" Foreground="White" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <TextBlock Text="VIDEOS TO COMPRESS" FontWeight="Bold" FontSize="13" Foreground="White" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="AvaloniaCompressorTotalEtaText" FontSize="11" Foreground="#38BDF8" VerticalAlignment="Center"/>
+                                </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                                     <Button Classes="primary" Content="📂 Add Video Files" Click="AvaloniaCompressorBrowse_Click"/>
                                     <Button Classes="secondary" Content="Clear List" Click="AvaloniaCompressorClear_Click"/>
@@ -376,6 +379,10 @@
                                                         <TextBlock Text="{Binding SavingsFormatted}" FontSize="11" FontWeight="Bold" Foreground="#10B981" IsVisible="{Binding IsCompleted}"/>
                                                         <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
                                                         <TextBlock Text="{Binding Status}" FontSize="11" Foreground="#818CF8"/>
+                                                        <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" IsVisible="{Binding IsCompleted}"/>
+                                                        <TextBlock Text="{Binding DurationFormatted}" FontSize="11" Foreground="#A1A1AA" IsVisible="{Binding IsCompleted}"/>
+                                                        <TextBlock Text="•" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" IsVisible="{Binding IsCompressing}"/>
+                                                        <TextBlock Text="{Binding TimeRemainingFormatted}" FontSize="11" Foreground="#38BDF8" IsVisible="{Binding IsCompressing}"/>
                                                     </StackPanel>
                                                     <ProgressBar Value="{Binding Progress}" Maximum="100" Height="4" Background="#262630" Foreground="#06B6D4" CornerRadius="2" IsVisible="{Binding IsCompressing}"/>
                                                 </StackPanel>
@@ -402,6 +409,15 @@
                                     <ComboBoxItem Content="🗜️ Maximum Compression (Smallest File Size)"/>
                                     <ComboBoxItem Content="🎯 Target File Size Limit (e.g. 25MB Discord)"/>
                                     <ComboBoxItem Content="⚙️ Custom Parameters"/>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- Hardware Device (GPU vs CPU) -->
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Encoding Device:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <ComboBox x:Name="AvaloniaCompressorDeviceComboBox" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="⚡ Hardware GPU (NVIDIA NVENC / AMD AMF / Intel QSV / Apple VideoToolbox - Recommended)"/>
+                                    <ComboBoxItem Content="💻 Software CPU (Universal Compatibility, Slower)"/>
                                 </ComboBox>
                             </StackPanel>
 

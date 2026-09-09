@@ -216,6 +216,63 @@ namespace UniversalDownloader
             {
                 StartCompressionButton.IsEnabled = CompressorItems.Count > 0 && !_isCompressingActive;
             }
+            if (CompressorItems.Count == 0 && CompressorTotalEtaTextBlock != null)
+            {
+                CompressorTotalEtaTextBlock.Text = string.Empty;
+            }
+        }
+
+        private void UpdateCompressorBatchEta(int currentFileIndex, double currentPercentage, TimeSpan batchElapsed, long totalInputBytes)
+        {
+            if (CompressorTotalEtaTextBlock == null || CompressorItems.Count == 0) return;
+
+            if (CompressorItems.Count == 1)
+            {
+                if (currentPercentage > 1 && batchElapsed.TotalSeconds > 1)
+                {
+                    double remainingSec = (batchElapsed.TotalSeconds / (currentPercentage / 100.0)) - batchElapsed.TotalSeconds;
+                    if (remainingSec > 0)
+                    {
+                        CompressorTotalEtaTextBlock.Text = $"Total ETA: {VideoCompressorService.FormatDurationShort(TimeSpan.FromSeconds(remainingSec))}";
+                    }
+                }
+                return;
+            }
+
+            double totalCompletedSec = batchElapsed.TotalSeconds;
+            if (totalCompletedSec <= 1) return;
+
+            if (totalInputBytes > 0)
+            {
+                long completedBytes = 0;
+                for (int j = 0; j < currentFileIndex; j++)
+                {
+                    completedBytes += CompressorItems[j].OriginalSizeBytes;
+                }
+                var currentItem = CompressorItems[currentFileIndex];
+                completedBytes += (long)(currentItem.OriginalSizeBytes * (currentPercentage / 100.0));
+
+                long remainingBytes = Math.Max(0, totalInputBytes - completedBytes);
+                if (completedBytes > 0)
+                {
+                    double bytesPerSec = completedBytes / totalCompletedSec;
+                    if (bytesPerSec > 0)
+                    {
+                        double remainingSec = remainingBytes / bytesPerSec;
+                        var remainingTime = TimeSpan.FromSeconds(remainingSec);
+                        CompressorTotalEtaTextBlock.Text = $"Total ETA: {VideoCompressorService.FormatDurationShort(remainingTime)} (File {currentFileIndex + 1}/{CompressorItems.Count})";
+                        return;
+                    }
+                }
+            }
+
+            double overallFraction = (currentFileIndex + (currentPercentage / 100.0)) / CompressorItems.Count;
+            if (overallFraction > 0.01)
+            {
+                double totalEstimatedSec = totalCompletedSec / overallFraction;
+                double remainingSec = Math.Max(0, totalEstimatedSec - totalCompletedSec);
+                CompressorTotalEtaTextBlock.Text = $"Total ETA: {VideoCompressorService.FormatDurationShort(TimeSpan.FromSeconds(remainingSec))} (File {currentFileIndex + 1}/{CompressorItems.Count})";
+            }
         }
 
         private void CompressorPresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -413,8 +470,13 @@ namespace UniversalDownloader
                 _ => VideoAudioMode.Copy
             };
 
+            var device = (CompressorDeviceComboBox?.SelectedIndex == 1)
+                ? VideoEncodingDevice.Cpu
+                : VideoEncodingDevice.Gpu;
+
             var options = new VideoCompressorOptions
             {
+                Device = device,
                 Preset = preset,
                 Codec = codec,
                 Crf = crf,
@@ -433,6 +495,13 @@ namespace UniversalDownloader
                 StartCompressionButton.Content = "✕ Cancel Compression";
                 StartCompressionButton.Style = (Style)FindResource("DangerButton");
                 StartCompressionButton.IsEnabled = true;
+            }
+
+            var batchWatch = Stopwatch.StartNew();
+            long totalInputBytes = 0;
+            foreach (var itm in CompressorItems)
+            {
+                totalInputBytes += itm.OriginalSizeBytes;
             }
 
             try
@@ -467,6 +536,9 @@ namespace UniversalDownloader
                     item.IsCompressing = true;
                     item.Status = "Starting compression...";
                     item.Progress = 0;
+                    item.TimeRemainingFormatted = string.Empty;
+
+                    var fileWatch = Stopwatch.StartNew();
 
                     var progress = new Progress<VideoCompressionProgress>(p =>
                     {
@@ -474,6 +546,17 @@ namespace UniversalDownloader
                         {
                             item.Progress = p.Percentage;
                             item.Status = p.StatusMessage;
+
+                            if (p.EstimatedRemainingTime.HasValue)
+                            {
+                                item.TimeRemainingFormatted = $"ETA: {VideoCompressorService.FormatDurationShort(p.EstimatedRemainingTime.Value)}";
+                            }
+                            else
+                            {
+                                item.TimeRemainingFormatted = string.Empty;
+                            }
+
+                            UpdateCompressorBatchEta(i, p.Percentage, batchWatch.Elapsed, totalInputBytes);
                         });
                     });
 
@@ -483,6 +566,12 @@ namespace UniversalDownloader
                         options,
                         progress,
                         _compressorCts.Token);
+
+                    fileWatch.Stop();
+                    item.ElapsedSeconds = fileWatch.Elapsed.TotalSeconds;
+                    string elapsedStr = VideoCompressorService.FormatDurationShort(fileWatch.Elapsed);
+                    item.DurationFormatted = $"⏱️ {elapsedStr}";
+                    item.TimeRemainingFormatted = string.Empty;
 
                     if (success && File.Exists(finalOutputPath))
                     {
@@ -502,12 +591,12 @@ namespace UniversalDownloader
                         if (savings >= 0)
                         {
                             item.SavingsFormatted = $"-{savings:F0}%";
-                            item.Status = $"Completed (-{savings:F0}% smaller)";
+                            item.Status = $"Completed (-{savings:F0}% in {elapsedStr})";
                         }
                         else
                         {
                             item.SavingsFormatted = $"+{Math.Abs(savings):F0}%";
-                            item.Status = "Completed (Original was already ultra-compact)";
+                            item.Status = $"Completed in {elapsedStr}";
                         }
 
                         // Add to download history
@@ -535,16 +624,28 @@ namespace UniversalDownloader
                     }
                 }
 
+                batchWatch.Stop();
+                string totalElapsed = VideoCompressorService.FormatDurationShort(batchWatch.Elapsed);
+                if (CompressorTotalEtaTextBlock != null)
+                {
+                    CompressorTotalEtaTextBlock.Text = $"✓ Completed {CompressorItems.Count} files in {totalElapsed}";
+                }
+
                 ModernMessageBox.Show("All videos have been processed and compressed successfully!", "Compression Completed", MessageBoxButton.OK, MessageBoxImage.Information, this);
             }
             catch (OperationCanceledException)
             {
+                if (CompressorTotalEtaTextBlock != null)
+                {
+                    CompressorTotalEtaTextBlock.Text = "Canceled";
+                }
                 foreach (var it in CompressorItems)
                 {
                     if (it.IsCompressing)
                     {
                         it.IsCompressing = false;
                         it.Status = "Canceled";
+                        it.TimeRemainingFormatted = string.Empty;
                     }
                 }
             }

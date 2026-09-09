@@ -18,6 +18,12 @@ namespace UniversalDownloader.Services
         Custom
     }
 
+    public enum VideoEncodingDevice
+    {
+        Gpu, // Default - Hardware Acceleration (NVENC, AMF, QSV)
+        Cpu  // Software Processing (libx264, libx265, libsvtav1)
+    }
+
     public enum VideoCodec
     {
         H264,
@@ -38,6 +44,7 @@ namespace UniversalDownloader.Services
     {
         public VideoCompressionPreset Preset { get; set; } = VideoCompressionPreset.VisuallyLossless;
         public VideoCodec Codec { get; set; } = VideoCodec.H264;
+        public VideoEncodingDevice Device { get; set; } = VideoEncodingDevice.Gpu;
         public int Crf { get; set; } = 20;
         public double? TargetSizeMb { get; set; } = null;
         public string Resolution { get; set; } = "Original";
@@ -51,6 +58,7 @@ namespace UniversalDownloader.Services
             {
                 Preset = VideoCompressionPreset.VisuallyLossless,
                 Codec = VideoCodec.H264,
+                Device = VideoEncodingDevice.Gpu,
                 Crf = 20,
                 EncoderPreset = "slow",
                 Resolution = "Original",
@@ -65,6 +73,7 @@ namespace UniversalDownloader.Services
             {
                 Preset = VideoCompressionPreset.Balanced,
                 Codec = VideoCodec.H264,
+                Device = VideoEncodingDevice.Gpu,
                 Crf = 24,
                 EncoderPreset = "medium",
                 Resolution = "Original",
@@ -79,6 +88,7 @@ namespace UniversalDownloader.Services
             {
                 Preset = VideoCompressionPreset.MaxCompression,
                 Codec = VideoCodec.H265,
+                Device = VideoEncodingDevice.Gpu,
                 Crf = 28,
                 EncoderPreset = "slow",
                 Resolution = "Original",
@@ -93,6 +103,7 @@ namespace UniversalDownloader.Services
             {
                 Preset = VideoCompressionPreset.TargetSize,
                 Codec = VideoCodec.H264,
+                Device = VideoEncodingDevice.Gpu,
                 TargetSizeMb = targetMb,
                 EncoderPreset = "medium",
                 Resolution = "Original",
@@ -109,6 +120,7 @@ namespace UniversalDownloader.Services
         public string Speed { get; set; } = "";
         public TimeSpan CurrentTime { get; set; }
         public TimeSpan TotalDuration { get; set; }
+        public TimeSpan? EstimatedRemainingTime { get; set; }
         public int Pass { get; set; } = 1;
         public int TotalPasses { get; set; } = 1;
     }
@@ -236,7 +248,8 @@ namespace UniversalDownloader.Services
             VideoCompressorOptions options,
             TimeSpan duration,
             int pass = 0,
-            string? passLogFile = null)
+            string? passLogFile = null,
+            string? encoderOverride = null)
         {
             var args = new List<string>
             {
@@ -269,19 +282,40 @@ namespace UniversalDownloader.Services
             }
 
             // Video codec
-            string vcodec = options.Codec switch
+            string vcodec = encoderOverride ?? (options.Codec switch
             {
                 VideoCodec.H265 => "libx265",
                 VideoCodec.AV1 => "libsvtav1",
                 _ => "libx264"
-            };
+            });
+
             args.Add("-c:v");
             args.Add(vcodec);
 
-            // Preset speed
+            bool isNvenc = vcodec.EndsWith("_nvenc", StringComparison.OrdinalIgnoreCase);
+            bool isAmf = vcodec.EndsWith("_amf", StringComparison.OrdinalIgnoreCase);
+            bool isQsv = vcodec.EndsWith("_qsv", StringComparison.OrdinalIgnoreCase);
+            bool isVideoToolbox = vcodec.EndsWith("_videotoolbox", StringComparison.OrdinalIgnoreCase);
+
             string speedPreset = string.IsNullOrWhiteSpace(options.EncoderPreset) ? "slow" : options.EncoderPreset.ToLowerInvariant();
-            args.Add("-preset");
-            args.Add(speedPreset);
+
+            if (isNvenc)
+            {
+                string nvencPreset = speedPreset switch
+                {
+                    "veryslow" => "p7",
+                    "slow" => "p5",
+                    "fast" => "p2",
+                    _ => "p4"
+                };
+                args.Add("-preset");
+                args.Add(nvencPreset);
+            }
+            else if (!isAmf && !isVideoToolbox)
+            {
+                args.Add("-preset");
+                args.Add(speedPreset);
+            }
 
             bool isTargetSize = options.Preset == VideoCompressionPreset.TargetSize || (options.TargetSizeMb.HasValue && options.TargetSizeMb.Value > 0);
 
@@ -339,8 +373,39 @@ namespace UniversalDownloader.Services
                     crf = options.Codec == VideoCodec.H265 ? 32 : (options.Codec == VideoCodec.AV1 ? 34 : 28);
                 }
 
-                args.Add("-crf");
-                args.Add(crf.ToString());
+                if (isNvenc)
+                {
+                    args.Add("-rc:v");
+                    args.Add("vbr");
+                    args.Add("-cq");
+                    args.Add(crf.ToString());
+                    args.Add("-b:v");
+                    args.Add("0");
+                }
+                else if (isQsv)
+                {
+                    args.Add("-global_quality");
+                    args.Add(crf.ToString());
+                }
+                else if (isAmf)
+                {
+                    args.Add("-rc");
+                    args.Add("cqp");
+                    args.Add("-qp_i");
+                    args.Add(crf.ToString());
+                    args.Add("-qp_p");
+                    args.Add(crf.ToString());
+                }
+                else if (isVideoToolbox)
+                {
+                    args.Add("-q:v");
+                    args.Add(crf.ToString());
+                }
+                else
+                {
+                    args.Add("-crf");
+                    args.Add(crf.ToString());
+                }
             }
 
             // Audio configuration
@@ -382,6 +447,90 @@ namespace UniversalDownloader.Services
             return args;
         }
 
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _hwEncoderCache = new(StringComparer.OrdinalIgnoreCase);
+
+        public async Task<bool> IsHardwareEncoderSupportedAsync(string encoderName)
+        {
+            if (_hwEncoderCache.TryGetValue(encoderName, out bool cached))
+            {
+                return cached;
+            }
+
+            if (!_dependencyManager.IsFfmpegReady) return false;
+
+            try
+            {
+                string nullOut = OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
+                var psi = new ProcessStartInfo
+                {
+                    FileName = _dependencyManager.FfmpegExecutablePath,
+                    Arguments = $"-hide_banner -f lavfi -i nullsrc=s=256x256:d=0.04 -c:v {encoderName} -f null {nullOut}",
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var proc = Process.Start(psi);
+                if (proc == null) return false;
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+                await proc.WaitForExitAsync(cts.Token);
+                bool supported = proc.ExitCode == 0;
+                _hwEncoderCache[encoderName] = supported;
+                return supported;
+            }
+            catch
+            {
+                _hwEncoderCache[encoderName] = false;
+                return false;
+            }
+        }
+
+        public async Task<string> ResolveVideoEncoderAsync(VideoCompressorOptions options)
+        {
+            if (options.Device == VideoEncodingDevice.Cpu)
+            {
+                return options.Codec switch
+                {
+                    VideoCodec.H265 => "libx265",
+                    VideoCodec.AV1 => "libsvtav1",
+                    _ => "libx264"
+                };
+            }
+
+            string[] candidates = options.Codec switch
+            {
+                VideoCodec.H265 => new[] { "hevc_nvenc", "hevc_amf", "hevc_qsv", "hevc_videotoolbox" },
+                VideoCodec.AV1 => new[] { "av1_nvenc", "av1_amf", "av1_qsv" },
+                _ => new[] { "h264_nvenc", "h264_amf", "h264_qsv", "h264_videotoolbox" }
+            };
+
+            foreach (var candidate in candidates)
+            {
+                if (await IsHardwareEncoderSupportedAsync(candidate))
+                {
+                    return candidate;
+                }
+            }
+
+            // Fallback to CPU software encoder if no hardware encoder was capable
+            return options.Codec switch
+            {
+                VideoCodec.H265 => "libx265",
+                VideoCodec.AV1 => "libsvtav1",
+                _ => "libx264"
+            };
+        }
+
+        public static string FormatDurationShort(TimeSpan time)
+        {
+            if (time.TotalSeconds < 1) return "0s";
+            if (time.TotalHours >= 1) return $"{(int)time.TotalHours}h {time.Minutes:D2}m";
+            if (time.TotalMinutes >= 1) return $"{(int)time.TotalMinutes}m {time.Seconds:D2}s";
+            return $"{(int)time.TotalSeconds}s";
+        }
+
         public async Task<bool> CompressVideoAsync(
             string inputFilePath,
             string outputFilePath,
@@ -403,6 +552,34 @@ namespace UniversalDownloader.Services
             var mediaInfo = await GetVideoInfoAsync(inputFilePath);
             TimeSpan duration = mediaInfo.Duration;
 
+            string encoder = await ResolveVideoEncoderAsync(options);
+            bool success = await RunCompressionInternalAsync(inputFilePath, outputFilePath, options, duration, encoder, progress, cancellationToken);
+
+            // If GPU encoder failed, automatically retry with CPU fallback
+            if (!success && encoder != "libx264" && encoder != "libx265" && encoder != "libsvtav1" && !cancellationToken.IsCancellationRequested)
+            {
+                _hwEncoderCache[encoder] = false;
+                string fallbackCpu = options.Codec switch
+                {
+                    VideoCodec.H265 => "libx265",
+                    VideoCodec.AV1 => "libsvtav1",
+                    _ => "libx264"
+                };
+                success = await RunCompressionInternalAsync(inputFilePath, outputFilePath, options, duration, fallbackCpu, progress, cancellationToken);
+            }
+
+            return success && File.Exists(outputFilePath);
+        }
+
+        private async Task<bool> RunCompressionInternalAsync(
+            string inputFilePath,
+            string outputFilePath,
+            VideoCompressorOptions options,
+            TimeSpan duration,
+            string encoder,
+            IProgress<VideoCompressionProgress>? progress,
+            CancellationToken cancellationToken)
+        {
             bool isTargetSize = options.Preset == VideoCompressionPreset.TargetSize || (options.TargetSizeMb.HasValue && options.TargetSizeMb.Value > 0);
 
             if (isTargetSize && options.TargetSizeMb.HasValue && duration.TotalSeconds > 0)
@@ -413,18 +590,17 @@ namespace UniversalDownloader.Services
                 try
                 {
                     // Pass 1
-                    var pass1Args = BuildFfmpegArguments(inputFilePath, outputFilePath, options, duration, pass: 1, passLogFile: tempLogPrefix);
+                    var pass1Args = BuildFfmpegArguments(inputFilePath, outputFilePath, options, duration, pass: 1, passLogFile: tempLogPrefix, encoderOverride: encoder);
                     bool pass1Success = await ExecuteFfmpegCommandAsync(pass1Args, duration, 1, 2, progress, cancellationToken);
                     if (!pass1Success) return false;
 
                     // Pass 2
-                    var pass2Args = BuildFfmpegArguments(inputFilePath, outputFilePath, options, duration, pass: 2, passLogFile: tempLogPrefix);
+                    var pass2Args = BuildFfmpegArguments(inputFilePath, outputFilePath, options, duration, pass: 2, passLogFile: tempLogPrefix, encoderOverride: encoder);
                     bool pass2Success = await ExecuteFfmpegCommandAsync(pass2Args, duration, 2, 2, progress, cancellationToken);
                     return pass2Success && File.Exists(outputFilePath);
                 }
                 finally
                 {
-                    // Clean up 2-pass temp log files
                     try
                     {
                         string log1 = tempLogPrefix + "-0.log";
@@ -438,7 +614,7 @@ namespace UniversalDownloader.Services
             else
             {
                 // Single-pass CRF encoding
-                var args = BuildFfmpegArguments(inputFilePath, outputFilePath, options, duration, pass: 0);
+                var args = BuildFfmpegArguments(inputFilePath, outputFilePath, options, duration, pass: 0, encoderOverride: encoder);
                 bool success = await ExecuteFfmpegCommandAsync(args, duration, 1, 1, progress, cancellationToken);
                 return success && File.Exists(outputFilePath);
             }
@@ -479,6 +655,8 @@ namespace UniversalDownloader.Services
                 catch { }
             });
 
+            var passWatch = Stopwatch.StartNew();
+
             process.ErrorDataReceived += (s, e) =>
             {
                 if (string.IsNullOrEmpty(e.Data)) return;
@@ -510,15 +688,31 @@ namespace UniversalDownloader.Services
                     string speed = speedMatch.Success ? $"{speedMatch.Groups[1].Value}x" : "";
                     string passInfo = totalPasses > 1 ? $"[Pass {currentPass}/{totalPasses}] " : "";
 
+                    TimeSpan? estRemaining = null;
+                    if (passWatch.Elapsed.TotalSeconds > 1.5 && overallPct > 1.0 && overallPct < 99.5)
+                    {
+                        double totalEstSec = passWatch.Elapsed.TotalSeconds / (overallPct / 100.0);
+                        double remSec = Math.Max(0, totalEstSec - passWatch.Elapsed.TotalSeconds);
+                        estRemaining = TimeSpan.FromSeconds(remSec);
+                    }
+                    else if (speedMatch.Success && double.TryParse(speedMatch.Groups[1].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double spdVal) && spdVal > 0.05)
+                    {
+                        double remainingSec = Math.Max(0, totalDuration.TotalSeconds - currentTime.TotalSeconds) / spdVal;
+                        estRemaining = TimeSpan.FromSeconds(remainingSec);
+                    }
+
+                    string etaStr = estRemaining.HasValue ? $" • {FormatDurationShort(estRemaining.Value)} left" : "";
+
                     progress?.Report(new VideoCompressionProgress
                     {
                         Percentage = overallPct,
                         CurrentTime = currentTime,
                         TotalDuration = totalDuration,
+                        EstimatedRemainingTime = estRemaining,
                         Speed = speed,
                         Pass = currentPass,
                         TotalPasses = totalPasses,
-                        StatusMessage = $"{passInfo}Compressing... {overallPct:F0}% {(!string.IsNullOrEmpty(speed) ? $"({speed})" : "")}"
+                        StatusMessage = $"{passInfo}Compressing... {overallPct:F0}% {(!string.IsNullOrEmpty(speed) ? $"({speed})" : "")}{etaStr}"
                     });
                 }
             };

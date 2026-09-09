@@ -1579,7 +1579,10 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="VIDEOS TO COMPRESS" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="VIDEOS TO COMPRESS" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="CompressorTotalEtaTextBlock" Foreground="#38BDF8" FontSize="11.5" FontWeight="SemiBold" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
                                     <Button Grid.Column="1" Content="Clear List" Style="{StaticResource DangerButton}" Padding="10,4" FontSize="11" Click="CompressorClearAll_Click"/>
                                 </Grid>
 
@@ -1605,6 +1608,10 @@
                                                             <TextBlock Text=")" Foreground="#10B981" FontSize="11.5" Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVisConverter}}"/>
                                                             <TextBlock Text=" • " Foreground="{StaticResource BorderBrush}" FontSize="11" Margin="6,0,6,0"/>
                                                             <TextBlock Text="{Binding Status}" Foreground="{StaticResource PrimaryHoverBrush}" FontSize="11.5"/>
+                                                            <TextBlock Text=" • " Foreground="{StaticResource BorderBrush}" FontSize="11" Margin="6,0,6,0" Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVisConverter}}"/>
+                                                            <TextBlock Text="{Binding DurationFormatted}" Foreground="#A1A1AA" FontSize="11.5" Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVisConverter}}"/>
+                                                            <TextBlock Text=" • " Foreground="{StaticResource BorderBrush}" FontSize="11" Margin="6,0,6,0" Visibility="{Binding IsCompressing, Converter={StaticResource BoolToVisConverter}}"/>
+                                                            <TextBlock Text="{Binding TimeRemainingFormatted}" Foreground="#38BDF8" FontSize="11.5" Visibility="{Binding IsCompressing, Converter={StaticResource BoolToVisConverter}}"/>
                                                         </StackPanel>
 
                                                         <!-- Progress Bar -->
@@ -1672,6 +1679,15 @@
                                         <ComboBoxItem Content="🗜️ Maximum Compression (Smallest File Size)"/>
                                         <ComboBoxItem Content="🎯 Target File Size (e.g. Discord 25MB Limit)"/>
                                         <ComboBoxItem Content="⚙️ Custom Parameters"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <!-- Hardware Device (GPU vs CPU) -->
+                                <StackPanel Margin="0,0,0,16">
+                                    <TextBlock Text="Encoding Device:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,6"/>
+                                    <ComboBox x:Name="CompressorDeviceComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0">
+                                        <ComboBoxItem Content="⚡ Hardware GPU (NVIDIA NVENC / AMD AMF / Intel QSV / Apple VideoToolbox - Recommended)" IsSelected="True"/>
+                                        <ComboBoxItem Content="💻 Software CPU (Universal Compatibility, Slower)"/>
                                     </ComboBox>
                                 </StackPanel>
 
