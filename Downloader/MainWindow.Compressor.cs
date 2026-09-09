@@ -133,6 +133,24 @@ namespace UniversalDownloader
         {
             if (sender is Button btn && btn.Tag is VideoCompressorItem item)
             {
+                if (item.IsCompressing || item.Cts != null)
+                {
+                    item.Cancel();
+                    _videoCompressorService?.CancelCurrentProcess();
+
+                    if (!string.IsNullOrEmpty(item.OutputPath))
+                    {
+                        try
+                        {
+                            if (File.Exists(item.OutputPath))
+                            {
+                                File.Delete(item.OutputPath);
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
                 CompressorItems.Remove(item);
                 UpdateCompressorDestinationText();
                 UpdateCompressorUiStates();
@@ -141,6 +159,27 @@ namespace UniversalDownloader
 
         private void CompressorClearAll_Click(object sender, RoutedEventArgs e)
         {
+            if (_isCompressingActive)
+            {
+                _compressorCts?.Cancel();
+                _videoCompressorService?.CancelCurrentProcess();
+                foreach (var itm in CompressorItems)
+                {
+                    itm.Cancel();
+                    if (!string.IsNullOrEmpty(itm.OutputPath) && itm.IsCompressing)
+                    {
+                        try
+                        {
+                            if (File.Exists(itm.OutputPath))
+                            {
+                                File.Delete(itm.OutputPath);
+                            }
+                        }
+                        catch { }
+                    }
+                }
+            }
+
             CompressorItems.Clear();
             UpdateCompressorDestinationText();
             UpdateCompressorUiStates();
@@ -381,6 +420,8 @@ namespace UniversalDownloader
             if (_isCompressingActive)
             {
                 _compressorCts?.Cancel();
+                _videoCompressorService?.CancelCurrentProcess();
+                if (StartCompressionButton != null) StartCompressionButton.Content = "Stopping...";
                 return;
             }
 
@@ -506,10 +547,18 @@ namespace UniversalDownloader
 
             try
             {
-                for (int i = 0; i < CompressorItems.Count; i++)
+                while (true)
                 {
-                    var item = CompressorItems[i];
                     _compressorCts.Token.ThrowIfCancellationRequested();
+
+                    var item = System.Linq.Enumerable.FirstOrDefault(CompressorItems, it => !it.IsCompleted && !it.IsCompressing);
+                    if (item == null)
+                    {
+                        break;
+                    }
+
+                    using var itemCts = CancellationTokenSource.CreateLinkedTokenSource(_compressorCts.Token);
+                    item.Cts = itemCts;
 
                     string originalBaseName = Path.GetFileNameWithoutExtension(item.InputPath);
                     string extension = ".mp4";
@@ -544,6 +593,8 @@ namespace UniversalDownloader
                     {
                         Dispatcher.Invoke(() =>
                         {
+                            if (!CompressorItems.Contains(item)) return;
+
                             item.Progress = p.Percentage;
                             item.Status = p.StatusMessage;
 
@@ -556,22 +607,60 @@ namespace UniversalDownloader
                                 item.TimeRemainingFormatted = string.Empty;
                             }
 
-                            UpdateCompressorBatchEta(i, p.Percentage, batchWatch.Elapsed, totalInputBytes);
+                            int currentIndex = CompressorItems.IndexOf(item);
+                            if (currentIndex >= 0)
+                            {
+                                UpdateCompressorBatchEta(currentIndex, p.Percentage, batchWatch.Elapsed, totalInputBytes);
+                            }
                         });
                     });
 
-                    bool success = await _videoCompressorService.CompressVideoAsync(
-                        item.InputPath,
-                        finalOutputPath,
-                        options,
-                        progress,
-                        _compressorCts.Token);
+                    bool success = false;
+                    try
+                    {
+                        success = await _videoCompressorService.CompressVideoAsync(
+                            item.InputPath,
+                            finalOutputPath,
+                            options,
+                            progress,
+                            itemCts.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        if (_compressorCts.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+
+                        // Just this individual file was removed or cancelled
+                        item.IsCompressing = false;
+                        item.Cts = null;
+                        try
+                        {
+                            if (File.Exists(finalOutputPath))
+                            {
+                                File.Delete(finalOutputPath);
+                            }
+                        }
+                        catch { }
+                        continue;
+                    }
+                    finally
+                    {
+                        item.Cts = null;
+                    }
 
                     fileWatch.Stop();
+                    item.IsCompressing = false;
                     item.ElapsedSeconds = fileWatch.Elapsed.TotalSeconds;
                     string elapsedStr = VideoCompressorService.FormatDurationShort(fileWatch.Elapsed);
                     item.DurationFormatted = $"⏱️ {elapsedStr}";
                     item.TimeRemainingFormatted = string.Empty;
+
+                    if (!CompressorItems.Contains(item))
+                    {
+                        continue;
+                    }
 
                     if (success && File.Exists(finalOutputPath))
                     {
@@ -579,7 +668,6 @@ namespace UniversalDownloader
                         item.CompressedSizeBytes = outFi.Length;
                         item.CompressedSizeFormatted = Utilities.FormatBytesOutput(outFi.Length);
                         item.Progress = 100;
-                        item.IsCompressing = false;
                         item.IsCompleted = true;
 
                         double savings = 0;
@@ -619,19 +707,21 @@ namespace UniversalDownloader
                     }
                     else
                     {
-                        item.IsCompressing = false;
                         item.Status = "Compression failed.";
                     }
                 }
 
                 batchWatch.Stop();
                 string totalElapsed = VideoCompressorService.FormatDurationShort(batchWatch.Elapsed);
-                if (CompressorTotalEtaTextBlock != null)
+                if (CompressorTotalEtaTextBlock != null && CompressorItems.Count > 0)
                 {
                     CompressorTotalEtaTextBlock.Text = $"✓ Completed {CompressorItems.Count} files in {totalElapsed}";
                 }
 
-                ModernMessageBox.Show("All videos have been processed and compressed successfully!", "Compression Completed", MessageBoxButton.OK, MessageBoxImage.Information, this);
+                if (CompressorItems.Count > 0)
+                {
+                    ModernMessageBox.Show("All videos have been processed and compressed successfully!", "Compression Completed", MessageBoxButton.OK, MessageBoxImage.Information, this);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -699,6 +789,17 @@ namespace UniversalDownloader
                 }
                 catch { }
             }
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            try
+            {
+                _compressorCts?.Cancel();
+                _videoCompressorService?.CancelCurrentProcess();
+            }
+            catch { }
+            base.OnClosed(e);
         }
     }
 }

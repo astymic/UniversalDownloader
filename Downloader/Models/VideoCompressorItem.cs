@@ -112,6 +112,24 @@ namespace UniversalDownloader.Models
             set { _elapsedSeconds = value; OnPropertyChanged(); }
         }
 
+        private System.Threading.CancellationTokenSource? _cts;
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public System.Threading.CancellationTokenSource? Cts
+        {
+            get => _cts;
+            set => _cts = value;
+        }
+
+        public void Cancel()
+        {
+            try
+            {
+                _cts?.Cancel();
+            }
+            catch { }
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? name = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

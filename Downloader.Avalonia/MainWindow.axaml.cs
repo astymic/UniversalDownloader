@@ -1183,6 +1183,27 @@ namespace UniversalDownloader.Avalonia
 
         private void AvaloniaCompressorClear_Click(object? sender, RoutedEventArgs e)
         {
+            if (_isAvaloniaCompressing)
+            {
+                _avaloniaCompressorCts?.Cancel();
+                _videoCompressorService.CancelCurrentProcess();
+                foreach (var itm in AvaloniaCompressorItems)
+                {
+                    itm.Cancel();
+                    if (!string.IsNullOrEmpty(itm.OutputPath) && itm.IsCompressing)
+                    {
+                        try
+                        {
+                            if (File.Exists(itm.OutputPath))
+                            {
+                                File.Delete(itm.OutputPath);
+                            }
+                        }
+                        catch { }
+                    }
+                }
+            }
+
             AvaloniaCompressorItems.Clear();
             UpdateAvaloniaCompressorDestinationText();
             UpdateAvaloniaCompressorEmptyState();
@@ -1192,6 +1213,24 @@ namespace UniversalDownloader.Avalonia
         {
             if (sender is Button btn && btn.Tag is VideoCompressorItem item)
             {
+                if (item.IsCompressing || item.Cts != null)
+                {
+                    item.Cancel();
+                    _videoCompressorService.CancelCurrentProcess();
+
+                    if (!string.IsNullOrEmpty(item.OutputPath))
+                    {
+                        try
+                        {
+                            if (File.Exists(item.OutputPath))
+                            {
+                                File.Delete(item.OutputPath);
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
                 AvaloniaCompressorItems.Remove(item);
                 UpdateAvaloniaCompressorDestinationText();
                 UpdateAvaloniaCompressorEmptyState();
@@ -1395,6 +1434,7 @@ namespace UniversalDownloader.Avalonia
             if (_isAvaloniaCompressing)
             {
                 _avaloniaCompressorCts?.Cancel();
+                _videoCompressorService.CancelCurrentProcess();
                 if (AvaloniaStartCompressButton != null) AvaloniaStartCompressButton.Content = "Stopping...";
                 return;
             }
@@ -1510,11 +1550,18 @@ namespace UniversalDownloader.Avalonia
 
             try
             {
-                for (int i = 0; i < AvaloniaCompressorItems.Count; i++)
+                while (true)
                 {
-                    var item = AvaloniaCompressorItems[i];
-                    if (item.IsCompleted) continue;
-                    if (_avaloniaCompressorCts.IsCancellationRequested) break;
+                    _avaloniaCompressorCts.Token.ThrowIfCancellationRequested();
+
+                    var item = AvaloniaCompressorItems.FirstOrDefault(it => !it.IsCompleted && !it.IsCompressing);
+                    if (item == null)
+                    {
+                        break;
+                    }
+
+                    using var itemCts = CancellationTokenSource.CreateLinkedTokenSource(_avaloniaCompressorCts.Token);
+                    item.Cts = itemCts;
 
                     item.IsCompressing = true;
                     item.Status = "Compressing...";
@@ -1549,6 +1596,8 @@ namespace UniversalDownloader.Avalonia
                     {
                         Dispatcher.UIThread.Post(() =>
                         {
+                            if (!AvaloniaCompressorItems.Contains(item)) return;
+
                             item.Progress = p.Percentage;
                             item.Status = p.StatusMessage;
 
@@ -1561,20 +1610,29 @@ namespace UniversalDownloader.Avalonia
                                 item.TimeRemainingFormatted = string.Empty;
                             }
 
-                            UpdateAvaloniaCompressorBatchEta(i, p.Percentage, batchWatch.Elapsed, totalInputBytes);
+                            int currentIndex = AvaloniaCompressorItems.IndexOf(item);
+                            if (currentIndex >= 0)
+                            {
+                                UpdateAvaloniaCompressorBatchEta(currentIndex, p.Percentage, batchWatch.Elapsed, totalInputBytes);
+                            }
                         });
                     });
 
                     try
                     {
-                        bool success = await _videoCompressorService.CompressVideoAsync(item.InputPath, outPath, options, progress, _avaloniaCompressorCts.Token);
+                        bool success = await _videoCompressorService.CompressVideoAsync(item.InputPath, outPath, options, progress, itemCts.Token);
 
                         fileWatch.Stop();
+                        item.IsCompressing = false;
                         item.ElapsedSeconds = fileWatch.Elapsed.TotalSeconds;
                         string elapsedStr = VideoCompressorService.FormatDurationShort(fileWatch.Elapsed);
                         item.DurationFormatted = $"⏱️ {elapsedStr}";
                         item.TimeRemainingFormatted = string.Empty;
-                        item.IsCompressing = false;
+
+                        if (!AvaloniaCompressorItems.Contains(item))
+                        {
+                            continue;
+                        }
 
                         if (success && File.Exists(outPath))
                         {
@@ -1625,25 +1683,45 @@ namespace UniversalDownloader.Avalonia
                     }
                     catch (OperationCanceledException)
                     {
-                        item.Status = "Cancelled";
-                        item.IsCompressing = false;
-                        item.TimeRemainingFormatted = string.Empty;
-                        if (AvaloniaCompressorTotalEtaText != null)
+                        if (_avaloniaCompressorCts.IsCancellationRequested)
                         {
-                            AvaloniaCompressorTotalEtaText.Text = "Canceled";
+                            item.Status = "Cancelled";
+                            item.IsCompressing = false;
+                            item.TimeRemainingFormatted = string.Empty;
+                            if (AvaloniaCompressorTotalEtaText != null)
+                            {
+                                AvaloniaCompressorTotalEtaText.Text = "Canceled";
+                            }
+                            break;
                         }
-                        break;
+
+                        // Just this item was removed/canceled
+                        item.IsCompressing = false;
+                        item.Cts = null;
+                        try
+                        {
+                            if (File.Exists(outPath))
+                            {
+                                File.Delete(outPath);
+                            }
+                        }
+                        catch { }
+                        continue;
                     }
                     catch (Exception ex)
                     {
                         item.Status = $"Error: {ex.Message}";
                         item.IsCompressing = false;
                     }
+                    finally
+                    {
+                        item.Cts = null;
+                    }
                 }
 
                 batchWatch.Stop();
                 string totalElapsed = VideoCompressorService.FormatDurationShort(batchWatch.Elapsed);
-                if (AvaloniaCompressorTotalEtaText != null)
+                if (AvaloniaCompressorTotalEtaText != null && AvaloniaCompressorItems.Count > 0)
                 {
                     AvaloniaCompressorTotalEtaText.Text = $"✓ Completed {AvaloniaCompressorItems.Count} files in {totalElapsed}";
                 }
@@ -1653,6 +1731,17 @@ namespace UniversalDownloader.Avalonia
                 _isAvaloniaCompressing = false;
                 if (AvaloniaStartCompressButton != null) AvaloniaStartCompressButton.Content = "🗜️ Start Video Compression";
             }
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            try
+            {
+                _avaloniaCompressorCts?.Cancel();
+                _videoCompressorService?.CancelCurrentProcess();
+            }
+            catch { }
+            base.OnClosed(e);
         }
         #endregion
     }

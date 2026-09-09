@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -553,19 +554,35 @@ namespace UniversalDownloader.Services
             TimeSpan duration = mediaInfo.Duration;
 
             string encoder = await ResolveVideoEncoderAsync(options);
-            bool success = await RunCompressionInternalAsync(inputFilePath, outputFilePath, options, duration, encoder, progress, cancellationToken);
-
-            // If GPU encoder failed, automatically retry with CPU fallback
-            if (!success && encoder != "libx264" && encoder != "libx265" && encoder != "libsvtav1" && !cancellationToken.IsCancellationRequested)
+            bool success = false;
+            try
             {
-                _hwEncoderCache[encoder] = false;
-                string fallbackCpu = options.Codec switch
+                success = await RunCompressionInternalAsync(inputFilePath, outputFilePath, options, duration, encoder, progress, cancellationToken);
+
+                // If GPU encoder failed, automatically retry with CPU fallback
+                if (!success && encoder != "libx264" && encoder != "libx265" && encoder != "libsvtav1" && !cancellationToken.IsCancellationRequested)
                 {
-                    VideoCodec.H265 => "libx265",
-                    VideoCodec.AV1 => "libsvtav1",
-                    _ => "libx264"
-                };
-                success = await RunCompressionInternalAsync(inputFilePath, outputFilePath, options, duration, fallbackCpu, progress, cancellationToken);
+                    _hwEncoderCache[encoder] = false;
+                    string fallbackCpu = options.Codec switch
+                    {
+                        VideoCodec.H265 => "libx265",
+                        VideoCodec.AV1 => "libsvtav1",
+                        _ => "libx264"
+                    };
+                    success = await RunCompressionInternalAsync(inputFilePath, outputFilePath, options, duration, fallbackCpu, progress, cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                try
+                {
+                    if (File.Exists(outputFilePath))
+                    {
+                        File.Delete(outputFilePath);
+                    }
+                }
+                catch { }
+                throw;
             }
 
             return success && File.Exists(outputFilePath);
@@ -620,6 +637,58 @@ namespace UniversalDownloader.Services
             }
         }
 
+        private readonly object _processLock = new();
+        private Process? _currentProcess;
+
+        public void CancelCurrentProcess()
+        {
+            lock (_processLock)
+            {
+                if (_currentProcess != null)
+                {
+                    ForceKillProcess(_currentProcess);
+                }
+            }
+        }
+
+        private static void ForceKillProcess(Process process)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    int pid = 0;
+                    try { pid = process.Id; } catch { }
+
+                    try
+                    {
+                        process.Kill(entireProcessTree: true);
+                    }
+                    catch { }
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && pid > 0)
+                    {
+                        try
+                        {
+                            if (!process.HasExited)
+                            {
+                                using var killer = Process.Start(new ProcessStartInfo
+                                {
+                                    FileName = "taskkill",
+                                    Arguments = $"/F /T /PID {pid}",
+                                    CreateNoWindow = true,
+                                    UseShellExecute = false
+                                });
+                                killer?.WaitForExit(1000);
+                            }
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch { }
+        }
+
         private async Task<bool> ExecuteFfmpegCommandAsync(
             List<string> arguments,
             TimeSpan totalDuration,
@@ -648,12 +717,13 @@ namespace UniversalDownloader.Services
 
             using var reg = cancellationToken.Register(() =>
             {
-                try
-                {
-                    if (!process.HasExited) process.Kill(true);
-                }
-                catch { }
+                ForceKillProcess(process);
             });
+
+            lock (_processLock)
+            {
+                _currentProcess = process;
+            }
 
             var passWatch = Stopwatch.StartNew();
 
@@ -720,8 +790,26 @@ namespace UniversalDownloader.Services
             process.Start();
             process.BeginErrorReadLine();
 
-            await process.WaitForExitAsync(cancellationToken);
-            return process.ExitCode == 0;
+            try
+            {
+                await process.WaitForExitAsync(cancellationToken);
+                return process.ExitCode == 0;
+            }
+            catch (OperationCanceledException)
+            {
+                ForceKillProcess(process);
+                throw;
+            }
+            finally
+            {
+                lock (_processLock)
+                {
+                    if (_currentProcess == process)
+                    {
+                        _currentProcess = null;
+                    }
+                }
+            }
         }
     }
 }
