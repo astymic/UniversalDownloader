@@ -42,6 +42,7 @@ namespace UniversalDownloader
             if (SearchScrollViewer != null) SearchScrollViewer.Visibility = Visibility.Collapsed;
             if (LiveStreamScrollViewer != null) LiveStreamScrollViewer.Visibility = Visibility.Collapsed;
             if (CompressorScrollViewer != null) CompressorScrollViewer.Visibility = Visibility.Collapsed;
+            if (GifWebpScrollViewer != null) GifWebpScrollViewer.Visibility = Visibility.Collapsed;
             if (HistoryScrollViewer != null)
             {
                 HistoryScrollViewer.Visibility = Visibility.Visible;
@@ -215,6 +216,14 @@ namespace UniversalDownloader
                 {
                     Debug.WriteLine($"Failed to open folder: {ex.Message}");
                 }
+            }
+        }
+
+        private void HistoryCreateClip_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is DownloadHistoryItem item && !string.IsNullOrEmpty(item.FilePath) && File.Exists(item.FilePath))
+            {
+                OpenVideoInGifCreator(item.FilePath);
             }
         }
 

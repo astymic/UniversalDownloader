@@ -1311,6 +1311,7 @@
                                             <!-- Action Buttons -->
                                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                                 <Button Style="{StaticResource PrimaryOutlineButton}" Content="▶ Play" Click="HistoryPreviewPlay_Click" Tag="{Binding}" Margin="0,0,8,0" Padding="12,6" FontSize="12" ToolTip="Preview in media player"/>
+                                                <Button Style="{StaticResource SecondaryButton}" Content="🎞️ Clip" Click="HistoryCreateClip_Click" Tag="{Binding}" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Create GIF or WebP clip from this video"/>
                                                 <Button Style="{StaticResource SecondaryButton}" Content="📂 Folder" Click="HistoryOpenFolder_Click" Tag="{Binding}" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Show file in folder"/>
                                                 <Button Style="{StaticResource SecondaryButton}" Content="🔗 Link" Click="HistoryCopyUrl_Click" Tag="{Binding}" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Open source link in browser and copy URL"/>
                                                 <Button Style="{StaticResource MinimalistCancelButton}" Content="✕" Click="HistoryDeleteItem_Click" Tag="{Binding}" Padding="8,6" FontSize="11" ToolTip="Remove from history"/>
@@ -1960,6 +1961,446 @@
                                 HorizontalAlignment="Center" 
                                 Click="StartCompressionButton_Click"
                                 IsEnabled="False"/>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- GIF & WebP Clip Creator Studio View -->
+                <ScrollViewer x:Name="GifWebpScrollViewer" 
+                              VerticalScrollBarVisibility="Auto" 
+                              HorizontalScrollBarVisibility="Disabled" 
+                              Visibility="Collapsed"
+                              AllowDrop="True"
+                              Drop="GifDropZone_Drop"
+                              DragOver="GifDropZone_DragOver"
+                              PreviewDragOver="GifDropZone_PreviewDragOver"
+                              PreviewDrop="GifDropZone_PreviewDrop">
+                    <StackPanel Margin="40,20,40,90" MaxWidth="780">
+                        <!-- Top Bar: Back Button -->
+                        <Grid Margin="0,0,0,20">
+                            <Button Content="&#x2190; Back to Downloader" 
+                                    Style="{StaticResource SecondaryButton}" 
+                                    Padding="14,8" 
+                                    FontSize="12.5" 
+                                    Click="BackFromGifCreator_Click" 
+                                    HorizontalAlignment="Left"/>
+                        </Grid>
+
+                        <!-- Header -->
+                        <TextBlock Text="GIF &amp; WebP Clip Creator" 
+                                   FontSize="32" 
+                                   FontWeight="Bold" 
+                                   Foreground="{StaticResource TextPrimaryBrush}" 
+                                   Margin="0,0,0,6"/>
+                        <TextBlock Text="Trim and convert videos into high-fidelity animated GIFs and lightweight animated WebP stickers." 
+                                   Foreground="{StaticResource TextSecondaryBrush}" 
+                                   FontSize="13" 
+                                   Margin="0,0,0,20"/>
+
+                        <!-- Drag & Drop Zone / Browse (Shown when no video loaded) -->
+                        <Border x:Name="GifDropZone" 
+                                Background="#141418" 
+                                BorderBrush="#3F3F46" 
+                                BorderThickness="2" 
+                                CornerRadius="16" 
+                                Padding="32,28" 
+                                Margin="0,0,0,20"
+                                AllowDrop="True"
+                                Drop="GifDropZone_Drop"
+                                DragOver="GifDropZone_DragOver"
+                                PreviewDragOver="GifDropZone_PreviewDragOver"
+                                PreviewDragEnter="GifDropZone_PreviewDragEnter"
+                                PreviewDragLeave="GifDropZone_PreviewDragLeave"
+                                PreviewDrop="GifDropZone_PreviewDrop"
+                                Cursor="Hand"
+                                PreviewMouseLeftButtonDown="GifBrowseVideo_Click">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="🎞️" FontSize="38" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                                <TextBlock Text="Drag &amp; Drop a video file here" Foreground="{StaticResource TextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBlock Text="or click to browse local video (MP4, MKV, MOV, WEBM, AVI, FLV, WMV)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" HorizontalAlignment="Center" Margin="0,0,0,14"/>
+                                <Button Content="Browse Video" Style="{StaticResource SecondaryButton}" Padding="18,7" FontSize="12.5" HorizontalAlignment="Center" Click="GifBrowseVideo_Click"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Active Clip Creator Studio Container (Shown when a video is loaded) -->
+                        <StackPanel x:Name="GifEditorContainer" Visibility="Collapsed">
+                            
+                            <!-- Source Video Info Card with Change Button -->
+                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16,14" Margin="0,0,0,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock x:Name="GifVideoTitleText" Text="Video Title.mp4" Foreground="{StaticResource TextPrimaryBrush}" FontSize="14" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock x:Name="GifVideoMetaText" Text="1920x1080 • 30 fps • 25.4 MB" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="🔄 Change Video" Style="{StaticResource SecondaryButton}" Padding="12,6" FontSize="11.5" Click="GifChangeVideo_Click"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Video Preview Player Card -->
+                            <Border Background="#0E0E12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,16">
+                                <StackPanel>
+                                    <!-- Video Viewport -->
+                                    <Border Background="#000000" CornerRadius="8" MaxHeight="300" ClipToBounds="True" Margin="0,0,0,12">
+                                        <MediaElement x:Name="GifMediaPlayer" 
+                                                      LoadedBehavior="Manual" 
+                                                      UnloadedBehavior="Stop" 
+                                                      MediaOpened="GifPlayer_MediaOpened" 
+                                                      MediaEnded="GifPlayer_MediaEnded" 
+                                                      Stretch="Uniform" 
+                                                      HorizontalAlignment="Center" 
+                                                      VerticalAlignment="Center"
+                                                      MaxHeight="300"/>
+                                    </Border>
+
+                                    <!-- Player Controls Bar -->
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Play/Pause Button -->
+                                        <Button x:Name="GifPlayPauseButton" 
+                                                Grid.Column="0" 
+                                                Style="{StaticResource SecondaryButton}" 
+                                                Width="38" 
+                                                Height="32" 
+                                                Padding="0" 
+                                                Margin="0,0,12,0" 
+                                                Click="GifPlayPause_Click"
+                                                ToolTip="Play / Pause">
+                                            <TextBlock x:Name="GifPlayPauseIcon" Text="▶" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Button>
+
+                                        <!-- Scrubber Slider -->
+                                        <Slider x:Name="GifPlayerScrubber" 
+                                                Grid.Column="1" 
+                                                Minimum="0" 
+                                                Maximum="100" 
+                                                Value="0" 
+                                                VerticalAlignment="Center"
+                                                PreviewMouseDown="GifPlayerScrubber_PreviewMouseDown"
+                                                PreviewMouseUp="GifPlayerScrubber_PreviewMouseUp"
+                                                ValueChanged="GifPlayerScrubber_ValueChanged"/>
+
+                                        <!-- Current / Total Time -->
+                                        <TextBlock x:Name="GifPlayerTimeText" 
+                                                   Grid.Column="2" 
+                                                   Text="00:00 / 00:00" 
+                                                   Foreground="{StaticResource TextSecondaryBrush}" 
+                                                   FontSize="12" 
+                                                   FontWeight="SemiBold" 
+                                                   VerticalAlignment="Center" 
+                                                   Margin="12,0,0,0"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Interactive Precision Trimming Section -->
+                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,16">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="CLIP TRIMMING RANGE" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        <!-- Loop Preview Button -->
+                                        <Button Grid.Column="1" Content="🔁 Preview Clip Loop" Style="{StaticResource SecondaryButton}" Padding="10,4" FontSize="11" Click="GifPreviewLoop_Click" ToolTip="Play loop strictly between Start and End"/>
+                                    </Grid>
+
+                                    <!-- Start and End Controls -->
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="20"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Start Time -->
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="START TIME" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox x:Name="GifStartTimeTextBox" Grid.Column="0" Text="00:00.00" Style="{StaticResource ModernTextBox}" Height="38" LostFocus="GifStartTimeTextBox_LostFocus"/>
+                                                <Button Grid.Column="1" Content="[ Set Current" Style="{StaticResource SecondaryButton}" Height="38" Padding="10,0" Margin="8,0,0,0" FontSize="11" Click="GifSetCurrentAsStart_Click" ToolTip="Set current player time as clip start"/>
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <!-- End Time -->
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="END TIME" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox x:Name="GifEndTimeTextBox" Grid.Column="0" Text="00:05.00" Style="{StaticResource ModernTextBox}" Height="38" LostFocus="GifEndTimeTextBox_LostFocus"/>
+                                                <Button Grid.Column="1" Content="Set Current ]" Style="{StaticResource SecondaryButton}" Height="38" Padding="10,0" Margin="8,0,0,0" FontSize="11" Click="GifSetCurrentAsEnd_Click" ToolTip="Set current player time as clip end"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Selected Clip Duration Badge -->
+                                    <Border Background="#18181B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8">
+                                        <TextBlock x:Name="GifClipDurationBadge" Text="Selected Clip: 5.00s (120 frames @ 24 fps)" Foreground="#38BDF8" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Format and Presets Card -->
+                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="OUTPUT FORMAT &amp; PRESET" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,14"/>
+
+                                    <!-- Format Radio Buttons -->
+                                    <Grid Margin="0,0,0,16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <RadioButton x:Name="GifFormatGifRadio" Grid.Column="0" Content="Animated GIF (.gif)" IsChecked="True" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13.5" FontWeight="SemiBold" Checked="GifFormat_Checked"/>
+                                        <RadioButton x:Name="GifFormatWebpRadio" Grid.Column="1" Content="Animated WebP (.webp)" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13.5" FontWeight="SemiBold" Checked="GifFormat_Checked"/>
+                                    </Grid>
+
+                                    <!-- Preset Selector -->
+                                    <TextBlock Text="Preset Profile" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                    <ComboBox x:Name="GifPresetComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0" SelectionChanged="GifPresetComboBox_SelectionChanged" Margin="0,0,0,12">
+                                        <ComboBoxItem Content="🌟 Maximum Quality (High-Fidelity, 256 colors / Lossless WebP)"/>
+                                        <ComboBoxItem Content="⚖️ Balanced (Discord &amp; Web Sharing, 720p / 24fps)"/>
+                                        <ComboBoxItem Content="🗜️ Maximum Compression (Compact Sticker / Emoji, 256px / 15fps)"/>
+                                        <ComboBoxItem Content="🎯 Target File Size (Auto-calculate to fit MB limit)"/>
+                                        <ComboBoxItem Content="⚙️ Custom Parameters (Full Manual Control)"/>
+                                    </ComboBox>
+
+                                    <!-- Target Size Panel (Visible only when preset is Target Size) -->
+                                    <Border x:Name="GifTargetSizePanel" Background="#18181B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,12" Visibility="Collapsed">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                <TextBlock Text="Target File Size Limit (MB):" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold"/>
+                                                <TextBlock Text="Automatically tunes resolution and fps so clip stays under limit" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                            <TextBox x:Name="GifTargetSizeTextBox" Grid.Column="1" Text="10" Style="{StaticResource ModernTextBox}" Width="70" Height="36" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Collapsible Detailed Parameters Drawer -->
+                                    <Border x:Name="GifDropdownBorder" Background="#18181B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,4,0,0">
+                                        <StackPanel>
+                                            <!-- Drawer Header Toggle Button -->
+                                            <Button x:Name="GifToggleSettingsButton" 
+                                                    Click="GifToggleSettings_Click"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Padding="14,10"
+                                                    HorizontalContentAlignment="Stretch"
+                                                    Cursor="Hand">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <TextBlock Text="⚙️ Advanced Parameters (FPS, Resolution, Speed, Dithering)" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold"/>
+                                                    </StackPanel>
+                                                    <TextBlock x:Name="GifDropdownArrow" Grid.Column="1" Text="▼" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Button>
+
+                                            <!-- Collapsible Panel Content -->
+                                            <Border x:Name="GifDetailedSettingsPanel" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}" Padding="16" Visibility="Collapsed">
+                                                <StackPanel x:Name="GifOptionsPanel">
+                                                    <!-- Row 1: FPS and Resolution -->
+                                                    <Grid Margin="0,0,0,12">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="16"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <!-- Frame Rate (FPS) -->
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock Text="Frame Rate (FPS)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                                            <ComboBox x:Name="GifFpsComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="1">
+                                                                <ComboBoxItem Content="60 fps (Ultra Smooth)" Tag="60"/>
+                                                                <ComboBoxItem Content="30 fps (Smooth - Recommended)" Tag="30"/>
+                                                                <ComboBoxItem Content="24 fps (Cinematic Standard)" Tag="24"/>
+                                                                <ComboBoxItem Content="20 fps (Web Optimized)" Tag="20"/>
+                                                                <ComboBoxItem Content="15 fps (Compact Standard)" Tag="15"/>
+                                                                <ComboBoxItem Content="12 fps (Low Bandwidth)" Tag="12"/>
+                                                                <ComboBoxItem Content="10 fps (Sticker / Minimal)" Tag="10"/>
+                                                            </ComboBox>
+                                                        </StackPanel>
+
+                                                        <!-- Resolution / Scale -->
+                                                        <StackPanel Grid.Column="2">
+                                                            <TextBlock Text="Resolution / Width" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                                            <ComboBox x:Name="GifResolutionComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0">
+                                                                <ComboBoxItem Content="Original Resolution" Tag="0"/>
+                                                                <ComboBoxItem Content="1080p (Full HD)" Tag="1080"/>
+                                                                <ComboBoxItem Content="720p (HD)" Tag="720"/>
+                                                                <ComboBoxItem Content="480p (Standard)" Tag="480"/>
+                                                                <ComboBoxItem Content="360p (Compact)" Tag="360"/>
+                                                                <ComboBoxItem Content="256px (Emoji / Sticker)" Tag="256"/>
+                                                            </ComboBox>
+                                                        </StackPanel>
+                                                    </Grid>
+
+                                                    <!-- Row 2: Speed and Looping -->
+                                                    <Grid Margin="0,0,0,12">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="16"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <!-- Speed Multiplier -->
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock Text="Playback Speed" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                                            <ComboBox x:Name="GifSpeedComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="2">
+                                                                <ComboBoxItem Content="0.5x (Slow Motion)" Tag="0.5"/>
+                                                                <ComboBoxItem Content="0.75x (Slower)" Tag="0.75"/>
+                                                                <ComboBoxItem Content="1.0x (Normal Speed)" Tag="1.0"/>
+                                                                <ComboBoxItem Content="1.25x (Faster)" Tag="1.25"/>
+                                                                <ComboBoxItem Content="1.5x (Fast)" Tag="1.5"/>
+                                                                <ComboBoxItem Content="2.0x (Double Speed)" Tag="2.0"/>
+                                                            </ComboBox>
+                                                        </StackPanel>
+
+                                                        <!-- Looping -->
+                                                        <StackPanel Grid.Column="2">
+                                                            <TextBlock Text="Loop Mode" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                                            <ComboBox x:Name="GifLoopComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0">
+                                                                <ComboBoxItem Content="Infinite Loop (Standard)" Tag="0"/>
+                                                                <ComboBoxItem Content="Play Once (No Loop)" Tag="-1"/>
+                                                            </ComboBox>
+                                                        </StackPanel>
+                                                    </Grid>
+
+                                                    <!-- GIF Specific: Dithering and Max Colors -->
+                                                    <Grid x:Name="GifDitherPanel" Margin="0,0,0,12">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="16"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <!-- Dithering -->
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock Text="GIF Dithering Mode" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                                            <ComboBox x:Name="GifDitherComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0">
+                                                                <ComboBoxItem Content="Sierra2_4a (Smoothest Gradients)" Tag="sierra2_4a"/>
+                                                                <ComboBoxItem Content="Bayer (Compact / Structured)" Tag="bayer"/>
+                                                                <ComboBoxItem Content="Floyd-Steinberg (Crisp)" Tag="floyd_steinberg"/>
+                                                                <ComboBoxItem Content="None (Solid Colors, Smallest Size)" Tag="none"/>
+                                                            </ComboBox>
+                                                        </StackPanel>
+
+                                                        <!-- Colors -->
+                                                        <StackPanel x:Name="GifColorsPanel" Grid.Column="2">
+                                                            <TextBlock Text="Color Palette Size" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                                            <ComboBox x:Name="GifColorsComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0">
+                                                                <ComboBoxItem Content="256 Colors (Maximum Fidelity)" Tag="256"/>
+                                                                <ComboBoxItem Content="128 Colors (Optimized)" Tag="128"/>
+                                                                <ComboBoxItem Content="64 Colors (Compact)" Tag="64"/>
+                                                                <ComboBoxItem Content="32 Colors (Minimal Size)" Tag="32"/>
+                                                            </ComboBox>
+                                                        </StackPanel>
+                                                    </Grid>
+
+                                                    <!-- WebP Specific: Quality Slider & Lossless -->
+                                                    <StackPanel x:Name="GifWebpQualityPanel" Visibility="Collapsed" Margin="0,0,0,6">
+                                                        <Grid Margin="0,0,0,6">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="WebP Visual Quality" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold"/>
+                                                            <TextBlock x:Name="GifWebpQualityValueText" Grid.Column="1" Text="Quality: 80%" Foreground="#38BDF8" FontSize="11" FontWeight="Bold"/>
+                                                        </Grid>
+                                                        <Slider x:Name="GifWebpQualitySlider" Minimum="10" Maximum="100" Value="80" TickFrequency="5" IsSnapToTickEnabled="True" ValueChanged="GifWebpQualitySlider_ValueChanged" Margin="0,0,0,8"/>
+                                                        <CheckBox x:Name="GifWebpLosslessCheckBox" Content="Lossless Compression Mode" Style="{StaticResource ModernCheckBox}"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Destination Folder & Output File Preview -->
+                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="OUTPUT DESTINATION" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,12"/>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="GifDestinationTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="38"/>
+                                        <Button Grid.Column="1" Content="Browse Custom..." Style="{StaticResource SecondaryButton}" Padding="12,0" Height="38" Margin="8,0,0,0" Click="GifBrowseDestination_Click"/>
+                                        <Button Grid.Column="2" Content="Reset" Style="{StaticResource SecondaryButton}" Padding="12,0" Height="38" Margin="8,0,0,0" Click="GifResetDestination_Click"/>
+                                    </Grid>
+                                    <TextBlock x:Name="GifOutputPreviewText" Text="[Destination Preview]" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Live Progress Panel (Visible while encoding) -->
+                            <Border x:Name="GifProgressPanel" Background="#18181B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,16" Visibility="Collapsed">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="GifProgressText" Grid.Column="0" Text="Encoding frames..." Foreground="#38BDF8" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <Button x:Name="GifCancelButton" Grid.Column="1" Content="✕ Cancel" Style="{StaticResource DangerButton}" Padding="12,4" FontSize="11" Click="GifCancelButton_Click"/>
+                                    </Grid>
+                                    <ProgressBar x:Name="GifProgressBar" Height="8" Minimum="0" Maximum="100" Value="0" Foreground="#F43F5E" Background="#27272A"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Completed Card (Visible on success) -->
+                            <Border x:Name="GifCompletionCard" Background="#14281E" BorderBrush="#10B981" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,16" Visibility="Collapsed">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="✓ Clip Created Successfully!" Foreground="#34D399" FontSize="14" FontWeight="Bold"/>
+                                        <TextBlock x:Name="GifCompletedFileNameText" Text="Clip_Name.gif" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12.5" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                        <TextBlock x:Name="GifCompletedSizeText" Text="File size: 1.2 MB • Time spent: 1.4s" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button x:Name="GifOpenCompletedFileButton" Content="▶ Open File" Style="{StaticResource SecondaryButton}" Padding="12,6" FontSize="12" Margin="0,0,8,0" Click="GifOpenCompletedFile_Click"/>
+                                        <Button x:Name="GifOpenCompletedFolderButton" Content="📂 Open Folder" Style="{StaticResource SecondaryButton}" Padding="12,6" FontSize="12" Click="GifOpenCompletedFolder_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Create Action Button -->
+                            <Button x:Name="GifCreateButton" 
+                                    Content="🎞️ Create GIF Clip" 
+                                    Style="{StaticResource ModernButton}" 
+                                    Height="48" 
+                                    Width="260" 
+                                    HorizontalAlignment="Center" 
+                                    Click="GifCreateButton_Click"
+                                    Margin="0,0,0,20"/>
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
 
@@ -3181,6 +3622,37 @@
                                                 <Setter TargetName="border" Property="Effect">
                                                     <Setter.Value>
                                                         <DropShadowEffect BlurRadius="15" ShadowDepth="0" Color="#06B6D4" Opacity="0.6"/>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+
+                            <!-- GIF & WebP Clip Creator Button -->
+                            <Button x:Name="GifCreatorButton"
+                                    Width="44"
+                                    Height="44"
+                                    Margin="0,0,0,12"
+                                    HorizontalAlignment="Center"
+                                    Click="GifCreatorButton_Click"
+                                    ToolTip="GIF &amp; WebP Clip Creator"
+                                    Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="border" Background="#1E1E24" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="22">
+                                            <!-- Modern Filmstrip / Scissors / Clip SVG Icon -->
+                                            <Path Width="18" Height="18" Stretch="Uniform" Fill="#FAFAFA" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Data="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="#F43F5E"/>
+                                                <Setter TargetName="border" Property="BorderBrush" Value="#FB7185"/>
+                                                <Setter TargetName="border" Property="Effect">
+                                                    <Setter.Value>
+                                                        <DropShadowEffect BlurRadius="15" ShadowDepth="0" Color="#F43F5E" Opacity="0.6"/>
                                                     </Setter.Value>
                                                 </Setter>
                                             </Trigger>

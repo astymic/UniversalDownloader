@@ -89,6 +89,7 @@ namespace UniversalDownloader
             if (SearchScrollViewer != null) SearchScrollViewer.Visibility = Visibility.Collapsed;
             if (LiveStreamScrollViewer != null) LiveStreamScrollViewer.Visibility = Visibility.Collapsed;
             if (CompressorScrollViewer != null) CompressorScrollViewer.Visibility = Visibility.Collapsed;
+            if (GifWebpScrollViewer != null) GifWebpScrollViewer.Visibility = Visibility.Collapsed;
 
             if (QueueScrollViewer != null)
             {

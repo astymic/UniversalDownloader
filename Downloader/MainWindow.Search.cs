@@ -78,6 +78,7 @@ namespace UniversalDownloader
             if (HistoryScrollViewer != null) HistoryScrollViewer.Visibility = Visibility.Collapsed;
             if (LiveStreamScrollViewer != null) LiveStreamScrollViewer.Visibility = Visibility.Collapsed;
             if (CompressorScrollViewer != null) CompressorScrollViewer.Visibility = Visibility.Collapsed;
+            if (GifWebpScrollViewer != null) GifWebpScrollViewer.Visibility = Visibility.Collapsed;
 
             if (SearchScrollViewer != null)
             {
@@ -101,6 +102,7 @@ namespace UniversalDownloader
             if (HistoryScrollViewer != null) HistoryScrollViewer.Visibility = Visibility.Collapsed;
             if (LiveStreamScrollViewer != null) LiveStreamScrollViewer.Visibility = Visibility.Collapsed;
             if (CompressorScrollViewer != null) CompressorScrollViewer.Visibility = Visibility.Collapsed;
+            if (GifWebpScrollViewer != null) GifWebpScrollViewer.Visibility = Visibility.Collapsed;
 
             if (SearchScrollViewer != null)
             {

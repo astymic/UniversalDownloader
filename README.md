@@ -74,6 +74,18 @@ A modern, high-performance, cross-platform desktop workstation (**Windows & Linu
 - **Flexible Downscaling & FPS Capping** — Downscale 4K/2K to 1080p, 720p, or 480p, and optionally cap framerates to 60, 30, or 24 FPS.
 - **Audio Modes** — Lossless passthrough stream copy, compact AAC 128 kbps, HQ AAC 192 kbps, or strip audio entirely (Mute).
 
+### 🎞️ GIF & WebP Clip Creator (Right Sidebar Tab)
+- **Dual Output Formats** — Create universal animated `.gif` files or lightweight, modern animated `.webp` stickers (up to 50–80% smaller with 24-bit color fidelity).
+- **Interactive Video Preview & Precision Trimmer** — Embedded player with real-time seek bar, `[ Set Current as Start ]` and `[ Set Current as End ]` markers, and a `[ 🔁 Preview Clip Loop ]` button to test the exact looping animation before encoding.
+- **Two-Pass Adaptive Palette Generation (GIF)** — Custom FFmpeg filter pipeline (`palettegen` + `paletteuse`) generating crisp 256-color palettes with Sierra2_4a or Bayer dithering for buttery-smooth gradients without color banding.
+- **Granular Compression Profiles**:
+  - 🌟 **Maximum Quality**: Full resolution, 30 fps, 256 colors / Lossless WebP, zero visible artifacts.
+  - ⚖️ **Balanced**: Discord & web-optimized 720p/480p @ 24 fps with Bayer dithering.
+  - 🗜️ **Maximum Compression**: Compact 256px sticker size @ 15 fps with 128-color quantization.
+  - 🎯 **Target File Size**: Automatically computes dimensions, frame rates, and color budgets to strictly stay under user-defined limits (e.g. 10 MB or 25 MB Discord free tiers).
+  - ⚙️ **Custom Parameters**: Full manual control over playback speed (0.5x to 2.0x), custom looping, framerate, scaling, dithering, and lossy/lossless WebP quality.
+- **1-Click History Integration** — Direct `[ 🎞️ Clip ]` button on any downloaded video in Download History to instantly open and trim it into a clip.
+
 ### 📜 Download History & Metadata
 - Filterable and searchable history log with direct file opening, folder navigation, and URL copying.
 - Automatic ID3 tag embedding (Artist, Title, Album, Thumbnail Artwork).

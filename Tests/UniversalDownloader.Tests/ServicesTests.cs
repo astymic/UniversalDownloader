@@ -448,6 +448,119 @@ namespace UniversalDownloader.Tests
                 }
             }
         }
+
+        [Fact]
+        public void GifWebp_BuildFfmpegArguments_HighQualityGif()
+        {
+            var options = GifWebpOptions.CreateMaxQuality(GifWebpFormat.Gif);
+            options.StartTime = TimeSpan.FromSeconds(1);
+            options.EndTime = TimeSpan.FromSeconds(4);
+
+            var args = GifWebpService.BuildFfmpegArguments("input.mp4", "output.gif", options);
+
+            Assert.Contains("-ss", args);
+            Assert.Contains("1", args);
+            Assert.Contains("-to", args);
+            Assert.Contains("4", args);
+            Assert.Contains("-filter_complex", args);
+
+            int fcIdx = args.IndexOf("-filter_complex");
+            string fc = args[fcIdx + 1];
+
+            Assert.Contains("fps=30", fc);
+            Assert.Contains("palettegen=max_colors=256:stats_mode=diff", fc);
+            Assert.Contains("paletteuse=dither=sierra2_4a", fc);
+            Assert.Contains("-loop", args);
+            int loopIdx = args.IndexOf("-loop");
+            Assert.Equal("0", args[loopIdx + 1]);
+        }
+
+        [Fact]
+        public void GifWebp_BuildFfmpegArguments_CompressedGif()
+        {
+            var options = GifWebpOptions.CreateMaxCompression(GifWebpFormat.Gif);
+            options.StartTime = TimeSpan.FromSeconds(0);
+            options.EndTime = TimeSpan.FromSeconds(3);
+
+            var args = GifWebpService.BuildFfmpegArguments("input.mp4", "output.gif", options);
+
+            int fcIdx = args.IndexOf("-filter_complex");
+            string fc = args[fcIdx + 1];
+
+            Assert.Contains("fps=15", fc);
+            Assert.Contains("scale=320:-2", fc);
+            Assert.Contains("palettegen=max_colors=128", fc);
+            Assert.Contains("paletteuse=dither=bayer:bayer_scale=3", fc);
+        }
+
+        [Fact]
+        public void GifWebp_BuildFfmpegArguments_AnimatedWebp_LossyAndLossless()
+        {
+            // 1. Lossy WebP
+            var lossyOptions = GifWebpOptions.CreateBalanced(GifWebpFormat.Webp);
+            var lossyArgs = GifWebpService.BuildFfmpegArguments("input.mp4", "output.webp", lossyOptions);
+
+            Assert.Contains("-vcodec", lossyArgs);
+            int vcIdx = lossyArgs.IndexOf("-vcodec");
+            Assert.Equal("libwebp", lossyArgs[vcIdx + 1]);
+
+            Assert.Contains("-lossless", lossyArgs);
+            int llIdx = lossyArgs.IndexOf("-lossless");
+            Assert.Equal("0", lossyArgs[llIdx + 1]);
+
+            Assert.Contains("-q:v", lossyArgs);
+            int qIdx = lossyArgs.IndexOf("-q:v");
+            Assert.Equal("70", lossyArgs[qIdx + 1]);
+
+            // 2. Lossless WebP
+            var losslessOptions = new GifWebpOptions
+            {
+                Format = GifWebpFormat.Webp,
+                WebpLossless = true
+            };
+            var losslessArgs = GifWebpService.BuildFfmpegArguments("input.mp4", "output.webp", losslessOptions);
+
+            int llIdx2 = losslessArgs.IndexOf("-lossless");
+            Assert.Equal("1", losslessArgs[llIdx2 + 1]);
+        }
+
+        [Fact]
+        public void GifWebp_BuildFfmpegArguments_SpeedAdjustment()
+        {
+            var options = new GifWebpOptions
+            {
+                Format = GifWebpFormat.Gif,
+                SpeedMultiplier = 2.0, // 2x speed -> setpts=0.5*PTS
+                Fps = 24
+            };
+
+            var args = GifWebpService.BuildFfmpegArguments("input.mp4", "output.gif", options);
+            int fcIdx = args.IndexOf("-filter_complex");
+            string fc = args[fcIdx + 1];
+
+            Assert.Contains("setpts=0.5*PTS", fc);
+            Assert.Contains("fps=24", fc);
+        }
+
+        [Fact]
+        public void GifWebp_TargetSizeTuning_ScalesDownUnderTightBudget()
+        {
+            var options = new GifWebpOptions
+            {
+                Format = GifWebpFormat.Gif,
+                Preset = GifWebpPreset.TargetSize,
+                TargetSizeMb = 1.0, // 1 MB for 10 seconds clip
+                StartTime = TimeSpan.Zero,
+                EndTime = TimeSpan.FromSeconds(10)
+            };
+
+            GifWebpService.ApplyTargetSizeTuning(options);
+
+            // Should scale down width and fps to fit tight 1MB budget
+            Assert.True(options.Width <= 360);
+            Assert.True(options.Fps <= 15);
+            Assert.True(options.MaxColors <= 128);
+        }
     }
 }
 

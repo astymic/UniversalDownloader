@@ -37,48 +37,15 @@ This document tracks planned features, architectural requirements, and specifica
 
 ---
 
-### 3. 🎞️ Advanced GIF & WebP Clip Creator (Enhanced Compression & Quality Control)
-* **Goal**: Expand the Media Converter and Trimmer into a dedicated high-fidelity GIF & animated WebP generator with granular quality and compression presets.
-* **Key Capabilities**:
-  * **Dual Output Formats**: Animated `.gif` and modern `.webp` (smaller file size, 24-bit color, alpha transparency support).
-  * **Compression & Quality Profiles**:
-    * 🌟 **Maximum Quality (Lossless / High-Fidelity)**:
-      * FFmpeg two-pass palette generation (`palettegen` + `paletteuse=dither=sierra2_4a`).
-      * High frame rate (30 fps / original fps), 0% lossy artifacts, full resolution.
-    * ⚖️ **Balanced (Discord / Web Sharing Optimized)**:
-      * Adaptive 256-color palette with dithering.
-      * Capped resolution (720p / 480p) and 20–24 fps.
-      * Target file size limiter (e.g. under 10 MB or 25 MB for Discord Nitro/free limits).
-    * 🗜️ **Maximum Compression (Compact Sticker / Emoji Size)**:
-      * Aggressive lossy WebP compression or low-palette GIF (64–128 colors).
-      * Frame skipping (12–15 fps) and scale down (320px / 256px).
-  * **Interactive Trimming Controls**: Start and end timestamps previewed directly from the video trimmer slider.
-  * **Speed & Looping Options**: Custom playback speed (0.5x, 1x, 1.5x, 2x) and loop count (Infinite vs N times).
+### 3. 🎞️ Advanced GIF & WebP Clip Creator (Enhanced Compression & Quality Control) ✅ *Completed & Released*
+* **Status**: Implemented with dedicated studio view, built-in preview player, precision loop trimmer, two-pass adaptive palettegen for GIF, animated WebP encoding, customizable presets (Max Quality, Balanced, Max Compression, Target Size, Custom), and Download History integration.
 
 ---
 
-### 4. 🗜️ "Smart Video Compressor" (Lossless / High-Efficiency Video Compression)
-* **Goal**: Enable users to compress videos with perceptually lossless visual quality by default, while offering full control over encoding parameters, target sizes, and codec profiles.
-* **Key Capabilities**:
-  * **Default Mode: Visually Lossless Compression**:
-    * Perceptually indistinguishable from original using modern FFmpeg encoders (H.264 / H.265 HEVC / AV1) with Constant Rate Factor (`crf=18–22` for x264, `crf=22–26` for x265) and efficient presets (`preset=slow`).
-    * Audio pass-through stream copy (`-c:a copy`) or high-bitrate Opus/AAC encoding.
-    * Significant file size reductions (typically 40%–70% smaller) with zero visible artifacts.
-  * **Granular Parameter Customization**:
-    * **Compression Modes**:
-      * **Visually Lossless (Default)**: Optimized for maximum size savings without noticeable quality degradation.
-      * **Target File Size Limit**: Auto-calculates 2-pass bitrate to fit exact sharing limits (e.g. Discord 25MB / 100MB, Telegram, email).
-      * **Custom CRF / Constant Quality**: Fine slider control from Ultra-Compact (high CRF) to Master Quality (low CRF).
-    * **Codec Selection**: H.264 (universal compatibility across older hardware/browsers), H.265 / HEVC (higher compression efficiency), AV1 (cutting-edge compression).
-    * **Resolution & Scaling**: Keep original resolution (default), or downscale to 1080p, 720p, 480p with bicubic/lanczos filtering.
-    * **Framerate (FPS) Control**: Keep source framerate (default), or cap to 60 / 30 / 24 fps to save additional bandwidth.
-    * **Encoding Speed vs Compression Efficiency**: Granular preset selection (`fast`, `medium`, `slow`, `veryslow`).
-  * **Integration & Usability**:
-    * **Post-Download Compression Option**: Checkbox in download settings: `[ ] Compress video after download`.
-    * **Stand-Alone Compression Utility**: Accessible from the Media Converter tab for dragging and dropping any local video file.
-    * **Real-time Before/After Metrics**: Live estimation and comparison of original file size vs. compressed file size and percentage saved.
+### 4. 🗜️ "Smart Video Compressor" (Lossless / High-Efficiency Video Compression) ✅ *Completed & Released (v1.0.14)*
+* **Status**: Implemented with GPU/CPU acceleration, ETA timers, elapsed time tracking, folder drag-and-drop, and Discord target sizing.
 
 ---
 
-*Last updated: 2026-09-09*
+*Last updated: 2026-09-13*
 
