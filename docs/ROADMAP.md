@@ -16,8 +16,8 @@ This document tracks planned features, architectural requirements, and specifica
 
 ---
 
-### 3. 🎞️ Advanced GIF & WebP Clip Creator (Enhanced Compression & Quality Control) ✅ *Completed & Released*
-* **Status**: Implemented with dedicated studio view, built-in preview player, precision loop trimmer, two-pass adaptive palettegen for GIF, animated WebP encoding, customizable presets (Max Quality, Balanced, Max Compression, Target Size, Custom), and Download History integration.
+### 3. 🎞️ Advanced GIF, WebP & Telegram Video Sticker Studio (Crop, 4K Proxy & Preset Optimization) ✅ *Completed & Released (v1.0.15)*
+* **Status**: Implemented with dedicated studio view, built-in preview player, 4K lightweight proxy scrub engine, visual draggable crop box, precision loop trimmer, two-pass adaptive palettegen for GIF, animated WebP encoding, Telegram Video Sticker (.webm) preset (VP9 512x512 <=256KB), customizable presets, and Download History integration.
 
 ---
 

@@ -74,17 +74,26 @@ A modern, high-performance, cross-platform desktop workstation (**Windows & Linu
 - **Flexible Downscaling & FPS Capping** — Downscale 4K/2K to 1080p, 720p, or 480p, and optionally cap framerates to 60, 30, or 24 FPS.
 - **Audio Modes** — Lossless passthrough stream copy, compact AAC 128 kbps, HQ AAC 192 kbps, or strip audio entirely (Mute).
 
-### 🎞️ GIF & WebP Clip Creator (Right Sidebar Tab)
-- **Dual Output Formats** — Create universal animated `.gif` files or lightweight, modern animated `.webp` stickers (up to 50–80% smaller with 24-bit color fidelity).
-- **Interactive Video Preview & Precision Trimmer** — Embedded player with real-time seek bar, `[ Set Current as Start ]` and `[ Set Current as End ]` markers, and a `[ 🔁 Preview Clip Loop ]` button to test the exact looping animation before encoding.
-- **Two-Pass Adaptive Palette Generation (GIF)** — Custom FFmpeg filter pipeline (`palettegen` + `paletteuse`) generating crisp 256-color palettes with Sierra2_4a or Bayer dithering for buttery-smooth gradients without color banding.
+### 🎞️ GIF, WebP & Telegram Video Sticker Studio (Right Sidebar Tab)
+- **Three Versatile Output Formats**:
+  - **Animated GIF**: Universal compatibility with two-pass adaptive palette generation (`palettegen` + `paletteuse`) and Sierra2_4a or Bayer dithering for smooth color gradients without banding.
+  - **Animated WebP**: Modern, ultra-lightweight animations (50–80% smaller than GIF) with 24-bit truecolor fidelity, configurable quality (lossy/lossless), and alpha transparency.
+  - **Telegram Video Stickers (`.webm`)**: 1-click preset strictly adhering to Telegram sticker specifications: VP9 codec, 512x512 canvas, 30 FPS, max 3 seconds duration, strict 256 KB file size ceiling, and no audio track for instant upload to `@Stickers`.
+- **Interactive Visual Crop Box**: Draggable and resizable on-screen crop rectangle with aspect-ratio locking (1:1 square for stickers/avatars, 16:9, 4:3, 9:16, or freeform).
+- **Embedded Player & 4K Proxy Preview**: Real-time seek bar, start/end marker buttons (`[ Set Current as Start ]`, `[ Set Current as End ]`), timeline jump buttons (`[⏮ Start]`, `[⏭ End]`), and a `[ 🔁 Preview Clip Loop ]` button. Includes automatic fast lightweight proxy generation for 4K and heavy codecs for instant, stutter-free timeline scrub and preview.
 - **Granular Compression Profiles**:
-  - 🌟 **Maximum Quality**: Full resolution, 30 fps, 256 colors / Lossless WebP, zero visible artifacts.
-  - ⚖️ **Balanced**: Discord & web-optimized 720p/480p @ 24 fps with Bayer dithering.
-  - 🗜️ **Maximum Compression**: Compact 256px sticker size @ 15 fps with 128-color quantization.
-  - 🎯 **Target File Size**: Automatically computes dimensions, frame rates, and color budgets to strictly stay under user-defined limits (e.g. 10 MB or 25 MB Discord free tiers).
-  - ⚙️ **Custom Parameters**: Full manual control over playback speed (0.5x to 2.0x), custom looping, framerate, scaling, dithering, and lossy/lossless WebP quality.
-- **1-Click History Integration** — Direct `[ 🎞️ Clip ]` button on any downloaded video in Download History to instantly open and trim it into a clip.
+  - 🌟 **Maximum Quality**: Full resolution, 30 fps, 256 colors / Lossless WebP.
+  - ⚖️ **Balanced**: Discord & web-optimized 720p/480p @ 24 fps.
+  - 🗜️ **Maximum Compression**: Compact 256px sticker size @ 15 fps.
+  - ✈️ **Telegram Video Sticker**: 512x512, VP9, 30 fps, strictly under 256 KB.
+  - 🎯 **Target File Size**: Computes dimensions, framerates, and bitrates to stay under user-defined limits (e.g. 10 MB or 25 MB Discord).
+  - ⚙️ **Custom Parameters**: Full manual control over playback speed (0.5x to 2.0x), custom looping, framerate, scaling, dithering, and crop coordinates.
+- **1-Click History Integration** — Direct `[ 🎞️ Clip ]` button on any downloaded video in Download History to instantly open, crop, and trim it into a clip.
+
+### ⏻ Automated Power Management (Shutdown, Sleep, Hibernate)
+- **Automatic Post-Process Power Actions**: Integrated directly into the **Download Queue**, **Media Converter**, and **Smart Video Compressor**.
+- **Configurable Modes**: Choose between **Shut Down PC**, **Sleep**, or **Hibernate** upon queue or batch completion.
+- **60-Second Safety Countdown Modal**: Displays an active countdown dialog with an instant `[ Cancel ]` button so you can safely abort if you are still working.
 
 ### 📜 Download History & Metadata
 - Filterable and searchable history log with direct file opening, folder navigation, and URL copying.
