@@ -476,7 +476,19 @@ namespace UniversalDownloader
 
                 if (!token.IsCancellationRequested)
                 {
-                    ModernMessageBox.Show($"Converted {successCount} of {ConverterItems.Count} files successfully.", "Conversion Complete", MessageBoxButton.OK, MessageBoxImage.Information, this);
+                    bool shouldTriggerPower = ConverterAutoPowerCheckBox?.IsChecked == true;
+                    int selectedIdx = ConverterAutoPowerActionComboBox?.SelectedIndex ?? 0;
+                    var action = SystemPowerService.ParseFromIndex(selectedIdx);
+
+                    if (shouldTriggerPower)
+                    {
+                        if (ConverterAutoPowerCheckBox != null) ConverterAutoPowerCheckBox.IsChecked = false;
+                        ShutdownCountdownDialog.Show(action, "Media Converter", 60, this);
+                    }
+                    else
+                    {
+                        ModernMessageBox.Show($"Converted {successCount} of {ConverterItems.Count} files successfully.", "Conversion Complete", MessageBoxButton.OK, MessageBoxImage.Information, this);
+                    }
                 }
             }
             catch (OperationCanceledException)

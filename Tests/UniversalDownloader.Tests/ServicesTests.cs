@@ -695,6 +695,23 @@ namespace UniversalDownloader.Tests
 
             Assert.Equal("-", args[^1]);
         }
+
+        [Fact]
+        public void SystemPowerService_ParseFromIndex_ResolvesCorrectActions()
+        {
+            Assert.Equal(PowerAction.Shutdown, SystemPowerService.ParseFromIndex(0));
+            Assert.Equal(PowerAction.Sleep, SystemPowerService.ParseFromIndex(1));
+            Assert.Equal(PowerAction.Hibernate, SystemPowerService.ParseFromIndex(2));
+            Assert.Equal(PowerAction.Shutdown, SystemPowerService.ParseFromIndex(99));
+        }
+
+        [Fact]
+        public void SystemPowerService_GetActionDisplayName_ReturnsExpectedLabels()
+        {
+            Assert.Equal("Shut Down", SystemPowerService.GetActionDisplayName(PowerAction.Shutdown));
+            Assert.Equal("Sleep", SystemPowerService.GetActionDisplayName(PowerAction.Sleep));
+            Assert.Equal("Hibernate", SystemPowerService.GetActionDisplayName(PowerAction.Hibernate));
+        }
     }
 }
 

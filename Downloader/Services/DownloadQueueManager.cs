@@ -26,6 +26,7 @@ namespace UniversalDownloader.Services
         public event Action<DownloadQueueItem>? ItemCompleted;
         public event Action<DownloadQueueItem>? ItemFailed;
         public event Action? QueueChanged;
+        public event Action? QueueCompleted;
 
         public DownloadQueueManager(DownloadService downloadService, HistoryService historyService)
         {
@@ -421,6 +422,11 @@ namespace UniversalDownloader.Services
             finally
             {
                 _isProcessing = false;
+                bool hasUnfinished = _items.Any(i => i.Status == QueueItemStatus.Queued || i.Status == QueueItemStatus.Downloading);
+                if (!hasUnfinished && _items.Count > 0)
+                {
+                    QueueCompleted?.Invoke();
+                }
             }
         }
 

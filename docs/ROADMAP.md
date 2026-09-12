@@ -6,34 +6,13 @@ This document tracks planned features, architectural requirements, and specifica
 
 ## 📋 Feature Priority Backlog
 
-### 1. 🎬 "Download Full Season / All Episodes" (Batch Anime Queue)
-* **Goal**: Enable 1-click downloading of entire anime seasons or multi-episode series from the YummyAnime catalog.
-* **Key Capabilities**:
-  * **"Download All Episodes" Header Action**: Place a prominent batch button inside the episode selector view.
-  * **Preferred Dub / Voiceover Selection**: Inherits current voiceover choice (e.g. AniLibria, SHIZA Project, Subtitles) across all episodes.
-  * **Automatic Resolution Waterfall**: Prioritizes Alloha (1080p) ➔ Kodik (720p) ➔ Sibnet / CVH fallback per episode.
-  * **Structured Directory Hierarchy**: Automatically organizes downloads into subfolders:
-    ```
-    Downloads/
-    └── Anime/
-        └── [Anime Title]/
-            ├── S01E01 - [AniLibria 1080p].mp4
-            ├── S01E02 - [AniLibria 1080p].mp4
-            └── ...
-    ```
-  * **Batch Queue Integration**: Push items sequentially or in parallel into `DownloadQueueManager` with individual progress tracking, pause/resume, and retry support.
+### 1. 🎬 "Download Full Season / All Episodes" (Batch Anime Queue) ✅ *Completed*
+* **Status**: Implemented with "Select All" (`Выбрать все`) in the series drawer, batch resolution waterfall (Alloha 1080p ➔ Cinemar ➔ VideoCDN ➔ Kodik), and 1-click batch enqueueing (`⬇ Скачать все ({N} серий)`).
 
 ---
 
-### 2. 🔌 "Shut Down PC When Downloads Finish" (Queue Automation)
-* **Goal**: Allow users to leave large download queues or season batches running unattended (e.g. overnight).
-* **Key Capabilities**:
-  * **UI Toggle**: Checkbox in the Queue tab: `[ ] Shut down PC when queue completes`.
-  * **Execution Options**:
-    * Power Off / Shutdown (`shutdown /s /t 60`)
-    * Sleep / Hibernate (`rundll32.exe powrprof.dll,SetSuspendState`)
-  * **Safety Countdown Dialog**: A 60-second warning modal with a `"Cancel Shutdown"` button in case the user is still at the computer.
-  * **Trigger Hook**: Invoked in `DownloadQueueManager` when all active and pending downloads reach `Completed` state without errors.
+### 2. 🔌 "Shut Down PC When Finished" (Queue, Converter & Compressor Automation) ✅ *Completed*
+* **Status**: Implemented across Download Queue, Media Converter, and Video Compressor with options for **Shut down**, **Sleep**, or **Hibernate**, featuring a 60-second safety countdown modal, audio warnings, and instant cancel capability.
 
 ---
 

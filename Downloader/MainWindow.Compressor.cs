@@ -792,7 +792,19 @@ namespace UniversalDownloader
 
                 if (CompressorItems.Count > 0)
                 {
-                    ModernMessageBox.Show("All videos have been processed and compressed successfully!", "Compression Completed", MessageBoxButton.OK, MessageBoxImage.Information, this);
+                    bool shouldTriggerPower = CompressorAutoPowerCheckBox?.IsChecked == true;
+                    int selectedIdx = CompressorAutoPowerActionComboBox?.SelectedIndex ?? 0;
+                    var action = SystemPowerService.ParseFromIndex(selectedIdx);
+
+                    if (shouldTriggerPower)
+                    {
+                        if (CompressorAutoPowerCheckBox != null) CompressorAutoPowerCheckBox.IsChecked = false;
+                        ShutdownCountdownDialog.Show(action, "Video Compressor", 60, this);
+                    }
+                    else
+                    {
+                        ModernMessageBox.Show("All videos have been processed and compressed successfully!", "Compression Completed", MessageBoxButton.OK, MessageBoxImage.Information, this);
+                    }
                 }
             }
             catch (OperationCanceledException)

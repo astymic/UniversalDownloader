@@ -1617,15 +1617,42 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Start Conversion Button -->
-                        <Button x:Name="StartConversionButton" 
-                                Content="⚡ Start Conversion" 
-                                Style="{StaticResource ModernButton}" 
-                                Height="46" 
-                                Width="240" 
-                                HorizontalAlignment="Center" 
-                                Click="StartConversionButton_Click"
-                                IsEnabled="False"/>
+                        <!-- Start Conversion Button & Action Bar -->
+                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="20,14" Margin="0,0,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <CheckBox x:Name="ConverterAutoPowerCheckBox" 
+                                              Style="{StaticResource ModernCheckBox}" 
+                                              Content="⏻ When finished:" 
+                                              VerticalAlignment="Center" 
+                                              Margin="0,0,10,0"
+                                              ToolTip="Automatically trigger selected power action when media conversion completes"/>
+                                    <ComboBox x:Name="ConverterAutoPowerActionComboBox" 
+                                              Style="{StaticResource ModernComboBox}" 
+                                              Width="125" 
+                                              Height="36" 
+                                              Padding="12,6" 
+                                              FontSize="12" 
+                                              SelectedIndex="0">
+                                        <ComboBoxItem Content="Shut down"/>
+                                        <ComboBoxItem Content="Sleep"/>
+                                        <ComboBoxItem Content="Hibernate"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <Button x:Name="StartConversionButton" 
+                                        Grid.Column="1"
+                                        Content="⚡ Start Conversion" 
+                                        Style="{StaticResource ModernButton}" 
+                                        Height="44" 
+                                        Width="200" 
+                                        Click="StartConversionButton_Click"
+                                        IsEnabled="False"/>
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
 
@@ -2025,15 +2052,42 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Start Compression Button -->
-                        <Button x:Name="StartCompressionButton" 
-                                Content="🗜️ Start Video Compression" 
-                                Style="{StaticResource ModernButton}" 
-                                Height="46" 
-                                Width="260" 
-                                HorizontalAlignment="Center" 
-                                Click="StartCompressionButton_Click"
-                                IsEnabled="False"/>
+                        <!-- Start Compression Button & Action Bar -->
+                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="20,14" Margin="0,0,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <CheckBox x:Name="CompressorAutoPowerCheckBox" 
+                                              Style="{StaticResource ModernCheckBox}" 
+                                              Content="⏻ When finished:" 
+                                              VerticalAlignment="Center" 
+                                              Margin="0,0,10,0"
+                                              ToolTip="Automatically trigger selected power action when video compression completes"/>
+                                    <ComboBox x:Name="CompressorAutoPowerActionComboBox" 
+                                              Style="{StaticResource ModernComboBox}" 
+                                              Width="125" 
+                                              Height="36" 
+                                              Padding="12,6" 
+                                              FontSize="12" 
+                                              SelectedIndex="0">
+                                        <ComboBoxItem Content="Shut down"/>
+                                        <ComboBoxItem Content="Sleep"/>
+                                        <ComboBoxItem Content="Hibernate"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <Button x:Name="StartCompressionButton" 
+                                        Grid.Column="1"
+                                        Content="🗜️ Start Video Compression" 
+                                        Style="{StaticResource ModernButton}" 
+                                        Height="44" 
+                                        Width="240" 
+                                        Click="StartCompressionButton_Click"
+                                        IsEnabled="False"/>
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
 
@@ -2709,6 +2763,29 @@
                                                Foreground="{StaticResource TextSecondaryBrush}" 
                                                FontSize="13"/>
                                 </StackPanel>
+
+                                <!-- Automatic Power Management Card on Queue Completion -->
+                                <Border Grid.Column="1" Background="#18181B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14,10" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <CheckBox x:Name="QueueAutoPowerCheckBox" 
+                                                  Style="{StaticResource ModernCheckBox}" 
+                                                  Content="⏻ When finished:" 
+                                                  VerticalAlignment="Center" 
+                                                  Margin="0,0,10,0"
+                                                  ToolTip="Automatically trigger selected power action when download queue completes"/>
+                                        <ComboBox x:Name="QueueAutoPowerActionComboBox" 
+                                                  Style="{StaticResource ModernComboBox}" 
+                                                  Width="125" 
+                                                  Height="36" 
+                                                  Padding="12,6" 
+                                                  FontSize="12" 
+                                                  SelectedIndex="0">
+                                            <ComboBoxItem Content="Shut down"/>
+                                            <ComboBoxItem Content="Sleep"/>
+                                            <ComboBoxItem Content="Hibernate"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Border>
                             </Grid>
                         </Border>
 

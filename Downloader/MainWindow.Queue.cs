@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using UniversalDownloader.Models;
 using UniversalDownloader.Controls;
+using UniversalDownloader.Services;
 
 namespace UniversalDownloader
 {
@@ -16,11 +17,27 @@ namespace UniversalDownloader
             if (_queueManager != null)
             {
                 _queueManager.QueueChanged += () => Dispatcher.Invoke(OnQueueStateUpdated);
+                _queueManager.QueueCompleted += () => Dispatcher.Invoke(OnQueueCompletedTriggerPowerAction);
                 if (QueueItemsControl != null)
                 {
                     QueueItemsControl.ItemsSource = _queueManager.Items;
                 }
                 OnQueueStateUpdated();
+            }
+        }
+
+        private void OnQueueCompletedTriggerPowerAction()
+        {
+            if (QueueAutoPowerCheckBox?.IsChecked == true)
+            {
+                int selectedIdx = QueueAutoPowerActionComboBox?.SelectedIndex ?? 0;
+                var action = SystemPowerService.ParseFromIndex(selectedIdx);
+
+                // Reset checkbox so it doesn't inadvertently fire later
+                QueueAutoPowerCheckBox.IsChecked = false;
+
+                // Show 60-second safety countdown dialog
+                ShutdownCountdownDialog.Show(action, "Download Queue", 60, this);
             }
         }
 
