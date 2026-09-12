@@ -111,6 +111,9 @@ jobs:
             A modern, fast, multi-platform media downloader, converter, and audio identification workstation for **Windows** and **Linux**.
 
             ### ✨ What's New in ${{ github.ref_name }}:
+            * 🎞️ **GIF, WebP & Telegram Video Sticker Studio** — Create animated GIFs with two-pass adaptive palettegen, animated lossy/lossless WebP, and official Telegram Video Stickers (`.webm` VP9 512x512 <=256KB) with an interactive visual crop box and 4K lightweight proxy preview engine.
+            * ⏻ **Automated Power Management (Shutdown / Sleep / Hibernate)** — Automatic PC action on completion across Download Queue, Media Converter, and Smart Video Compressor with a 60-second safety countdown dialog and instant cancel button.
+            * 🛡️ **Corporate PC & UIPI Drag-and-Drop Fix** — Added explicit `asInvoker` application manifest, automatic removal of Windows PCA `RUNASADMIN` registry shims, `%LOCALAPPDATA%` dependency fallback for read-only folders, and Win32 UIPI message filter bypass so Drag-and-Drop works seamlessly even under Administrator elevation.
             * 🗜️ **Smart Video Compressor** — High-performance video compression with visually lossless defaults (`CRF 20`), target file size optimizer (e.g. Discord 25MB), and custom parameter presets.
             * ⚡ **GPU & CPU Hardware Acceleration** — Accelerated encoding with NVIDIA NVENC, Intel QSV, and AMD AMF (defaulting to GPU), with automatic runtime detection and seamless CPU software fallback.
             * 📋 **Multi-File Batch Queue & Live ETA** — Batch drag-and-drop and multi-selection, real-time "Time Left" countdown for active files and batch, and completed time spent tracking.
