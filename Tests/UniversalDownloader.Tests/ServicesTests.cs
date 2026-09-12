@@ -667,6 +667,7 @@ namespace UniversalDownloader.Tests
         {
             var args = GifWebpService.BuildExtractFrameArguments("test.mp4", TimeSpan.FromSeconds(7.5), 1280);
 
+            Assert.Contains("-noaccurate_seek", args);
             Assert.Contains("-ss", args);
             int ssIdx = args.IndexOf("-ss");
             Assert.Equal("7.5", args[ssIdx + 1]);
@@ -678,6 +679,10 @@ namespace UniversalDownloader.Tests
             int vfIdx = args.IndexOf("-vframes");
             Assert.Equal("1", args[vfIdx + 1]);
 
+            Assert.Contains("-vf", args);
+            int vfFilterIdx = args.IndexOf("-vf");
+            Assert.Contains("flags=fast_bilinear", args[vfFilterIdx + 1]);
+
             Assert.Contains("-f", args);
             int fIdx = args.IndexOf("-f");
             Assert.Equal("image2pipe", args[fIdx + 1]);
@@ -685,6 +690,8 @@ namespace UniversalDownloader.Tests
             Assert.Contains("-vcodec", args);
             int vcIdx = args.IndexOf("-vcodec");
             Assert.Equal("mjpeg", args[vcIdx + 1]);
+
+            Assert.Contains("-threads", args);
 
             Assert.Equal("-", args[^1]);
         }

@@ -46,6 +46,32 @@ namespace UniversalDownloader
         private int _sourceVideoWidth = 0;
         private int _sourceVideoHeight = 0;
 
+        private string? _previewProxyVideo;
+        private CancellationTokenSource? _proxyCts;
+
+        private void CleanupPreviewProxy()
+        {
+            _proxyCts?.Cancel();
+            _proxyCts = null;
+            string? oldProxy = _previewProxyVideo;
+            _previewProxyVideo = null;
+            if (!string.IsNullOrEmpty(oldProxy))
+            {
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        Thread.Sleep(500);
+                        if (File.Exists(oldProxy))
+                        {
+                            File.Delete(oldProxy);
+                        }
+                    }
+                    catch { }
+                });
+            }
+        }
+
         private void InitializeGifWebp()
         {
             _gifWebpService = new GifWebpService(_dependencyManager);
@@ -99,6 +125,7 @@ namespace UniversalDownloader
         private void BackFromGifCreator_Click(object sender, RoutedEventArgs e)
         {
             StopGifPlayer();
+            CleanupPreviewProxy();
             if (_isGifGenerating)
             {
                 _gifCts?.Cancel();
@@ -126,6 +153,7 @@ namespace UniversalDownloader
         {
             if (!File.Exists(filePath)) return;
 
+            CleanupPreviewProxy();
             _currentGifSourceVideo = filePath;
             var fi = new FileInfo(filePath);
 
@@ -196,6 +224,38 @@ namespace UniversalDownloader
                         UpdateOutputDestinationPreview();
                         UpdateCropOverlay();
                         UpdateTimelineTrimHighlight();
+
+                        // For 4K/high-res or MKV/heavy containers, generate lightweight 480p preview proxy in background
+                        if (info.Width > 1920 || info.Height > 1080 || filePath.EndsWith(".mkv", StringComparison.OrdinalIgnoreCase) || filePath.EndsWith(".mov", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _proxyCts = new CancellationTokenSource();
+                            var proxyToken = _proxyCts.Token;
+                            Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    string? proxy = await _gifWebpService.GeneratePreviewProxyAsync(filePath, Downloader.App.AppTempDirectory, proxyToken);
+                                    if (proxy != null && !proxyToken.IsCancellationRequested)
+                                    {
+                                        await Dispatcher.InvokeAsync(() =>
+                                        {
+                                            if (proxyToken.IsCancellationRequested || _currentGifSourceVideo != filePath) return;
+                                            _previewProxyVideo = proxy;
+                                            if (GifMediaPlayer != null)
+                                            {
+                                                var pos = GifMediaPlayer.Position;
+                                                bool playing = _isGifPlayerPlaying;
+                                                GifMediaPlayer.Source = new Uri(proxy, UriKind.Absolute);
+                                                GifMediaPlayer.Position = pos;
+                                                if (playing) GifMediaPlayer.Play();
+                                                else GifMediaPlayer.Pause();
+                                            }
+                                        });
+                                    }
+                                }
+                                catch { }
+                            });
+                        }
                     });
                 }
             });
@@ -437,7 +497,11 @@ namespace UniversalDownloader
             {
                 if (_gifWebpService == null) return;
 
-                byte[]? frameBytes = await _gifWebpService.ExtractFrameBytesAsync(videoPath, targetTime, 1280, token);
+                string sourceToExtract = (!string.IsNullOrEmpty(_previewProxyVideo) && File.Exists(_previewProxyVideo))
+                    ? _previewProxyVideo
+                    : videoPath;
+
+                byte[]? frameBytes = await _gifWebpService.ExtractFrameBytesAsync(sourceToExtract, targetTime, 640, token);
                 if (token.IsCancellationRequested || frameBytes == null || frameBytes.Length == 0)
                     return;
 
@@ -535,10 +599,23 @@ namespace UniversalDownloader
         private void GifJumpStart_Click(object sender, RoutedEventArgs e)
         {
             StopGifPlayer();
-            SeekToPosition(_gifStartTime, forceHighQuality: true);
+            SeekToPosition(TimeSpan.Zero, forceHighQuality: true);
         }
 
         private void GifJumpEnd_Click(object sender, RoutedEventArgs e)
+        {
+            StopGifPlayer();
+            var target = _gifTotalDuration > TimeSpan.Zero ? _gifTotalDuration : TimeSpan.FromSeconds(GifPlayerScrubber?.Maximum ?? 10);
+            SeekToPosition(target, forceHighQuality: true);
+        }
+
+        private void GifSeekToStartTime_Click(object sender, RoutedEventArgs e)
+        {
+            StopGifPlayer();
+            SeekToPosition(_gifStartTime, forceHighQuality: true);
+        }
+
+        private void GifSeekToEndTime_Click(object sender, RoutedEventArgs e)
         {
             StopGifPlayer();
             SeekToPosition(_gifEndTime, forceHighQuality: true);

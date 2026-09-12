@@ -275,19 +275,21 @@ namespace UniversalDownloader.Services
             return info;
         }
 
-        public static List<string> BuildExtractFrameArguments(string videoPath, TimeSpan position, int maxWidth = 960)
+        public static List<string> BuildExtractFrameArguments(string videoPath, TimeSpan position, int maxWidth = 640)
         {
             return new List<string>
             {
                 "-hide_banner",
                 "-loglevel", "error",
+                "-noaccurate_seek",
                 "-ss", position.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture),
                 "-i", videoPath,
                 "-vframes", "1",
-                "-vf", $"scale='min(iw,{maxWidth})':-2",
-                "-q:v", "3",
+                "-vf", $"scale='min(iw,{maxWidth})':-2:flags=fast_bilinear",
+                "-q:v", "4",
                 "-f", "image2pipe",
                 "-vcodec", "mjpeg",
+                "-threads", "0",
                 "-"
             };
         }
@@ -295,7 +297,7 @@ namespace UniversalDownloader.Services
         public async Task<byte[]?> ExtractFrameBytesAsync(
             string videoPath, 
             TimeSpan position, 
-            int maxWidth = 960, 
+            int maxWidth = 640, 
             CancellationToken cancellationToken = default)
         {
             if (!File.Exists(videoPath) || !_dependencyManager.IsFfmpegReady)
@@ -323,7 +325,11 @@ namespace UniversalDownloader.Services
                 using var memoryStream = new MemoryStream();
                 using (cancellationToken.Register(() => { try { proc.Kill(); } catch { } }))
                 {
-                    await proc.StandardOutput.BaseStream.CopyToAsync(memoryStream, cancellationToken);
+                    // Concurrently drain both stdout and stderr to prevent pipe buffer deadlocks
+                    var stdoutTask = proc.StandardOutput.BaseStream.CopyToAsync(memoryStream, cancellationToken);
+                    var stderrTask = proc.StandardError.ReadToEndAsync(cancellationToken);
+
+                    await Task.WhenAll(stdoutTask, stderrTask);
                     await proc.WaitForExitAsync(cancellationToken);
                 }
 
@@ -344,6 +350,81 @@ namespace UniversalDownloader.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"[GifWebpService] Frame extraction error: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        public async Task<string?> GeneratePreviewProxyAsync(
+            string inputVideoPath,
+            string outputDirectory,
+            CancellationToken cancellationToken = default)
+        {
+            if (!File.Exists(inputVideoPath) || !_dependencyManager.IsFfmpegReady)
+                return null;
+
+            try
+            {
+                if (!Directory.Exists(outputDirectory))
+                {
+                    Directory.CreateDirectory(outputDirectory);
+                }
+
+                string proxyFileName = $"proxy_{Guid.NewGuid():N}.mp4";
+                string proxyPath = Path.Combine(outputDirectory, proxyFileName);
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = _dependencyManager.FfmpegExecutablePath,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                psi.ArgumentList.Add("-hide_banner");
+                psi.ArgumentList.Add("-loglevel");
+                psi.ArgumentList.Add("error");
+                psi.ArgumentList.Add("-i");
+                psi.ArgumentList.Add(inputVideoPath);
+                psi.ArgumentList.Add("-vf");
+                psi.ArgumentList.Add("scale=min(iw\\,854):-2:flags=fast_bilinear");
+                psi.ArgumentList.Add("-c:v");
+                psi.ArgumentList.Add("libx264");
+                psi.ArgumentList.Add("-preset");
+                psi.ArgumentList.Add("ultrafast");
+                psi.ArgumentList.Add("-tune");
+                psi.ArgumentList.Add("fastdecode");
+                psi.ArgumentList.Add("-crf");
+                psi.ArgumentList.Add("26");
+                psi.ArgumentList.Add("-c:a");
+                psi.ArgumentList.Add("aac");
+                psi.ArgumentList.Add("-b:a");
+                psi.ArgumentList.Add("96k");
+                psi.ArgumentList.Add("-threads");
+                psi.ArgumentList.Add("0");
+                psi.ArgumentList.Add("-y");
+                psi.ArgumentList.Add(proxyPath);
+
+                using var proc = Process.Start(psi);
+                if (proc == null) return null;
+
+                using (cancellationToken.Register(() => { try { proc.Kill(); } catch { } }))
+                {
+                    var stderrTask = proc.StandardError.ReadToEndAsync(cancellationToken);
+                    await proc.WaitForExitAsync(cancellationToken);
+                    await stderrTask;
+                }
+
+                if (File.Exists(proxyPath) && new FileInfo(proxyPath).Length > 0)
+                {
+                    return proxyPath;
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[GifWebpService] Proxy generation error: {ex.Message}");
             }
 
             return null;

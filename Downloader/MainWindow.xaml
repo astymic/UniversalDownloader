@@ -2222,7 +2222,7 @@
 
                                         <!-- Transport Controls (Jump Start, Step Back, Play/Pause, Step Forward, Jump End) -->
                                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                                            <!-- Jump to Clip Start -->
+                                            <!-- Jump to Clip / Video Start -->
                                             <Button x:Name="GifJumpStartBtn" 
                                                     Style="{StaticResource SecondaryButton}" 
                                                     Width="30" 
@@ -2230,7 +2230,7 @@
                                                     Padding="0" 
                                                     Margin="0,0,4,0" 
                                                     Click="GifJumpStart_Click" 
-                                                    ToolTip="Jump to Clip Start">
+                                                    ToolTip="Jump to beginning of video (00:00)">
                                                 <TextBlock Text="⏮" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Button>
 
@@ -2270,14 +2270,14 @@
                                                 <TextBlock Text="▶" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Button>
 
-                                            <!-- Jump to Clip End -->
+                                            <!-- Jump to Clip / Video End -->
                                             <Button x:Name="GifJumpEndBtn" 
                                                     Style="{StaticResource SecondaryButton}" 
                                                     Width="30" 
                                                     Height="32" 
                                                     Padding="0" 
                                                     Click="GifJumpEnd_Click" 
-                                                    ToolTip="Jump to Clip End">
+                                                    ToolTip="Jump to end of video">
                                                 <TextBlock Text="⏭" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Button>
                                         </StackPanel>
@@ -2344,9 +2344,11 @@
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <TextBox x:Name="GifStartTimeTextBox" Grid.Column="0" Text="00:00.00" Style="{StaticResource TrimTimeTextBox}" Height="38" Background="#18181B" Foreground="White" BorderBrush="{StaticResource BorderBrush}" FontSize="13.5" FontWeight="SemiBold" LostFocus="GifStartTimeTextBox_LostFocus" KeyDown="GifTimeTextBox_KeyDown"/>
-                                                <Button Grid.Column="1" Content="[ Set Current" Style="{StaticResource SecondaryButton}" Height="38" Padding="10,0" Margin="8,0,0,0" FontSize="11" Click="GifSetCurrentAsStart_Click" ToolTip="Set current player time as clip start"/>
+                                                <Button Grid.Column="1" Content="👁️ Seek" Style="{StaticResource SecondaryButton}" Height="38" Padding="8,0" Margin="6,0,0,0" FontSize="11" Click="GifSeekToStartTime_Click" ToolTip="Seek player to Clip Start"/>
+                                                <Button Grid.Column="2" Content="[ Set Current" Style="{StaticResource SecondaryButton}" Height="38" Padding="10,0" Margin="6,0,0,0" FontSize="11" Click="GifSetCurrentAsStart_Click" ToolTip="Set current player time as clip start"/>
                                             </Grid>
                                         </StackPanel>
 
@@ -2357,9 +2359,11 @@
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <TextBox x:Name="GifEndTimeTextBox" Grid.Column="0" Text="00:05.00" Style="{StaticResource TrimTimeTextBox}" Height="38" Background="#18181B" Foreground="White" BorderBrush="{StaticResource BorderBrush}" FontSize="13.5" FontWeight="SemiBold" LostFocus="GifEndTimeTextBox_LostFocus" KeyDown="GifTimeTextBox_KeyDown"/>
-                                                <Button Grid.Column="1" Content="Set Current ]" Style="{StaticResource SecondaryButton}" Height="38" Padding="10,0" Margin="8,0,0,0" FontSize="11" Click="GifSetCurrentAsEnd_Click" ToolTip="Set current player time as clip end"/>
+                                                <Button Grid.Column="1" Content="👁️ Seek" Style="{StaticResource SecondaryButton}" Height="38" Padding="8,0" Margin="6,0,0,0" FontSize="11" Click="GifSeekToEndTime_Click" ToolTip="Seek player to Clip End"/>
+                                                <Button Grid.Column="2" Content="Set Current ]" Style="{StaticResource SecondaryButton}" Height="38" Padding="10,0" Margin="6,0,0,0" FontSize="11" Click="GifSetCurrentAsEnd_Click" ToolTip="Set current player time as clip end"/>
                                             </Grid>
                                         </StackPanel>
                                     </Grid>
