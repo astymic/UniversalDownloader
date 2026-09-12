@@ -86,6 +86,11 @@ namespace UniversalDownloader
         private void BackFromGifCreator_Click(object sender, RoutedEventArgs e)
         {
             StopGifPlayer();
+            if (_isGifGenerating)
+            {
+                _gifCts?.Cancel();
+                _gifWebpService?.CancelCurrentProcess();
+            }
             if (GifWebpScrollViewer != null) GifWebpScrollViewer.Visibility = Visibility.Collapsed;
             if (MainScrollViewer != null) MainScrollViewer.Visibility = Visibility.Visible;
         }
@@ -118,6 +123,13 @@ namespace UniversalDownloader
 
             if (GifVideoTitleText != null) GifVideoTitleText.Text = fi.Name;
             if (GifVideoMetaText != null) GifVideoMetaText.Text = $"Loading info... • {Utilities.FormatBytesOutput(fi.Length)}";
+
+            // Initialize default destination folder
+            string defaultFolder = Path.Combine(Path.GetDirectoryName(filePath) ?? SelectedDirectory ?? "", "Clips");
+            if (GifDestinationTextBox != null)
+            {
+                GifDestinationTextBox.Text = defaultFolder;
+            }
 
             // Load into MediaElement player
             try
@@ -390,6 +402,19 @@ namespace UniversalDownloader
             UpdateOutputDestinationPreview();
         }
 
+        private void GifTimeTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                if (sender is TextBox tb)
+                {
+                    if (tb == GifStartTimeTextBox) GifStartTimeTextBox_LostFocus(sender, e);
+                    else if (tb == GifEndTimeTextBox) GifEndTimeTextBox_LostFocus(sender, e);
+                    Keyboard.ClearFocus();
+                }
+            }
+        }
+
         private static string FormatTimeSpanDetailed(TimeSpan ts)
         {
             return $"{(int)ts.TotalMinutes:00}:{ts.Seconds:00}.{ts.Milliseconds / 10:00}";
@@ -622,8 +647,16 @@ namespace UniversalDownloader
         {
             if (GifDestinationTextBox != null)
             {
-                GifDestinationTextBox.Text = "";
+                string defaultFolder = !string.IsNullOrEmpty(_currentGifSourceVideo)
+                    ? Path.Combine(Path.GetDirectoryName(_currentGifSourceVideo) ?? SelectedDirectory ?? "", "Clips")
+                    : (SelectedDirectory ?? "");
+                GifDestinationTextBox.Text = defaultFolder;
             }
+            UpdateOutputDestinationPreview();
+        }
+
+        private void GifDestinationTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
             UpdateOutputDestinationPreview();
         }
 
@@ -740,6 +773,12 @@ namespace UniversalDownloader
                         progressReporter,
                         _gifCts.Token);
 
+                    if (result.IsCancelled || _gifCts?.IsCancellationRequested == true)
+                    {
+                        // User cancelled clip creation; cleanly exit with no error dialog
+                        return;
+                    }
+
                     if (result.Success && File.Exists(finalOutputPath))
                     {
                         // Show completion card
@@ -778,10 +817,11 @@ namespace UniversalDownloader
             }
             catch (OperationCanceledException)
             {
-                if (GifProgressText != null) GifProgressText.Text = "Cancelled by user.";
+                // Silently exit on cancellation
             }
             catch (Exception ex)
             {
+                if (_gifCts?.IsCancellationRequested == true) return;
                 ModernMessageBox.Show($"Encoding error: {ex.Message}", "Encoding Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally

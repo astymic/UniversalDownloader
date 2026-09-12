@@ -2129,7 +2129,7 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBox x:Name="GifStartTimeTextBox" Grid.Column="0" Text="00:00.00" Style="{StaticResource ModernTextBox}" Height="38" LostFocus="GifStartTimeTextBox_LostFocus"/>
+                                                <TextBox x:Name="GifStartTimeTextBox" Grid.Column="0" Text="00:00.00" Style="{StaticResource TrimTimeTextBox}" Height="38" Background="#18181B" Foreground="White" BorderBrush="{StaticResource BorderBrush}" FontSize="13.5" FontWeight="SemiBold" LostFocus="GifStartTimeTextBox_LostFocus" KeyDown="GifTimeTextBox_KeyDown"/>
                                                 <Button Grid.Column="1" Content="[ Set Current" Style="{StaticResource SecondaryButton}" Height="38" Padding="10,0" Margin="8,0,0,0" FontSize="11" Click="GifSetCurrentAsStart_Click" ToolTip="Set current player time as clip start"/>
                                             </Grid>
                                         </StackPanel>
@@ -2142,7 +2142,7 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBox x:Name="GifEndTimeTextBox" Grid.Column="0" Text="00:05.00" Style="{StaticResource ModernTextBox}" Height="38" LostFocus="GifEndTimeTextBox_LostFocus"/>
+                                                <TextBox x:Name="GifEndTimeTextBox" Grid.Column="0" Text="00:05.00" Style="{StaticResource TrimTimeTextBox}" Height="38" Background="#18181B" Foreground="White" BorderBrush="{StaticResource BorderBrush}" FontSize="13.5" FontWeight="SemiBold" LostFocus="GifEndTimeTextBox_LostFocus" KeyDown="GifTimeTextBox_KeyDown"/>
                                                 <Button Grid.Column="1" Content="Set Current ]" Style="{StaticResource SecondaryButton}" Height="38" Padding="10,0" Margin="8,0,0,0" FontSize="11" Click="GifSetCurrentAsEnd_Click" ToolTip="Set current player time as clip end"/>
                                             </Grid>
                                         </StackPanel>
@@ -2349,11 +2349,20 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="GifDestinationTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="38"/>
+                                        <TextBox x:Name="GifDestinationTextBox" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="38" Padding="10,0" VerticalContentAlignment="Center" Background="#18181B" Foreground="White" BorderBrush="{StaticResource BorderBrush}" FontSize="12.5" TextChanged="GifDestinationTextBox_TextChanged"/>
                                         <Button Grid.Column="1" Content="Browse Custom..." Style="{StaticResource SecondaryButton}" Padding="12,0" Height="38" Margin="8,0,0,0" Click="GifBrowseDestination_Click"/>
                                         <Button Grid.Column="2" Content="Reset" Style="{StaticResource SecondaryButton}" Padding="12,0" Height="38" Margin="8,0,0,0" Click="GifResetDestination_Click"/>
                                     </Grid>
-                                    <TextBlock x:Name="GifOutputPreviewText" Text="[Destination Preview]" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                                    <Border Background="#18181B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,4,0,0">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Output file:  " Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="GifOutputPreviewText" Grid.Column="1" Text="[Destination Preview]" Foreground="#38BDF8" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
                                 </StackPanel>
                             </Border>
 

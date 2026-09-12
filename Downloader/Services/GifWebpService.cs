@@ -134,6 +134,7 @@ namespace UniversalDownloader.Services
     public class GifWebpResult
     {
         public bool Success { get; set; }
+        public bool IsCancelled { get; set; }
         public string OutputPath { get; set; } = "";
         public long OutputSizeBytes { get; set; }
         public string FormattedSize { get; set; } = "";
@@ -339,6 +340,12 @@ namespace UniversalDownloader.Services
             var result = new GifWebpResult();
             var startTime = DateTime.Now;
 
+            if (cancellationToken.IsCancellationRequested)
+            {
+                result.IsCancelled = true;
+                return result;
+            }
+
             if (!File.Exists(inputPath))
             {
                 result.ErrorMessage = $"Input file '{inputPath}' does not exist.";
@@ -452,7 +459,8 @@ namespace UniversalDownloader.Services
                 if (cancellationToken.IsCancellationRequested)
                 {
                     try { if (File.Exists(outputPath)) File.Delete(outputPath); } catch { }
-                    result.ErrorMessage = "Creation cancelled by user.";
+                    result.IsCancelled = true;
+                    result.ErrorMessage = null;
                     return result;
                 }
 
@@ -479,6 +487,14 @@ namespace UniversalDownloader.Services
                 }
                 else
                 {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        try { if (File.Exists(outputPath)) File.Delete(outputPath); } catch { }
+                        result.IsCancelled = true;
+                        result.ErrorMessage = null;
+                        return result;
+                    }
+
                     result.ErrorMessage = $"FFmpeg exited with error code {proc.ExitCode}.";
                     return result;
                 }
@@ -486,11 +502,20 @@ namespace UniversalDownloader.Services
             catch (OperationCanceledException)
             {
                 try { if (File.Exists(outputPath)) File.Delete(outputPath); } catch { }
-                result.ErrorMessage = "Creation cancelled.";
+                result.IsCancelled = true;
+                result.ErrorMessage = null;
                 return result;
             }
             catch (Exception ex)
             {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    try { if (File.Exists(outputPath)) File.Delete(outputPath); } catch { }
+                    result.IsCancelled = true;
+                    result.ErrorMessage = null;
+                    return result;
+                }
+
                 result.ErrorMessage = $"Error during encoding: {ex.Message}";
                 return result;
             }

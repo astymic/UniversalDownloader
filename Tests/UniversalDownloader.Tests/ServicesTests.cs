@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using UniversalDownloader.Models;
 using UniversalDownloader.Services;
@@ -560,6 +561,22 @@ namespace UniversalDownloader.Tests
             Assert.True(options.Width <= 360);
             Assert.True(options.Fps <= 15);
             Assert.True(options.MaxColors <= 128);
+        }
+
+        [Fact]
+        public async Task GifWebp_CreateClipAsync_CancelledToken_SetsIsCancelledAndNullErrorMessage()
+        {
+            var depManager = new DependencyManager();
+            var service = new GifWebpService(depManager);
+            using var cts = new CancellationTokenSource();
+            cts.Cancel(); // Pre-cancel
+
+            var options = GifWebpOptions.CreateMaxQuality();
+            var result = await service.CreateClipAsync("dummy.mp4", "dummy.gif", options, null, cts.Token);
+
+            Assert.False(result.Success);
+            Assert.True(result.IsCancelled);
+            Assert.Null(result.ErrorMessage);
         }
     }
 }
