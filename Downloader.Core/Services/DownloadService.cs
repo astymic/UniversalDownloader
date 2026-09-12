@@ -941,8 +941,8 @@ namespace UniversalDownloader.Services
                 psi.ArgumentList.Add(cookiesFromBrowser);
             }
 
-            string ffmpegDir = AppContext.BaseDirectory;
-            if (File.Exists(Path.Combine(ffmpegDir, "ffmpeg.exe")) || _dependencyManager.IsFfmpegReady)
+            string ffmpegDir = Path.GetDirectoryName(_dependencyManager.FfmpegExecutablePath) ?? AppContext.BaseDirectory;
+            if (File.Exists(_dependencyManager.FfmpegExecutablePath) || _dependencyManager.IsFfmpegReady)
             {
                 psi.ArgumentList.Add("--ffmpeg-location");
                 psi.ArgumentList.Add(ffmpegDir);

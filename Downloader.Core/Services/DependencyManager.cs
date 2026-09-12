@@ -65,9 +65,11 @@ namespace UniversalDownloader.Services
 
             // Determine base storage directory
             string baseDir = AppContext.BaseDirectory;
-            if (_isLinux && !HasWriteAccess(baseDir))
+            if (!HasWriteAccess(baseDir))
             {
-                string localData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "UniversalDownloader", "bin");
+                string localData = _isLinux
+                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "UniversalDownloader", "bin")
+                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UniversalDownloader", "bin");
                 Directory.CreateDirectory(localData);
                 baseDir = localData;
             }

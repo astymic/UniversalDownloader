@@ -50,18 +50,93 @@ namespace UniversalDownloader.Services
 
         public event Action<string>? ProgressUpdated;
 
+        private static readonly string UserBinDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "UniversalDownloader",
+            "bin"
+        );
+
+        public static bool HasWriteAccess(string dir)
+        {
+            try
+            {
+                if (!Directory.Exists(dir)) return false;
+                string testPath = Path.Combine(dir, ".perm_test_" + Guid.NewGuid().ToString("N"));
+                using (var fs = new FileStream(testPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose))
+                {
+                    fs.WriteByte(0);
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static string GetWritableBinDirectory()
+        {
+            string baseDir = AppContext.BaseDirectory;
+            if (HasWriteAccess(baseDir))
+            {
+                return baseDir;
+            }
+
+            try
+            {
+                if (!Directory.Exists(UserBinDirectory))
+                {
+                    Directory.CreateDirectory(UserBinDirectory);
+                }
+                return UserBinDirectory;
+            }
+            catch
+            {
+                return baseDir;
+            }
+        }
+
         public DependencyManager()
         {
-            YtDlpExecutablePath = Path.Combine(AppContext.BaseDirectory, YtDlpFileName);
-            FfmpegExecutablePath = Path.Combine(AppContext.BaseDirectory, FfmpegFileName);
+            string userBin = UserBinDirectory;
+            string baseDir = AppContext.BaseDirectory;
 
-            if (File.Exists(YtDlpExecutablePath))
+            // Check if user bin has yt-dlp first (e.g. newer updated version)
+            string userYtDlp = Path.Combine(userBin, YtDlpFileName);
+            string baseYtDlp = Path.Combine(baseDir, YtDlpFileName);
+            if (File.Exists(userYtDlp))
             {
+                YtDlpExecutablePath = userYtDlp;
                 IsYtDlpReady = true;
             }
-            if (File.Exists(FfmpegExecutablePath))
+            else if (File.Exists(baseYtDlp))
             {
+                YtDlpExecutablePath = baseYtDlp;
+                IsYtDlpReady = true;
+            }
+            else
+            {
+                string targetDir = GetWritableBinDirectory();
+                YtDlpExecutablePath = Path.Combine(targetDir, YtDlpFileName);
+            }
+
+            // Check if user bin has ffmpeg first
+            string userFfmpeg = Path.Combine(userBin, FfmpegFileName);
+            string baseFfmpeg = Path.Combine(baseDir, FfmpegFileName);
+            if (File.Exists(userFfmpeg))
+            {
+                FfmpegExecutablePath = userFfmpeg;
                 IsFfmpegReady = true;
+            }
+            else if (File.Exists(baseFfmpeg))
+            {
+                FfmpegExecutablePath = baseFfmpeg;
+                IsFfmpegReady = true;
+            }
+            else
+            {
+                string targetDir = GetWritableBinDirectory();
+                FfmpegExecutablePath = Path.Combine(targetDir, FfmpegFileName);
             }
         }
 
@@ -136,7 +211,16 @@ namespace UniversalDownloader.Services
                     ReportProgress($"Status: {YtDlpFileName} not found. Attempting to download...");
                 }
 
-                string tempPath = YtDlpExecutablePath + ".tmp";
+                string currentDir = Path.GetDirectoryName(YtDlpExecutablePath) ?? "";
+                string targetExePath = YtDlpExecutablePath;
+                if (!HasWriteAccess(currentDir))
+                {
+                    string targetDir = GetWritableBinDirectory();
+                    Directory.CreateDirectory(targetDir);
+                    targetExePath = Path.Combine(targetDir, YtDlpFileName);
+                }
+
+                string tempPath = targetExePath + ".tmp";
                 bool downloaded = await DownloadYtDlpToPathAsync(tempPath, CancellationToken.None);
 
                 if (downloaded)
@@ -146,17 +230,18 @@ namespace UniversalDownloader.Services
                     {
                         try
                         {
-                            if (File.Exists(YtDlpExecutablePath))
+                            if (File.Exists(targetExePath))
                             {
-                                File.Delete(YtDlpExecutablePath);
+                                File.Delete(targetExePath);
                             }
-                            File.Move(tempPath, YtDlpExecutablePath);
+                            File.Move(tempPath, targetExePath);
                         }
                         catch
                         {
-                            try { File.Copy(tempPath, YtDlpExecutablePath, true); File.Delete(tempPath); } catch { }
+                            try { File.Copy(tempPath, targetExePath, true); File.Delete(tempPath); } catch { }
                         }
 
+                        YtDlpExecutablePath = targetExePath;
                         IsYtDlpReady = true;
                         ReportProgress($"Status: {YtDlpFileName} ready.");
                     }
@@ -217,12 +302,21 @@ namespace UniversalDownloader.Services
                 string? ffmpegSourcePath = Directory.EnumerateFiles(tempExtractPath, FfmpegFileName, SearchOption.AllDirectories).FirstOrDefault();
                 if (string.IsNullOrEmpty(ffmpegSourcePath)) return false;
 
+                string currentDir = Path.GetDirectoryName(FfmpegExecutablePath) ?? "";
+                if (!HasWriteAccess(currentDir))
+                {
+                    string targetDir = GetWritableBinDirectory();
+                    Directory.CreateDirectory(targetDir);
+                    FfmpegExecutablePath = Path.Combine(targetDir, FfmpegFileName);
+                }
+
                 File.Copy(ffmpegSourcePath, FfmpegExecutablePath, true);
 
+                string destDir = Path.GetDirectoryName(FfmpegExecutablePath) ?? AppContext.BaseDirectory;
                 string? ffprobeSourcePath = Directory.EnumerateFiles(tempExtractPath, "ffprobe.exe", SearchOption.AllDirectories).FirstOrDefault();
                 if (!string.IsNullOrEmpty(ffprobeSourcePath))
                 {
-                    File.Copy(ffprobeSourcePath, Path.Combine(AppContext.BaseDirectory, "ffprobe.exe"), true);
+                    File.Copy(ffprobeSourcePath, Path.Combine(destDir, "ffprobe.exe"), true);
                 }
 
                 return File.Exists(FfmpegExecutablePath);

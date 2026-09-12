@@ -21,6 +21,7 @@
 		<Company>astymic</Company>
 		<Description>Universal Downloader - Multi-platform Media Downloader, Converter, and Recognition Workstation</Description>
 		<Copyright>Copyright © 2026 astymic</Copyright>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
 	</PropertyGroup>
 
 	<ItemGroup>

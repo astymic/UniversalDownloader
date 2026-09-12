@@ -712,6 +712,37 @@ namespace UniversalDownloader.Tests
             Assert.Equal("Sleep", SystemPowerService.GetActionDisplayName(PowerAction.Sleep));
             Assert.Equal("Hibernate", SystemPowerService.GetActionDisplayName(PowerAction.Hibernate));
         }
+
+        [Fact]
+        public void DependencyManager_HasWriteAccess_DetectsWritableAndNonExistentDirectories()
+        {
+            string tempDir = Path.GetTempPath();
+            Assert.True(UniversalDownloader.Services.DependencyManager.HasWriteAccess(tempDir));
+
+            string nonExistent = Path.Combine(tempDir, "non_existent_" + Guid.NewGuid().ToString("N"));
+            Assert.False(UniversalDownloader.Services.DependencyManager.HasWriteAccess(nonExistent));
+        }
+
+        [Fact]
+        public void DependencyManager_GetWritableBinDirectory_ReturnsValidWritablePath()
+        {
+            string dir = UniversalDownloader.Services.DependencyManager.GetWritableBinDirectory();
+            Assert.False(string.IsNullOrWhiteSpace(dir));
+            Assert.True(Directory.Exists(dir));
+            Assert.True(UniversalDownloader.Services.DependencyManager.HasWriteAccess(dir));
+        }
+
+        [Fact]
+        public void ApplicationManifest_ContainsAsInvokerExecutionLevel()
+        {
+            string projectDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "Downloader"));
+            string manifestPath = Path.Combine(projectDir, "app.manifest");
+            Assert.True(File.Exists(manifestPath), $"app.manifest should exist at {manifestPath}");
+
+            string content = File.ReadAllText(manifestPath);
+            Assert.Contains("level=\"asInvoker\"", content);
+            Assert.Contains("uiAccess=\"false\"", content);
+        }
     }
 }
 
