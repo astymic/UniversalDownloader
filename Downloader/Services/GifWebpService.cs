@@ -275,6 +275,80 @@ namespace UniversalDownloader.Services
             return info;
         }
 
+        public static List<string> BuildExtractFrameArguments(string videoPath, TimeSpan position, int maxWidth = 960)
+        {
+            return new List<string>
+            {
+                "-hide_banner",
+                "-loglevel", "error",
+                "-ss", position.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture),
+                "-i", videoPath,
+                "-vframes", "1",
+                "-vf", $"scale='min(iw,{maxWidth})':-2",
+                "-q:v", "3",
+                "-f", "image2pipe",
+                "-vcodec", "mjpeg",
+                "-"
+            };
+        }
+
+        public async Task<byte[]?> ExtractFrameBytesAsync(
+            string videoPath, 
+            TimeSpan position, 
+            int maxWidth = 960, 
+            CancellationToken cancellationToken = default)
+        {
+            if (!File.Exists(videoPath) || !_dependencyManager.IsFfmpegReady)
+                return null;
+
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = _dependencyManager.FfmpegExecutablePath,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                foreach (var arg in BuildExtractFrameArguments(videoPath, position, maxWidth))
+                {
+                    psi.ArgumentList.Add(arg);
+                }
+
+                using var proc = Process.Start(psi);
+                if (proc == null) return null;
+
+                using var memoryStream = new MemoryStream();
+                using (cancellationToken.Register(() => { try { proc.Kill(); } catch { } }))
+                {
+                    await proc.StandardOutput.BaseStream.CopyToAsync(memoryStream, cancellationToken);
+                    await proc.WaitForExitAsync(cancellationToken);
+                }
+
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return null;
+                }
+
+                if (memoryStream.Length > 0)
+                {
+                    return memoryStream.ToArray();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[GifWebpService] Frame extraction error: {ex.Message}");
+            }
+
+            return null;
+        }
+
         public static List<string> BuildFfmpegArguments(string inputPath, string outputPath, GifWebpOptions options)
         {
             var args = new List<string>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -10,6 +11,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using UniversalDownloader.Controls;
@@ -33,6 +35,12 @@ namespace UniversalDownloader
         private bool _isGifPlayerSeeking = false;
         private bool _isLoopPreviewActive = false;
         private bool _isGifSettingsExpanded = false;
+
+        private bool _isTimerUpdatingScrubber = false;
+        private bool _wasPlayingBeforeSeek = false;
+        private CancellationTokenSource? _previewFrameCts;
+        private readonly Dictionary<int, BitmapSource> _previewFrameCache = new();
+        private bool _isGifPlayerPlaying => _gifPlayerTimer != null && _gifPlayerTimer.IsEnabled;
 
         private VideoCropRect _cropRect = new VideoCropRect();
         private int _sourceVideoWidth = 0;
@@ -121,6 +129,12 @@ namespace UniversalDownloader
             _currentGifSourceVideo = filePath;
             var fi = new FileInfo(filePath);
 
+            _previewFrameCache.Clear();
+            _previewFrameCts?.Cancel();
+            _isTimerUpdatingScrubber = true;
+            if (GifPlayerScrubber != null) GifPlayerScrubber.Value = 0;
+            _isTimerUpdatingScrubber = false;
+
             // Hide empty drop zone, show active studio editor
             if (GifDropZone != null) GifDropZone.Visibility = Visibility.Collapsed;
             if (GifEditorContainer != null) GifEditorContainer.Visibility = Visibility.Visible;
@@ -151,6 +165,9 @@ namespace UniversalDownloader
                 Debug.WriteLine($"[GifWebp] Media load error: {ex.Message}");
             }
 
+            // Render initial frame preview immediately
+            SeekToPosition(TimeSpan.Zero, forceHighQuality: true);
+
             // Extract accurate media metadata in background
             Task.Run(async () =>
             {
@@ -178,6 +195,7 @@ namespace UniversalDownloader
                         UpdateTrimmerUi();
                         UpdateOutputDestinationPreview();
                         UpdateCropOverlay();
+                        UpdateTimelineTrimHighlight();
                     });
                 }
             });
@@ -203,6 +221,7 @@ namespace UniversalDownloader
             }
 
             UpdateTelegramDurationWarning();
+            UpdateTimelineTrimHighlight();
         }
 
         private void UpdateOutputDestinationPreview()
@@ -248,6 +267,8 @@ namespace UniversalDownloader
                     _sourceVideoHeight = GifMediaPlayer.NaturalVideoHeight;
                     UpdateCropOverlay();
                 }
+
+                UpdateTimelineTrimHighlight();
             }
         }
 
@@ -264,7 +285,7 @@ namespace UniversalDownloader
         {
             if (GifMediaPlayer == null) return;
 
-            if (_gifPlayerTimer != null && _gifPlayerTimer.IsEnabled)
+            if (_isGifPlayerPlaying)
             {
                 StopGifPlayer();
             }
@@ -279,6 +300,12 @@ namespace UniversalDownloader
             if (GifMediaPlayer == null) return;
 
             _isLoopPreviewActive = isLoopPreview;
+
+            // Hide still frame preview so live video renders natively
+            if (GifFramePreviewImage != null)
+            {
+                GifFramePreviewImage.Visibility = Visibility.Collapsed;
+            }
 
             if (isLoopPreview)
             {
@@ -295,11 +322,15 @@ namespace UniversalDownloader
         {
             if (GifMediaPlayer == null) return;
 
+            var currentPos = GifPlayerScrubber != null ? TimeSpan.FromSeconds(GifPlayerScrubber.Value) : GifMediaPlayer.Position;
             GifMediaPlayer.Pause();
             _gifPlayerTimer?.Stop();
             _isLoopPreviewActive = false;
 
             if (GifPlayPauseIcon != null) GifPlayPauseIcon.Text = "▶";
+
+            // When stopping, refresh with a crisp high-fidelity preview frame
+            SeekToPosition(currentPos, forceHighQuality: true);
         }
 
         private void GifPlayerTimer_Tick(object? sender, EventArgs e)
@@ -320,7 +351,9 @@ namespace UniversalDownloader
 
             if (GifPlayerScrubber != null && _gifTotalDuration.TotalSeconds > 0)
             {
+                _isTimerUpdatingScrubber = true;
                 GifPlayerScrubber.Value = pos.TotalSeconds;
+                _isTimerUpdatingScrubber = false;
             }
 
             if (GifPlayerTimeText != null)
@@ -329,36 +362,219 @@ namespace UniversalDownloader
             }
         }
 
+        private void SeekToPosition(TimeSpan targetTime, bool forceHighQuality = false)
+        {
+            if (_gifTotalDuration > TimeSpan.Zero)
+            {
+                if (targetTime < TimeSpan.Zero) targetTime = TimeSpan.Zero;
+                if (targetTime > _gifTotalDuration) targetTime = _gifTotalDuration;
+            }
+
+            // Update scrubber value without triggering recursive ValueChanged
+            if (GifPlayerScrubber != null && !_isGifPlayerSeeking)
+            {
+                _isTimerUpdatingScrubber = true;
+                GifPlayerScrubber.Value = targetTime.TotalSeconds;
+                _isTimerUpdatingScrubber = false;
+            }
+
+            // Update time text label immediately
+            if (GifPlayerTimeText != null)
+            {
+                GifPlayerTimeText.Text = $"{FormatTimeSpan(targetTime)} / {FormatTimeSpan(_gifTotalDuration)}";
+            }
+
+            // If actively playing, let MediaElement play forward
+            if (_isGifPlayerPlaying)
+            {
+                if (GifMediaPlayer != null)
+                {
+                    GifMediaPlayer.Position = targetTime;
+                }
+                if (GifFramePreviewImage != null)
+                {
+                    GifFramePreviewImage.Visibility = Visibility.Collapsed;
+                }
+                return;
+            }
+
+            // Check frame cache for instant sub-millisecond hit
+            int cacheKey = (int)Math.Round(targetTime.TotalSeconds * 4.0); // 250ms buckets
+            if (_previewFrameCache.TryGetValue(cacheKey, out var cachedBmp))
+            {
+                if (GifFramePreviewImage != null)
+                {
+                    GifFramePreviewImage.Source = cachedBmp;
+                    GifFramePreviewImage.Visibility = Visibility.Visible;
+                }
+                if (GifMediaPlayer != null)
+                {
+                    GifMediaPlayer.Position = targetTime;
+                }
+                return;
+            }
+
+            // Update MediaElement position as baseline
+            if (GifMediaPlayer != null)
+            {
+                GifMediaPlayer.Position = targetTime;
+            }
+
+            // Asynchronously extract and render exact frame via FFmpeg
+            if (!string.IsNullOrEmpty(_currentGifSourceVideo) && File.Exists(_currentGifSourceVideo))
+            {
+                _previewFrameCts?.Cancel();
+                _previewFrameCts = new CancellationTokenSource();
+                var token = _previewFrameCts.Token;
+
+                _ = RequestFramePreviewAsync(_currentGifSourceVideo, targetTime, cacheKey, token);
+            }
+        }
+
+        private async Task RequestFramePreviewAsync(string videoPath, TimeSpan targetTime, int cacheKey, CancellationToken token)
+        {
+            try
+            {
+                if (_gifWebpService == null) return;
+
+                byte[]? frameBytes = await _gifWebpService.ExtractFrameBytesAsync(videoPath, targetTime, 1280, token);
+                if (token.IsCancellationRequested || frameBytes == null || frameBytes.Length == 0)
+                    return;
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (token.IsCancellationRequested) return;
+
+                    try
+                    {
+                        var bitmap = new BitmapImage();
+                        bitmap.BeginInit();
+                        bitmap.StreamSource = new MemoryStream(frameBytes);
+                        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                        bitmap.EndInit();
+                        bitmap.Freeze();
+
+                        if (_previewFrameCache.Count > 120)
+                        {
+                            _previewFrameCache.Clear();
+                        }
+                        _previewFrameCache[cacheKey] = bitmap;
+
+                        if (GifFramePreviewImage != null && !_isGifPlayerPlaying)
+                        {
+                            GifFramePreviewImage.Source = bitmap;
+                            GifFramePreviewImage.Visibility = Visibility.Visible;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[GifWebp] Bitmap decode error: {ex.Message}");
+                    }
+                });
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[GifWebp] RequestFramePreviewAsync error: {ex.Message}");
+            }
+        }
+
         private void GifPlayerScrubber_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
             _isGifPlayerSeeking = true;
+            _wasPlayingBeforeSeek = _isGifPlayerPlaying;
+            if (_wasPlayingBeforeSeek)
+            {
+                GifMediaPlayer?.Pause();
+                _gifPlayerTimer?.Stop();
+                if (GifPlayPauseIcon != null) GifPlayPauseIcon.Text = "▶";
+            }
         }
 
         private void GifPlayerScrubber_PreviewMouseUp(object sender, MouseButtonEventArgs e)
         {
             _isGifPlayerSeeking = false;
-            if (GifMediaPlayer != null && GifPlayerScrubber != null)
+            if (GifPlayerScrubber != null)
             {
-                GifMediaPlayer.Position = TimeSpan.FromSeconds(GifPlayerScrubber.Value);
+                var target = TimeSpan.FromSeconds(GifPlayerScrubber.Value);
+                SeekToPosition(target, forceHighQuality: true);
+
+                if (_wasPlayingBeforeSeek)
+                {
+                    StartGifPlayer(_isLoopPreviewActive);
+                }
             }
         }
 
         private void GifPlayerScrubber_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (_isGifPlayerSeeking && GifMediaPlayer != null)
+            if (_isTimerUpdatingScrubber) return;
+
+            var target = TimeSpan.FromSeconds(e.NewValue);
+            SeekToPosition(target, forceHighQuality: !_isGifPlayerSeeking);
+        }
+
+        private void GifStepBack_Click(object sender, RoutedEventArgs e)
+        {
+            StopGifPlayer();
+            var current = GifPlayerScrubber != null ? TimeSpan.FromSeconds(GifPlayerScrubber.Value) : (GifMediaPlayer?.Position ?? TimeSpan.Zero);
+            var target = current - TimeSpan.FromSeconds(0.1);
+            if (target < TimeSpan.Zero) target = TimeSpan.Zero;
+            SeekToPosition(target, forceHighQuality: true);
+        }
+
+        private void GifStepForward_Click(object sender, RoutedEventArgs e)
+        {
+            StopGifPlayer();
+            var current = GifPlayerScrubber != null ? TimeSpan.FromSeconds(GifPlayerScrubber.Value) : (GifMediaPlayer?.Position ?? TimeSpan.Zero);
+            var target = current + TimeSpan.FromSeconds(0.1);
+            if (_gifTotalDuration > TimeSpan.Zero && target > _gifTotalDuration) target = _gifTotalDuration;
+            SeekToPosition(target, forceHighQuality: true);
+        }
+
+        private void GifJumpStart_Click(object sender, RoutedEventArgs e)
+        {
+            StopGifPlayer();
+            SeekToPosition(_gifStartTime, forceHighQuality: true);
+        }
+
+        private void GifJumpEnd_Click(object sender, RoutedEventArgs e)
+        {
+            StopGifPlayer();
+            SeekToPosition(_gifEndTime, forceHighQuality: true);
+        }
+
+        private void GifTimelineGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateTimelineTrimHighlight();
+        }
+
+        private void UpdateTimelineTrimHighlight()
+        {
+            if (GifTimelineTrackCanvas == null || GifTimelineTrimHighlight == null || _gifTotalDuration <= TimeSpan.Zero)
+                return;
+
+            double canvasWidth = GifTimelineTrackCanvas.ActualWidth;
+            if (canvasWidth <= 10 && GifPlayerScrubber != null)
             {
-                GifMediaPlayer.Position = TimeSpan.FromSeconds(e.NewValue);
-                if (GifPlayerTimeText != null)
-                {
-                    GifPlayerTimeText.Text = $"{FormatTimeSpan(TimeSpan.FromSeconds(e.NewValue))} / {FormatTimeSpan(_gifTotalDuration)}";
-                }
+                canvasWidth = GifPlayerScrubber.ActualWidth;
             }
+            if (canvasWidth <= 10) return;
+
+            double startFrac = Math.Clamp(_gifStartTime.TotalSeconds / _gifTotalDuration.TotalSeconds, 0, 1.0);
+            double endFrac = Math.Clamp(_gifEndTime.TotalSeconds / _gifTotalDuration.TotalSeconds, 0, 1.0);
+            if (endFrac < startFrac) endFrac = startFrac;
+
+            double left = startFrac * canvasWidth;
+            double width = Math.Max(2, (endFrac - startFrac) * canvasWidth);
+
+            Canvas.SetLeft(GifTimelineTrimHighlight, left);
+            GifTimelineTrimHighlight.Width = width;
         }
 
         private void GifSetCurrentAsStart_Click(object sender, RoutedEventArgs e)
         {
-            if (GifMediaPlayer == null) return;
-            var pos = GifMediaPlayer.Position;
+            var pos = GifPlayerScrubber != null ? TimeSpan.FromSeconds(GifPlayerScrubber.Value) : (GifMediaPlayer?.Position ?? TimeSpan.Zero);
             if (pos < _gifEndTime)
             {
                 _gifStartTime = pos;
@@ -376,8 +592,7 @@ namespace UniversalDownloader
 
         private void GifSetCurrentAsEnd_Click(object sender, RoutedEventArgs e)
         {
-            if (GifMediaPlayer == null) return;
-            var pos = GifMediaPlayer.Position;
+            var pos = GifPlayerScrubber != null ? TimeSpan.FromSeconds(GifPlayerScrubber.Value) : (GifMediaPlayer?.Position ?? TimeSpan.Zero);
             if (pos > _gifStartTime)
             {
                 _gifEndTime = pos;

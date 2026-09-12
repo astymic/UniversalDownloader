@@ -300,6 +300,48 @@
             </Setter>
         </Style>
 
+        <!-- Video Player Timeline Scrubber Slider Style -->
+        <Style TargetType="Slider" x:Key="TimelineSliderStyle">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#38BDF8"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center" Height="24" Background="Transparent">
+                            <!-- Background Track Bar -->
+                            <Border Height="6" Background="#27272A" CornerRadius="3" VerticalAlignment="Center"/>
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.DecreaseLarge}">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="6" Background="#0284C7" CornerRadius="3"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="16" Height="16" Cursor="Hand">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse Fill="#FFFFFF" Stroke="#38BDF8" StrokeThickness="2.5">
+                                                    <Ellipse.Effect>
+                                                        <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="#38BDF8" Opacity="0.6"/>
+                                                    </Ellipse.Effect>
+                                                </Ellipse>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Global Modern ScrollBar Style -->
         <Style TargetType="ScrollBar">
             <Setter Property="Background" Value="Transparent"/>
@@ -2086,6 +2128,14 @@
                                                           HorizontalAlignment="Center" 
                                                           VerticalAlignment="Center"/>
 
+                                            <!-- Dedicated Frame Preview Image (Scrubbing / Seeking / Paused) -->
+                                            <Image x:Name="GifFramePreviewImage" 
+                                                   Stretch="Uniform" 
+                                                   HorizontalAlignment="Center" 
+                                                   VerticalAlignment="Center" 
+                                                   Visibility="Collapsed" 
+                                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+
                                             <!-- Crop Overlay Canvas -->
                                             <Canvas x:Name="GifCropCanvas" ClipToBounds="True" Visibility="Visible">
                                                 <!-- Dimmed Shroud Outside Crop Box -->
@@ -2170,29 +2220,88 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <!-- Play/Pause Button -->
-                                        <Button x:Name="GifPlayPauseButton" 
-                                                Grid.Column="0" 
-                                                Style="{StaticResource SecondaryButton}" 
-                                                Width="38" 
-                                                Height="32" 
-                                                Padding="0" 
-                                                Margin="0,0,12,0" 
-                                                Click="GifPlayPause_Click"
-                                                ToolTip="Play / Pause">
-                                            <TextBlock x:Name="GifPlayPauseIcon" Text="▶" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Button>
+                                        <!-- Transport Controls (Jump Start, Step Back, Play/Pause, Step Forward, Jump End) -->
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <!-- Jump to Clip Start -->
+                                            <Button x:Name="GifJumpStartBtn" 
+                                                    Style="{StaticResource SecondaryButton}" 
+                                                    Width="30" 
+                                                    Height="32" 
+                                                    Padding="0" 
+                                                    Margin="0,0,4,0" 
+                                                    Click="GifJumpStart_Click" 
+                                                    ToolTip="Jump to Clip Start">
+                                                <TextBlock Text="⏮" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Button>
 
-                                        <!-- Scrubber Slider -->
-                                        <Slider x:Name="GifPlayerScrubber" 
-                                                Grid.Column="1" 
-                                                Minimum="0" 
-                                                Maximum="100" 
-                                                Value="0" 
-                                                VerticalAlignment="Center"
-                                                PreviewMouseDown="GifPlayerScrubber_PreviewMouseDown"
-                                                PreviewMouseUp="GifPlayerScrubber_PreviewMouseUp"
-                                                ValueChanged="GifPlayerScrubber_ValueChanged"/>
+                                            <!-- Step -0.1s (-1 frame) -->
+                                            <Button x:Name="GifStepBackBtn" 
+                                                    Style="{StaticResource SecondaryButton}" 
+                                                    Width="32" 
+                                                    Height="32" 
+                                                    Padding="0" 
+                                                    Margin="0,0,4,0" 
+                                                    Click="GifStepBack_Click" 
+                                                    ToolTip="Step back 0.1s">
+                                                <TextBlock Text="◀" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Button>
+
+                                            <!-- Play/Pause Button -->
+                                            <Button x:Name="GifPlayPauseButton" 
+                                                    Style="{StaticResource SecondaryButton}" 
+                                                    Width="38" 
+                                                    Height="32" 
+                                                    Padding="0" 
+                                                    Margin="0,0,4,0" 
+                                                    Click="GifPlayPause_Click" 
+                                                    ToolTip="Play / Pause">
+                                                <TextBlock x:Name="GifPlayPauseIcon" Text="▶" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Button>
+
+                                            <!-- Step +0.1s (+1 frame) -->
+                                            <Button x:Name="GifStepForwardBtn" 
+                                                    Style="{StaticResource SecondaryButton}" 
+                                                    Width="32" 
+                                                    Height="32" 
+                                                    Padding="0" 
+                                                    Margin="0,0,4,0" 
+                                                    Click="GifStepForward_Click" 
+                                                    ToolTip="Step forward 0.1s">
+                                                <TextBlock Text="▶" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Button>
+
+                                            <!-- Jump to Clip End -->
+                                            <Button x:Name="GifJumpEndBtn" 
+                                                    Style="{StaticResource SecondaryButton}" 
+                                                    Width="30" 
+                                                    Height="32" 
+                                                    Padding="0" 
+                                                    Click="GifJumpEnd_Click" 
+                                                    ToolTip="Jump to Clip End">
+                                                <TextBlock Text="⏭" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Button>
+                                        </StackPanel>
+
+                                        <!-- Interactive Timeline Scrubber with Visual Trim Range Highlight -->
+                                        <Grid Grid.Column="1" VerticalAlignment="Center" Height="26" SizeChanged="GifTimelineGrid_SizeChanged">
+                                            <!-- Canvas for Trim Region Highlight on track -->
+                                            <Canvas x:Name="GifTimelineTrackCanvas" ClipToBounds="True" Height="6" VerticalAlignment="Center" IsHitTestVisible="False">
+                                                <Rectangle x:Name="GifTimelineTrimHighlight" Fill="#38BDF8" Opacity="0.45" Height="6" RadiusX="3" RadiusY="3" Canvas.Left="0" Canvas.Top="0" Width="0"/>
+                                            </Canvas>
+
+                                            <!-- Scrubber Slider with IsMoveToPointEnabled="True" -->
+                                            <Slider x:Name="GifPlayerScrubber" 
+                                                    Minimum="0" 
+                                                    Maximum="100" 
+                                                    Value="0" 
+                                                    IsMoveToPointEnabled="True"
+                                                    Cursor="Hand"
+                                                    VerticalAlignment="Center"
+                                                    PreviewMouseDown="GifPlayerScrubber_PreviewMouseDown"
+                                                    PreviewMouseUp="GifPlayerScrubber_PreviewMouseUp"
+                                                    ValueChanged="GifPlayerScrubber_ValueChanged"
+                                                    Style="{StaticResource TimelineSliderStyle}"/>
+                                        </Grid>
 
                                         <!-- Current / Total Time -->
                                         <TextBlock x:Name="GifPlayerTimeText" 

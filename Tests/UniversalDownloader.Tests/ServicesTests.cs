@@ -661,6 +661,33 @@ namespace UniversalDownloader.Tests
             Assert.True(cx + cw <= 1922);
             Assert.True(cy + ch <= 1082);
         }
+
+        [Fact]
+        public void GifWebp_BuildExtractFrameArguments_ProducesCorrectFfmpegPiping()
+        {
+            var args = GifWebpService.BuildExtractFrameArguments("test.mp4", TimeSpan.FromSeconds(7.5), 1280);
+
+            Assert.Contains("-ss", args);
+            int ssIdx = args.IndexOf("-ss");
+            Assert.Equal("7.5", args[ssIdx + 1]);
+
+            Assert.Contains("-i", args);
+            Assert.Contains("test.mp4", args);
+
+            Assert.Contains("-vframes", args);
+            int vfIdx = args.IndexOf("-vframes");
+            Assert.Equal("1", args[vfIdx + 1]);
+
+            Assert.Contains("-f", args);
+            int fIdx = args.IndexOf("-f");
+            Assert.Equal("image2pipe", args[fIdx + 1]);
+
+            Assert.Contains("-vcodec", args);
+            int vcIdx = args.IndexOf("-vcodec");
+            Assert.Equal("mjpeg", args[vcIdx + 1]);
+
+            Assert.Equal("-", args[^1]);
+        }
     }
 }
 
