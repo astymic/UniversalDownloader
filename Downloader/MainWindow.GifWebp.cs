@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -32,6 +33,10 @@ namespace UniversalDownloader
         private bool _isGifPlayerSeeking = false;
         private bool _isLoopPreviewActive = false;
         private bool _isGifSettingsExpanded = false;
+
+        private VideoCropRect _cropRect = new VideoCropRect();
+        private int _sourceVideoWidth = 0;
+        private int _sourceVideoHeight = 0;
 
         private void InitializeGifWebp()
         {
@@ -166,8 +171,13 @@ namespace UniversalDownloader
                         _gifStartTime = TimeSpan.Zero;
                         _gifEndTime = _gifTotalDuration > TimeSpan.FromSeconds(5) ? TimeSpan.FromSeconds(5) : _gifTotalDuration;
 
+                        _sourceVideoWidth = info.Width;
+                        _sourceVideoHeight = info.Height;
+                        _cropRect = new VideoCropRect();
+
                         UpdateTrimmerUi();
                         UpdateOutputDestinationPreview();
+                        UpdateCropOverlay();
                     });
                 }
             });
@@ -191,13 +201,16 @@ namespace UniversalDownloader
             {
                 GifPlayerScrubber.Maximum = _gifTotalDuration.TotalSeconds;
             }
+
+            UpdateTelegramDurationWarning();
         }
 
         private void UpdateOutputDestinationPreview()
         {
             if (string.IsNullOrEmpty(_currentGifSourceVideo)) return;
 
-            string ext = IsWebpSelected() ? ".webp" : ".gif";
+            string ext = IsTelegramStickerSelected() ? ".webm" :
+                         IsWebpSelected() ? ".webp" : ".gif";
             string folder = GifDestinationTextBox?.Text?.Trim() ?? "";
 
             if (string.IsNullOrEmpty(folder))
@@ -221,12 +234,19 @@ namespace UniversalDownloader
 
         private void GifPlayer_MediaOpened(object sender, RoutedEventArgs e)
         {
-            if (GifMediaPlayer != null && GifMediaPlayer.NaturalDuration.HasTimeSpan)
+            if (GifMediaPlayer != null)
             {
-                if (_gifTotalDuration == TimeSpan.Zero)
+                if (GifMediaPlayer.NaturalDuration.HasTimeSpan && _gifTotalDuration == TimeSpan.Zero)
                 {
                     _gifTotalDuration = GifMediaPlayer.NaturalDuration.TimeSpan;
                     UpdateTrimmerUi();
+                }
+
+                if (_sourceVideoWidth <= 0 && GifMediaPlayer.NaturalVideoWidth > 0)
+                {
+                    _sourceVideoWidth = GifMediaPlayer.NaturalVideoWidth;
+                    _sourceVideoHeight = GifMediaPlayer.NaturalVideoHeight;
+                    UpdateCropOverlay();
                 }
             }
         }
@@ -453,7 +473,328 @@ namespace UniversalDownloader
             return false;
         }
 
+        // ==================== Interactive Crop Editor ====================
+
+        private void GifPlayerViewportGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateCropOverlay();
+        }
+
+        private (double renderX, double renderY, double renderW, double renderH) GetRenderedVideoBounds()
+        {
+            if (GifPlayerViewportGrid == null || _sourceVideoWidth <= 0 || _sourceVideoHeight <= 0)
+                return (0, 0, 1, 1);
+
+            double containerW = GifPlayerViewportGrid.ActualWidth;
+            double containerH = GifPlayerViewportGrid.ActualHeight;
+            if (containerW <= 10 || containerH <= 10) return (0, 0, 1, 1);
+
+            double videoAspect = (double)_sourceVideoWidth / _sourceVideoHeight;
+            double containerAspect = containerW / containerH;
+
+            if (containerAspect > videoAspect)
+            {
+                double renderH = containerH;
+                double renderW = containerH * videoAspect;
+                return ((containerW - renderW) / 2.0, 0, renderW, renderH);
+            }
+            else
+            {
+                double renderW = containerW;
+                double renderH = containerW / videoAspect;
+                return (0, (containerH - renderH) / 2.0, renderW, renderH);
+            }
+        }
+
+        private void UpdateCropOverlay()
+        {
+            if (GifPlayerViewportGrid == null || GifCropCanvas == null) return;
+
+            if (_sourceVideoWidth <= 0 || _sourceVideoHeight <= 0)
+            {
+                GifCropCanvas.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            GifCropCanvas.Visibility = Visibility.Visible;
+
+            var (renderX, renderY, renderW, renderH) = GetRenderedVideoBounds();
+            if (renderW <= 10 || renderH <= 10) return;
+
+            // Screen pixel position for crop box
+            double screenCropX = renderX + _cropRect.X * renderW;
+            double screenCropY = renderY + _cropRect.Y * renderH;
+            double screenCropW = Math.Max(24, _cropRect.Width * renderW);
+            double screenCropH = Math.Max(24, _cropRect.Height * renderH);
+
+            // Crop Box Border
+            if (CropBoxBorder != null)
+            {
+                Canvas.SetLeft(CropBoxBorder, screenCropX);
+                Canvas.SetTop(CropBoxBorder, screenCropY);
+                CropBoxBorder.Width = screenCropW;
+                CropBoxBorder.Height = screenCropH;
+            }
+
+            // 4 Dimmed Masks
+            if (CropMaskTop != null)
+            {
+                Canvas.SetLeft(CropMaskTop, renderX);
+                Canvas.SetTop(CropMaskTop, renderY);
+                CropMaskTop.Width = renderW;
+                CropMaskTop.Height = Math.Max(0, screenCropY - renderY);
+            }
+
+            if (CropMaskBottom != null)
+            {
+                Canvas.SetLeft(CropMaskBottom, renderX);
+                Canvas.SetTop(CropMaskBottom, screenCropY + screenCropH);
+                CropMaskBottom.Width = renderW;
+                CropMaskBottom.Height = Math.Max(0, (renderY + renderH) - (screenCropY + screenCropH));
+            }
+
+            if (CropMaskLeft != null)
+            {
+                Canvas.SetLeft(CropMaskLeft, renderX);
+                Canvas.SetTop(CropMaskLeft, screenCropY);
+                CropMaskLeft.Width = Math.Max(0, screenCropX - renderX);
+                CropMaskLeft.Height = screenCropH;
+            }
+
+            if (CropMaskRight != null)
+            {
+                Canvas.SetLeft(CropMaskRight, screenCropX + screenCropW);
+                Canvas.SetTop(CropMaskRight, screenCropY);
+                CropMaskRight.Width = Math.Max(0, (renderX + renderW) - (screenCropX + screenCropW));
+                CropMaskRight.Height = screenCropH;
+            }
+
+            // 4 Edge Handles
+            if (CropHandleTop != null)
+            {
+                Canvas.SetLeft(CropHandleTop, screenCropX + (screenCropW - 28) / 2.0);
+                Canvas.SetTop(CropHandleTop, screenCropY - 4);
+            }
+
+            if (CropHandleBottom != null)
+            {
+                Canvas.SetLeft(CropHandleBottom, screenCropX + (screenCropW - 28) / 2.0);
+                Canvas.SetTop(CropHandleBottom, screenCropY + screenCropH - 4);
+            }
+
+            if (CropHandleLeft != null)
+            {
+                Canvas.SetLeft(CropHandleLeft, screenCropX - 4);
+                Canvas.SetTop(CropHandleLeft, screenCropY + (screenCropH - 28) / 2.0);
+            }
+
+            if (CropHandleRight != null)
+            {
+                Canvas.SetLeft(CropHandleRight, screenCropX + screenCropW - 4);
+                Canvas.SetTop(CropHandleRight, screenCropY + (screenCropH - 28) / 2.0);
+            }
+
+            // 4 Corner Handles
+            if (CropHandleTopLeft != null)
+            {
+                Canvas.SetLeft(CropHandleTopLeft, screenCropX - 6);
+                Canvas.SetTop(CropHandleTopLeft, screenCropY - 6);
+            }
+
+            if (CropHandleTopRight != null)
+            {
+                Canvas.SetLeft(CropHandleTopRight, screenCropX + screenCropW - 6);
+                Canvas.SetTop(CropHandleTopRight, screenCropY - 6);
+            }
+
+            if (CropHandleBottomLeft != null)
+            {
+                Canvas.SetLeft(CropHandleBottomLeft, screenCropX - 6);
+                Canvas.SetTop(CropHandleBottomLeft, screenCropY + screenCropH - 6);
+            }
+
+            if (CropHandleBottomRight != null)
+            {
+                Canvas.SetLeft(CropHandleBottomRight, screenCropX + screenCropW - 6);
+                Canvas.SetTop(CropHandleBottomRight, screenCropY + screenCropH - 6);
+            }
+
+            // Crop Dimension Badge
+            var (pxX, pxY, pxW, pxH) = _cropRect.ToPixelCrop(_sourceVideoWidth, _sourceVideoHeight);
+            if (CropDimensionText != null)
+            {
+                CropDimensionText.Text = $"{pxW} × {pxH}";
+            }
+
+            if (GifCropInfoText != null)
+            {
+                if (_cropRect.IsActive)
+                {
+                    double ratio = (double)pxW / Math.Max(1, pxH);
+                    string ratioLabel = Math.Abs(ratio - 1.0) < 0.04 ? "1:1" :
+                                       Math.Abs(ratio - 16.0 / 9.0) < 0.04 ? "16:9" :
+                                       Math.Abs(ratio - 9.0 / 16.0) < 0.04 ? "9:16" :
+                                       Math.Abs(ratio - 4.0 / 3.0) < 0.04 ? "4:3" : $"{ratio:F2}:1";
+                    GifCropInfoText.Text = $"✂️ {pxW} × {pxH} ({ratioLabel})";
+                }
+                else
+                {
+                    GifCropInfoText.Text = $"Full frame: {_sourceVideoWidth} × {_sourceVideoHeight}";
+                }
+            }
+        }
+
+        private void CropCenter_DragDelta(object sender, DragDeltaEventArgs e)
+        {
+            var (_, _, renderW, renderH) = GetRenderedVideoBounds();
+            if (renderW <= 0 || renderH <= 0) return;
+
+            double dx = e.HorizontalChange / renderW;
+            double dy = e.VerticalChange / renderH;
+
+            _cropRect.X = Math.Clamp(_cropRect.X + dx, 0, Math.Max(0, 1.0 - _cropRect.Width));
+            _cropRect.Y = Math.Clamp(_cropRect.Y + dy, 0, Math.Max(0, 1.0 - _cropRect.Height));
+
+            UpdateCropOverlay();
+        }
+
+        private void CropEdge_DragDelta(object sender, DragDeltaEventArgs e)
+        {
+            var (_, _, renderW, renderH) = GetRenderedVideoBounds();
+            if (renderW <= 0 || renderH <= 0 || sender is not FrameworkElement fe) return;
+
+            string tag = fe.Tag as string ?? "";
+            double dx = e.HorizontalChange / renderW;
+            double dy = e.VerticalChange / renderH;
+            double minPct = 0.05;
+
+            switch (tag)
+            {
+                case "Top":
+                    double newTop = Math.Clamp(_cropRect.Y + dy, 0, _cropRect.Y + _cropRect.Height - minPct);
+                    _cropRect.Height = (_cropRect.Y + _cropRect.Height) - newTop;
+                    _cropRect.Y = newTop;
+                    break;
+                case "Bottom":
+                    _cropRect.Height = Math.Clamp(_cropRect.Height + dy, minPct, 1.0 - _cropRect.Y);
+                    break;
+                case "Left":
+                    double newLeft = Math.Clamp(_cropRect.X + dx, 0, _cropRect.X + _cropRect.Width - minPct);
+                    _cropRect.Width = (_cropRect.X + _cropRect.Width) - newLeft;
+                    _cropRect.X = newLeft;
+                    break;
+                case "Right":
+                    _cropRect.Width = Math.Clamp(_cropRect.Width + dx, minPct, 1.0 - _cropRect.X);
+                    break;
+            }
+
+            UpdateCropOverlay();
+        }
+
+        private void CropCorner_DragDelta(object sender, DragDeltaEventArgs e)
+        {
+            var (_, _, renderW, renderH) = GetRenderedVideoBounds();
+            if (renderW <= 0 || renderH <= 0 || sender is not FrameworkElement fe) return;
+
+            string tag = fe.Tag as string ?? "";
+            double dx = e.HorizontalChange / renderW;
+            double dy = e.VerticalChange / renderH;
+            double minPct = 0.05;
+
+            switch (tag)
+            {
+                case "TopLeft":
+                    double newTopTL = Math.Clamp(_cropRect.Y + dy, 0, _cropRect.Y + _cropRect.Height - minPct);
+                    _cropRect.Height = (_cropRect.Y + _cropRect.Height) - newTopTL;
+                    _cropRect.Y = newTopTL;
+
+                    double newLeftTL = Math.Clamp(_cropRect.X + dx, 0, _cropRect.X + _cropRect.Width - minPct);
+                    _cropRect.Width = (_cropRect.X + _cropRect.Width) - newLeftTL;
+                    _cropRect.X = newLeftTL;
+                    break;
+
+                case "TopRight":
+                    double newTopTR = Math.Clamp(_cropRect.Y + dy, 0, _cropRect.Y + _cropRect.Height - minPct);
+                    _cropRect.Height = (_cropRect.Y + _cropRect.Height) - newTopTR;
+                    _cropRect.Y = newTopTR;
+
+                    _cropRect.Width = Math.Clamp(_cropRect.Width + dx, minPct, 1.0 - _cropRect.X);
+                    break;
+
+                case "BottomLeft":
+                    _cropRect.Height = Math.Clamp(_cropRect.Height + dy, minPct, 1.0 - _cropRect.Y);
+
+                    double newLeftBL = Math.Clamp(_cropRect.X + dx, 0, _cropRect.X + _cropRect.Width - minPct);
+                    _cropRect.Width = (_cropRect.X + _cropRect.Width) - newLeftBL;
+                    _cropRect.X = newLeftBL;
+                    break;
+
+                case "BottomRight":
+                    _cropRect.Height = Math.Clamp(_cropRect.Height + dy, minPct, 1.0 - _cropRect.Y);
+                    _cropRect.Width = Math.Clamp(_cropRect.Width + dx, minPct, 1.0 - _cropRect.X);
+                    break;
+            }
+
+            UpdateCropOverlay();
+        }
+
+        private void GifCropRatioFull_Click(object sender, RoutedEventArgs e)
+        {
+            _cropRect = new VideoCropRect { X = 0, Y = 0, Width = 1.0, Height = 1.0 };
+            UpdateCropOverlay();
+        }
+
+        private void GifCropRatio1x1_Click(object sender, RoutedEventArgs e)
+        {
+            if (_sourceVideoWidth <= 0 || _sourceVideoHeight <= 0) return;
+
+            if (_sourceVideoWidth >= _sourceVideoHeight)
+            {
+                double normW = (double)_sourceVideoHeight / _sourceVideoWidth;
+                double normX = (1.0 - normW) / 2.0;
+                _cropRect = new VideoCropRect { X = normX, Y = 0, Width = normW, Height = 1.0 };
+            }
+            else
+            {
+                double normH = (double)_sourceVideoWidth / _sourceVideoHeight;
+                double normY = (1.0 - normH) / 2.0;
+                _cropRect = new VideoCropRect { X = 0, Y = normY, Width = 1.0, Height = normH };
+            }
+            UpdateCropOverlay();
+        }
+
+        private void ApplyAspectRatioCrop(double targetRatio)
+        {
+            if (_sourceVideoWidth <= 0 || _sourceVideoHeight <= 0 || targetRatio <= 0) return;
+
+            double sourceRatio = (double)_sourceVideoWidth / _sourceVideoHeight;
+            if (sourceRatio >= targetRatio)
+            {
+                double targetW = _sourceVideoHeight * targetRatio;
+                double normW = Math.Min(1.0, targetW / _sourceVideoWidth);
+                double normX = (1.0 - normW) / 2.0;
+                _cropRect = new VideoCropRect { X = normX, Y = 0, Width = normW, Height = 1.0 };
+            }
+            else
+            {
+                double targetH = _sourceVideoWidth / targetRatio;
+                double normH = Math.Min(1.0, targetH / _sourceVideoHeight);
+                double normY = (1.0 - normH) / 2.0;
+                _cropRect = new VideoCropRect { X = 0, Y = normY, Width = 1.0, Height = normH };
+            }
+            UpdateCropOverlay();
+        }
+
+        private void GifCropRatio16x9_Click(object sender, RoutedEventArgs e) => ApplyAspectRatioCrop(16.0 / 9.0);
+        private void GifCropRatio9x16_Click(object sender, RoutedEventArgs e) => ApplyAspectRatioCrop(9.0 / 16.0);
+        private void GifCropRatio4x3_Click(object sender, RoutedEventArgs e) => ApplyAspectRatioCrop(4.0 / 3.0);
+
         // ==================== Presets & Format Selection ====================
+
+        private bool IsTelegramStickerSelected()
+        {
+            return GifFormatTelegramRadio != null && GifFormatTelegramRadio.IsChecked == true;
+        }
 
         private bool IsWebpSelected()
         {
@@ -462,21 +803,44 @@ namespace UniversalDownloader
 
         private void GifFormat_Checked(object sender, RoutedEventArgs e)
         {
+            bool isTelegram = IsTelegramStickerSelected();
             bool isWebp = IsWebpSelected();
+
+            if (GifTelegramNoticeCard != null)
+            {
+                GifTelegramNoticeCard.Visibility = isTelegram ? Visibility.Visible : Visibility.Collapsed;
+            }
 
             if (GifOptionsPanel != null)
             {
-                if (GifDitherPanel != null) GifDitherPanel.Visibility = isWebp ? Visibility.Collapsed : Visibility.Visible;
-                if (GifColorsPanel != null) GifColorsPanel.Visibility = isWebp ? Visibility.Collapsed : Visibility.Visible;
+                if (GifDitherPanel != null) GifDitherPanel.Visibility = (!isWebp && !isTelegram) ? Visibility.Visible : Visibility.Collapsed;
+                if (GifColorsPanel != null) GifColorsPanel.Visibility = (!isWebp && !isTelegram) ? Visibility.Visible : Visibility.Collapsed;
                 if (GifWebpQualityPanel != null) GifWebpQualityPanel.Visibility = isWebp ? Visibility.Visible : Visibility.Collapsed;
             }
 
             if (GifCreateButton != null)
             {
-                GifCreateButton.Content = isWebp ? "🌐 Create WebP Clip" : "🎞️ Create GIF Clip";
+                GifCreateButton.Content = isTelegram ? "✈️ Create Telegram Sticker" :
+                                          isWebp ? "🌐 Create WebP Clip" : "🎞️ Create GIF Clip";
             }
 
+            UpdateTelegramDurationWarning();
             UpdateOutputDestinationPreview();
+        }
+
+        private void UpdateTelegramDurationWarning()
+        {
+            if (GifTelegramDurationWarning == null) return;
+
+            if (IsTelegramStickerSelected())
+            {
+                var dur = _gifEndTime > _gifStartTime ? _gifEndTime - _gifStartTime : TimeSpan.Zero;
+                GifTelegramDurationWarning.Visibility = dur > TimeSpan.FromSeconds(3) ? Visibility.Visible : Visibility.Collapsed;
+            }
+            else
+            {
+                GifTelegramDurationWarning.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void GifPresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -680,8 +1044,9 @@ namespace UniversalDownloader
 
             StopGifPlayer();
 
-            bool isWebp = IsWebpSelected();
-            var format = isWebp ? GifWebpFormat.Webp : GifWebpFormat.Gif;
+            bool isTelegram = IsTelegramStickerSelected();
+            bool isWebp = !isTelegram && IsWebpSelected();
+            var format = isTelegram ? GifWebpFormat.TelegramSticker : (isWebp ? GifWebpFormat.Webp : GifWebpFormat.Gif);
 
             int presetIdx = GifPresetComboBox?.SelectedIndex ?? 0;
             var preset = presetIdx switch
@@ -693,20 +1058,29 @@ namespace UniversalDownloader
                 _ => GifWebpPreset.MaxQuality
             };
 
+            var endTime = _gifEndTime;
+            if (isTelegram && (endTime - _gifStartTime > TimeSpan.FromSeconds(3.0)))
+            {
+                endTime = _gifStartTime + TimeSpan.FromSeconds(3.0);
+            }
+
             var options = new GifWebpOptions
             {
                 Format = format,
                 Preset = preset,
                 StartTime = _gifStartTime,
-                EndTime = _gifEndTime,
-                Fps = GetSelectedFps(),
+                EndTime = endTime,
+                Fps = isTelegram ? Math.Min(30, GetSelectedFps()) : GetSelectedFps(),
                 Width = GetSelectedWidth(),
                 SpeedMultiplier = GetSelectedSpeed(),
                 MaxColors = GetSelectedColors(),
                 Dither = GetSelectedDither(),
                 LoopCount = (GifLoopComboBox?.SelectedIndex == 1) ? -1 : 0,
                 WebpQuality = (int)(GifWebpQualitySlider?.Value ?? 80),
-                WebpLossless = GifWebpLosslessCheckBox?.IsChecked == true
+                WebpLossless = GifWebpLosslessCheckBox?.IsChecked == true,
+                Crop = _cropRect,
+                OriginalVideoWidth = _sourceVideoWidth,
+                OriginalVideoHeight = _sourceVideoHeight
             };
 
             if (preset == GifWebpPreset.TargetSize &&
@@ -716,7 +1090,7 @@ namespace UniversalDownloader
                 options.TargetSizeMb = parsedMb;
             }
 
-            string ext = isWebp ? ".webp" : ".gif";
+            string ext = isTelegram ? ".webm" : (isWebp ? ".webp" : ".gif");
             string targetFolder = GifDestinationTextBox?.Text?.Trim() ?? "";
             if (string.IsNullOrEmpty(targetFolder))
             {
@@ -797,7 +1171,7 @@ namespace UniversalDownloader
                             {
                                 Title = Path.GetFileName(finalOutputPath),
                                 Url = _currentGifSourceVideo,
-                                Platform = isWebp ? "WebP Clip" : "GIF Clip",
+                                Platform = isTelegram ? "Telegram Sticker" : (isWebp ? "WebP Clip" : "GIF Clip"),
                                 FilePath = finalOutputPath,
                                 FileSizeBytes = result.OutputSizeBytes,
                                 FormattedSize = result.FormattedSize,

@@ -13,7 +13,41 @@ namespace UniversalDownloader.Services
     public enum GifWebpFormat
     {
         Gif,
-        Webp
+        Webp,
+        TelegramSticker,
+        Webm
+    }
+
+    public class VideoCropRect
+    {
+        public double X { get; set; } = 0.0;
+        public double Y { get; set; } = 0.0;
+        public double Width { get; set; } = 1.0;
+        public double Height { get; set; } = 1.0;
+
+        public bool IsActive => Width < 0.999 || Height < 0.999 || X > 0.001 || Y > 0.001;
+
+        public (int x, int y, int w, int h) ToPixelCrop(int originalWidth, int originalHeight)
+        {
+            if (originalWidth <= 0 || originalHeight <= 0) return (0, 0, 0, 0);
+
+            int x = (int)Math.Round(X * originalWidth);
+            int y = (int)Math.Round(Y * originalHeight);
+            int w = (int)Math.Round(Width * originalWidth);
+            int h = (int)Math.Round(Height * originalHeight);
+
+            x = Math.Clamp(x, 0, Math.Max(0, originalWidth - 2));
+            y = Math.Clamp(y, 0, Math.Max(0, originalHeight - 2));
+            w = Math.Clamp(w, 2, originalWidth - x);
+            h = Math.Clamp(h, 2, originalHeight - y);
+
+            w = Math.Max(2, (w / 2) * 2);
+            h = Math.Max(2, (h / 2) * 2);
+            x = (x / 2) * 2;
+            y = (y / 2) * 2;
+
+            return (x, y, w, h);
+        }
     }
 
     public enum GifWebpPreset
@@ -48,8 +82,25 @@ namespace UniversalDownloader.Services
         public int WebpQuality { get; set; } = 80; // 1-100
         public bool WebpLossless { get; set; } = false;
         public double? TargetSizeMb { get; set; } = null;
+        public VideoCropRect? Crop { get; set; } = null;
+        public int OriginalVideoWidth { get; set; } = 0;
+        public int OriginalVideoHeight { get; set; } = 0;
 
         public TimeSpan ClipDuration => EndTime > StartTime ? EndTime - StartTime : TimeSpan.FromSeconds(1);
+
+        public static GifWebpOptions CreateTelegramSticker()
+        {
+            return new GifWebpOptions
+            {
+                Format = GifWebpFormat.TelegramSticker,
+                Preset = GifWebpPreset.Custom,
+                Fps = 30,
+                Width = 512,
+                SpeedMultiplier = 1.0,
+                LoopCount = 0,
+                TargetSizeMb = 0.25
+            };
+        }
 
         public static GifWebpOptions CreateMaxQuality(GifWebpFormat format = GifWebpFormat.Gif)
         {
@@ -248,6 +299,17 @@ namespace UniversalDownloader.Services
             args.Add("-i");
             args.Add(inputPath);
 
+            // Compute crop filter string if active
+            string cropFilter = "";
+            if (options.Crop != null && options.Crop.IsActive && options.OriginalVideoWidth > 0 && options.OriginalVideoHeight > 0)
+            {
+                var (cx, cy, cw, ch) = options.Crop.ToPixelCrop(options.OriginalVideoWidth, options.OriginalVideoHeight);
+                if (cw > 0 && ch > 0)
+                {
+                    cropFilter = $"crop={cw}:{ch}:{cx}:{cy},";
+                }
+            }
+
             // Compute scaling filter string
             string scaleFilter;
             if (options.Width > 0)
@@ -283,8 +345,8 @@ namespace UniversalDownloader.Services
 
                 int colors = Math.Clamp(options.MaxColors, 16, 256);
 
-                // Complex filter combining split, palettegen and paletteuse in single pass
-                string filterComplex = $"[0:v] {speedFilter}fps={fps},{scaleFilter},split [a][b];[a] palettegen=max_colors={colors}:stats_mode=diff [p];[b][p] paletteuse=dither={dither}";
+                // Complex filter combining crop, split, palettegen and paletteuse in single pass
+                string filterComplex = $"[0:v] {cropFilter}{speedFilter}fps={fps},{scaleFilter},split [a][b];[a] palettegen=max_colors={colors}:stats_mode=diff [p];[b][p] paletteuse=dither={dither}";
 
                 args.Add("-filter_complex");
                 args.Add(filterComplex);
@@ -293,9 +355,9 @@ namespace UniversalDownloader.Services
                 args.Add("-loop");
                 args.Add(options.LoopCount.ToString());
             }
-            else // WebP
+            else if (options.Format == GifWebpFormat.Webp)
             {
-                string filterComplex = $"[0:v] {speedFilter}fps={fps},{scaleFilter}";
+                string filterComplex = $"[0:v] {cropFilter}{speedFilter}fps={fps},{scaleFilter}";
                 args.Add("-filter_complex");
                 args.Add(filterComplex);
 
@@ -322,6 +384,48 @@ namespace UniversalDownloader.Services
 
                 args.Add("-loop");
                 args.Add(options.LoopCount.ToString());
+            }
+            else if (options.Format == GifWebpFormat.TelegramSticker)
+            {
+                // Telegram Video Sticker: VP9, 512px constraint (one side 512, other <= 512), no audio, max 30 fps, < 256 KB
+                string tScaleFilter = "scale='if(gte(iw,ih),512,-2)':'if(gte(iw,ih),-2,512)':flags=lanczos";
+                int stickerFps = Math.Min(30, fps > 0 ? fps : 30);
+                string filterComplex = $"[0:v] {cropFilter}{speedFilter}fps={stickerFps},{tScaleFilter}";
+
+                args.Add("-filter_complex");
+                args.Add(filterComplex);
+
+                args.Add("-c:v");
+                args.Add("libvpx-vp9");
+                args.Add("-pix_fmt");
+                args.Add("yuv420p");
+                args.Add("-an");
+
+                // Target bitrate to guarantee under 256 KB
+                args.Add("-b:v");
+                args.Add("450k");
+                args.Add("-maxrate");
+                args.Add("500k");
+                args.Add("-bufsize");
+                args.Add("1000k");
+                args.Add("-crf");
+                args.Add("30");
+            }
+            else if (options.Format == GifWebpFormat.Webm)
+            {
+                string filterComplex = $"[0:v] {cropFilter}{speedFilter}fps={fps},{scaleFilter}";
+                args.Add("-filter_complex");
+                args.Add(filterComplex);
+
+                args.Add("-c:v");
+                args.Add("libvpx-vp9");
+                args.Add("-pix_fmt");
+                args.Add("yuv420p");
+                args.Add("-an");
+                args.Add("-crf");
+                args.Add("28");
+                args.Add("-b:v");
+                args.Add("0");
             }
 
             args.Add("-y");
@@ -356,6 +460,15 @@ namespace UniversalDownloader.Services
             {
                 result.ErrorMessage = "FFmpeg is not available. Please verify dependencies.";
                 return result;
+            }
+
+            // Telegram stickers cannot exceed 3 seconds
+            if (options.Format == GifWebpFormat.TelegramSticker)
+            {
+                if (options.EndTime > options.StartTime + TimeSpan.FromSeconds(3))
+                {
+                    options.EndTime = options.StartTime + TimeSpan.FromSeconds(3);
+                }
             }
 
             // Adjust parameters if TargetSize preset is active

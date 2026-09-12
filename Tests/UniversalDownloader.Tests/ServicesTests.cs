@@ -578,6 +578,90 @@ namespace UniversalDownloader.Tests
             Assert.True(result.IsCancelled);
             Assert.Null(result.ErrorMessage);
         }
+
+        [Fact]
+        public void GifWebp_BuildFfmpegArguments_WithCrop_AddsCropFilter()
+        {
+            var crop = new VideoCropRect
+            {
+                X = 0.25,
+                Y = 0.1,
+                Width = 0.5,
+                Height = 0.8
+            };
+
+            var options = new GifWebpOptions
+            {
+                Format = GifWebpFormat.Gif,
+                Crop = crop,
+                OriginalVideoWidth = 1920,
+                OriginalVideoHeight = 1080
+            };
+
+            var args = GifWebpService.BuildFfmpegArguments("input.mp4", "output.gif", options);
+            int fcIdx = args.IndexOf("-filter_complex");
+            Assert.True(fcIdx >= 0);
+            string fc = args[fcIdx + 1];
+
+            // 1920 * 0.5 = 960 width, 1080 * 0.8 = 864 height, 1920 * 0.25 = 480 x, 1080 * 0.1 = 108 y
+            Assert.Contains("crop=960:864:480:108,", fc);
+        }
+
+        [Fact]
+        public void GifWebp_BuildFfmpegArguments_TelegramSticker_MatchesSpecs()
+        {
+            var options = GifWebpOptions.CreateTelegramSticker();
+            options.OriginalVideoWidth = 1280;
+            options.OriginalVideoHeight = 720;
+            options.Fps = 30;
+
+            var args = GifWebpService.BuildFfmpegArguments("input.mp4", "sticker.webm", options);
+
+            // Verify VP9 codec, no audio, and bitrate bounds
+            int cvIdx = args.IndexOf("-c:v");
+            Assert.True(cvIdx >= 0);
+            Assert.Equal("libvpx-vp9", args[cvIdx + 1]);
+
+            Assert.Contains("-an", args);
+
+            int bvIdx = args.IndexOf("-b:v");
+            Assert.True(bvIdx >= 0);
+            Assert.Equal("450k", args[bvIdx + 1]);
+
+            int mrIdx = args.IndexOf("-maxrate");
+            Assert.True(mrIdx >= 0);
+            Assert.Equal("500k", args[mrIdx + 1]);
+
+            int fcIdx = args.IndexOf("-filter_complex");
+            Assert.True(fcIdx >= 0);
+            string fc = args[fcIdx + 1];
+
+            // Verify Telegram 512px constraint scale filter
+            Assert.Contains("scale='if(gte(iw,ih),512,-2)':'if(gte(iw,ih),-2,512)'", fc);
+        }
+
+        [Fact]
+        public void VideoCropRect_ToPixelCrop_EnsuresEvenDimensions()
+        {
+            var crop = new VideoCropRect
+            {
+                X = 0.111,
+                Y = 0.222,
+                Width = 0.555,
+                Height = 0.666
+            };
+
+            var (cx, cy, cw, ch) = crop.ToPixelCrop(1921, 1081);
+
+            // Codecs like VP9 and x264 require even dimensions and offsets
+            Assert.True(cx % 2 == 0, $"cx ({cx}) must be even");
+            Assert.True(cy % 2 == 0, $"cy ({cy}) must be even");
+            Assert.True(cw % 2 == 0, $"cw ({cw}) must be even");
+            Assert.True(ch % 2 == 0, $"ch ({ch}) must be even");
+            Assert.True(cx + cw <= 1922);
+            Assert.True(cy + ch <= 1082);
+        }
     }
 }
+
 

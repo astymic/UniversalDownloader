@@ -425,6 +425,37 @@
             </Setter>
         </Style>
 
+        <!-- Crop Thumb Styles -->
+        <Style x:Key="CropEdgeThumbStyle" TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="#38BDF8" BorderBrush="White" BorderThickness="1" CornerRadius="3"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CropCornerThumbStyle" TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="White" BorderBrush="#38BDF8" BorderThickness="2" CornerRadius="2"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CropCenterThumbStyle" TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Rectangle Fill="#01FFFFFF"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="CheckBox" x:Key="ModernCheckBox">
             <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
             <Setter Property="FontSize" Value="14"/>
@@ -2042,18 +2073,94 @@
                             <!-- Video Preview Player Card -->
                             <Border Background="#0E0E12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,16">
                                 <StackPanel>
-                                    <!-- Video Viewport -->
-                                    <Border Background="#000000" CornerRadius="8" MaxHeight="300" ClipToBounds="True" Margin="0,0,0,12">
-                                        <MediaElement x:Name="GifMediaPlayer" 
-                                                      LoadedBehavior="Manual" 
-                                                      UnloadedBehavior="Stop" 
-                                                      MediaOpened="GifPlayer_MediaOpened" 
-                                                      MediaEnded="GifPlayer_MediaEnded" 
-                                                      Stretch="Uniform" 
-                                                      HorizontalAlignment="Center" 
-                                                      VerticalAlignment="Center"
-                                                      MaxHeight="300"/>
+                                    <!-- Video Viewport with Interactive Crop Overlay -->
+                                    <Border Background="#000000" CornerRadius="8" Height="300" ClipToBounds="True" Margin="0,0,0,12">
+                                        <Grid x:Name="GifPlayerViewportGrid" SizeChanged="GifPlayerViewportGrid_SizeChanged">
+                                            <!-- Video Player -->
+                                            <MediaElement x:Name="GifMediaPlayer" 
+                                                          LoadedBehavior="Manual" 
+                                                          UnloadedBehavior="Stop" 
+                                                          MediaOpened="GifPlayer_MediaOpened" 
+                                                          MediaEnded="GifPlayer_MediaEnded" 
+                                                          Stretch="Uniform" 
+                                                          HorizontalAlignment="Center" 
+                                                          VerticalAlignment="Center"/>
+
+                                            <!-- Crop Overlay Canvas -->
+                                            <Canvas x:Name="GifCropCanvas" ClipToBounds="True" Visibility="Visible">
+                                                <!-- Dimmed Shroud Outside Crop Box -->
+                                                <Rectangle x:Name="CropMaskTop" Fill="#90000000" IsHitTestVisible="False"/>
+                                                <Rectangle x:Name="CropMaskBottom" Fill="#90000000" IsHitTestVisible="False"/>
+                                                <Rectangle x:Name="CropMaskLeft" Fill="#90000000" IsHitTestVisible="False"/>
+                                                <Rectangle x:Name="CropMaskRight" Fill="#90000000" IsHitTestVisible="False"/>
+
+                                                <!-- The Resizable Crop Box -->
+                                                <Border x:Name="CropBoxBorder" BorderBrush="#38BDF8" BorderThickness="2" Background="#01FFFFFF">
+                                                    <!-- Inside the crop box: Grid with Rule of Thirds guidelines and Center Drag Thumb -->
+                                                    <Grid>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="*"/>
+                                                            <RowDefinition Height="*"/>
+                                                            <RowDefinition Height="*"/>
+                                                        </Grid.RowDefinitions>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <!-- Subtle rule-of-thirds lines -->
+                                                        <Border Grid.Row="0" Grid.ColumnSpan="3" BorderBrush="#20FFFFFF" BorderThickness="0,0,0,1" IsHitTestVisible="False"/>
+                                                        <Border Grid.Row="1" Grid.ColumnSpan="3" BorderBrush="#20FFFFFF" BorderThickness="0,0,0,1" IsHitTestVisible="False"/>
+                                                        <Border Grid.Column="0" Grid.RowSpan="3" BorderBrush="#20FFFFFF" BorderThickness="0,0,1,0" IsHitTestVisible="False"/>
+                                                        <Border Grid.Column="1" Grid.RowSpan="3" BorderBrush="#20FFFFFF" BorderThickness="0,0,1,0" IsHitTestVisible="False"/>
+
+                                                        <!-- Center Drag Thumb to move the whole crop rectangle -->
+                                                        <Thumb x:Name="CropCenterThumb" Grid.RowSpan="3" Grid.ColumnSpan="3" Style="{StaticResource CropCenterThumbStyle}" Cursor="SizeAll" DragDelta="CropCenter_DragDelta" ToolTip="Drag to move crop area"/>
+
+                                                        <!-- Dimension Tag Badge inside crop box -->
+                                                        <Border x:Name="CropDimensionBadge" Grid.RowSpan="3" Grid.ColumnSpan="3" Background="#D918181B" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,6,0,0" IsHitTestVisible="False">
+                                                            <TextBlock x:Name="CropDimensionText" Text="512 × 512" Foreground="#38BDF8" FontSize="10.5" FontWeight="Bold"/>
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+
+                                                <!-- 4 Edge Handles -->
+                                                <Thumb x:Name="CropHandleTop" Style="{StaticResource CropEdgeThumbStyle}" Width="28" Height="8" Cursor="SizeNS" DragDelta="CropEdge_DragDelta" Tag="Top" ToolTip="Drag top border"/>
+                                                <Thumb x:Name="CropHandleBottom" Style="{StaticResource CropEdgeThumbStyle}" Width="28" Height="8" Cursor="SizeNS" DragDelta="CropEdge_DragDelta" Tag="Bottom" ToolTip="Drag bottom border"/>
+                                                <Thumb x:Name="CropHandleLeft" Style="{StaticResource CropEdgeThumbStyle}" Width="8" Height="28" Cursor="SizeWE" DragDelta="CropEdge_DragDelta" Tag="Left" ToolTip="Drag left border"/>
+                                                <Thumb x:Name="CropHandleRight" Style="{StaticResource CropEdgeThumbStyle}" Width="8" Height="28" Cursor="SizeWE" DragDelta="CropEdge_DragDelta" Tag="Right" ToolTip="Drag right border"/>
+
+                                                <!-- 4 Corner Handles (Moves 2 sides simultaneously) -->
+                                                <Thumb x:Name="CropHandleTopLeft" Style="{StaticResource CropCornerThumbStyle}" Width="12" Height="12" Cursor="SizeNWSE" DragDelta="CropCorner_DragDelta" Tag="TopLeft" ToolTip="Drag corner"/>
+                                                <Thumb x:Name="CropHandleTopRight" Style="{StaticResource CropCornerThumbStyle}" Width="12" Height="12" Cursor="SizeNESW" DragDelta="CropCorner_DragDelta" Tag="TopRight" ToolTip="Drag corner"/>
+                                                <Thumb x:Name="CropHandleBottomLeft" Style="{StaticResource CropCornerThumbStyle}" Width="12" Height="12" Cursor="SizeNESW" DragDelta="CropCorner_DragDelta" Tag="BottomLeft" ToolTip="Drag corner"/>
+                                                <Thumb x:Name="CropHandleBottomRight" Style="{StaticResource CropCornerThumbStyle}" Width="12" Height="12" Cursor="SizeNWSE" DragDelta="CropCorner_DragDelta" Tag="BottomRight" ToolTip="Drag corner"/>
+                                            </Canvas>
+                                        </Grid>
                                     </Border>
+
+                                    <!-- Interactive Crop Toolbar -->
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Preset Ratio Buttons -->
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="✂️ Crop:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <Button Content="Full (Reset)" Style="{StaticResource SecondaryButton}" Padding="8,3" FontSize="11" Margin="0,0,6,0" Click="GifCropRatioFull_Click" ToolTip="Reset to 100% full original video"/>
+                                            <Button Content="1:1 (Square)" Style="{StaticResource SecondaryButton}" Padding="8,3" FontSize="11" Margin="0,0,6,0" Click="GifCropRatio1x1_Click" ToolTip="Snap crop to 1:1 square (optimal for stickers)"/>
+                                            <Button Content="16:9" Style="{StaticResource SecondaryButton}" Padding="8,3" FontSize="11" Margin="0,0,6,0" Click="GifCropRatio16x9_Click" ToolTip="Snap crop to 16:9 widescreen"/>
+                                            <Button Content="9:16" Style="{StaticResource SecondaryButton}" Padding="8,3" FontSize="11" Margin="0,0,6,0" Click="GifCropRatio9x16_Click" ToolTip="Snap crop to 9:16 vertical / reel"/>
+                                            <Button Content="4:3" Style="{StaticResource SecondaryButton}" Padding="8,3" FontSize="11" Click="GifCropRatio4x3_Click" ToolTip="Snap crop to 4:3 standard"/>
+                                        </StackPanel>
+
+                                        <!-- Live Crop Info Badge -->
+                                        <TextBlock x:Name="GifCropInfoText" Grid.Column="2" Text="Full frame: Original" Foreground="#38BDF8" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    </Grid>
 
                                     <!-- Player Controls Bar -->
                                     <Grid Margin="0,0,0,4">
@@ -2161,14 +2268,32 @@
                                     <TextBlock Text="OUTPUT FORMAT &amp; PRESET" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,14"/>
 
                                     <!-- Format Radio Buttons -->
-                                    <Grid Margin="0,0,0,16">
+                                    <Grid Margin="0,0,0,14">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <RadioButton x:Name="GifFormatGifRadio" Grid.Column="0" Content="Animated GIF (.gif)" IsChecked="True" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13.5" FontWeight="SemiBold" Checked="GifFormat_Checked"/>
-                                        <RadioButton x:Name="GifFormatWebpRadio" Grid.Column="1" Content="Animated WebP (.webp)" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13.5" FontWeight="SemiBold" Checked="GifFormat_Checked"/>
+                                        <RadioButton x:Name="GifFormatGifRadio" Grid.Column="0" Content="Animated GIF (.gif)" IsChecked="True" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" Checked="GifFormat_Checked"/>
+                                        <RadioButton x:Name="GifFormatWebpRadio" Grid.Column="1" Content="Animated WebP (.webp)" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" Checked="GifFormat_Checked"/>
+                                        <RadioButton x:Name="GifFormatTelegramRadio" Grid.Column="2" Content="Telegram Sticker (.webm)" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" Checked="GifFormat_Checked" ToolTip="Official Telegram Video Sticker specification (VP9, 512px box, &lt; 256 KB, no audio)"/>
                                     </Grid>
+
+                                    <!-- Telegram Video Sticker Notice Banner -->
+                                    <Border x:Name="GifTelegramNoticeCard" Background="#132A38" BorderBrush="#0284C7" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,14" Visibility="Collapsed">
+                                        <StackPanel>
+                                            <Grid Margin="0,0,0,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="✈️ Telegram Video Sticker Mode Active" Foreground="#38BDF8" FontSize="12.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                <Button Grid.Column="1" Content="Snap 1:1 Square" Style="{StaticResource SecondaryButton}" Padding="8,2" FontSize="11" Click="GifCropRatio1x1_Click" ToolTip="Center 1:1 square crop for sticker"/>
+                                            </Grid>
+                                            <TextBlock Text="Generates VP9 WebM conforming to Telegram @Stickers bot (/newvideo): 512px bounding box, no audio, and &lt; 256 KB." Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            <TextBlock x:Name="GifTelegramDurationWarning" Text="⚠️ Note: Telegram video stickers must be 3.0 seconds or less. Output clip will automatically be capped to 3.0s." Foreground="#F59E0B" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,0" Visibility="Collapsed"/>
+                                        </StackPanel>
+                                    </Border>
 
                                     <!-- Preset Selector -->
                                     <TextBlock Text="Preset Profile" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,6"/>
