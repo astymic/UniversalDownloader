@@ -119,6 +119,7 @@ namespace UniversalDownloader
             if (GifWebpScrollViewer != null)
             {
                 GifWebpScrollViewer.Visibility = Visibility.Visible;
+                ApplyElevatedDragDropFix();
             }
         }
 

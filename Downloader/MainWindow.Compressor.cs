@@ -57,6 +57,7 @@ namespace UniversalDownloader
             {
                 CompressorScrollViewer.Visibility = Visibility.Visible;
                 UpdateCompressorDestinationText();
+                ApplyElevatedDragDropFix();
             }
         }
 

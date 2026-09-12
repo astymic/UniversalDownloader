@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Configuration;
 using System.Data;
 using System.IO;
@@ -16,6 +16,9 @@ namespace Downloader
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            // Clean up any RUNASADMIN shims placed by Windows Program Compatibility Assistant
+            CleanupAppCompatFlags();
 
             // Generate a unique temp folder path for this session
             string tempPath = Path.GetTempPath();
@@ -51,6 +54,26 @@ namespace Downloader
             }
 
             base.OnExit(e);
+        }
+
+        private static void CleanupAppCompatFlags()
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers", true);
+                if (key != null)
+                {
+                    string[] names = key.GetValueNames();
+                    foreach (var name in names)
+                    {
+                        if (name.IndexOf("Universal Downloader", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            try { key.DeleteValue(name, false); } catch { }
+                        }
+                    }
+                }
+            }
+            catch { }
         }
     }
 }

@@ -125,6 +125,7 @@ namespace UniversalDownloader
                 {
                     ConverterDestinationTextBox.Text = SelectedDirectory;
                 }
+                ApplyElevatedDragDropFix();
             }
         }
 

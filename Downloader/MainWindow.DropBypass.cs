@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Text;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace UniversalDownloader
@@ -32,6 +34,9 @@ namespace UniversalDownloader
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool DragQueryPoint(IntPtr hDrop, out POINT lppt);
 
+        [DllImport("ole32.dll")]
+        private static extern int RevokeDragDrop(IntPtr hWnd);
+
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT
         {
@@ -44,6 +49,23 @@ namespace UniversalDownloader
         private const uint WM_COPYGLOBALDATA = 0x0049;
         private const uint MSGFLT_ADD = 1;
         private const uint MSGFLT_ALLOW = 1;
+
+        /// <summary>
+        /// Checks if the current process is running with elevated Administrator privileges.
+        /// </summary>
+        public static bool IsProcessElevated()
+        {
+            try
+            {
+                using var identity = WindowsIdentity.GetCurrent();
+                var principal = new WindowsPrincipal(identity);
+                return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         /// <summary>
         /// Configures Win32 UIPI filters and shell drag-accept flags so that Windows Explorer
@@ -70,6 +92,47 @@ namespace UniversalDownloader
 
                 // Register window with Windows Shell to receive WM_DROPFILES messages
                 DragAcceptFiles(hWnd, true);
+            }
+            catch { }
+
+            ApplyElevatedDragDropFix();
+        }
+
+        /// <summary>
+        /// When running elevated, Windows UIPI blocks OLE Drag & Drop (showing the 🚫 cursor).
+        /// To bypass this, we revoke the OLE IDropTarget from the HWND and disable AllowDrop
+        /// on WPF elements, forcing Windows Shell to use Win32 DragAcceptFiles + WM_DROPFILES.
+        /// </summary>
+        public void ApplyElevatedDragDropFix()
+        {
+            if (!IsProcessElevated()) return;
+
+            var handle = new WindowInteropHelper(this).Handle;
+            if (handle == IntPtr.Zero) return;
+
+            try
+            {
+                // Disable WPF AllowDrop on controls so WPF does not re-register OLE IDropTarget
+                if (ConverterDropZone != null) ConverterDropZone.AllowDrop = false;
+                if (CompressorDropZone != null) CompressorDropZone.AllowDrop = false;
+                if (GifDropZone != null) GifDropZone.AllowDrop = false;
+                if (ConverterScrollViewer != null) ConverterScrollViewer.AllowDrop = false;
+                if (CompressorScrollViewer != null) CompressorScrollViewer.AllowDrop = false;
+                if (GifWebpScrollViewer != null) GifWebpScrollViewer.AllowDrop = false;
+            }
+            catch { }
+
+            try
+            {
+                // Revoke OLE drop target on this HWND
+                RevokeDragDrop(handle);
+            }
+            catch { }
+
+            try
+            {
+                // Ensure shell DragAcceptFiles is active
+                DragAcceptFiles(handle, true);
             }
             catch { }
         }
@@ -120,10 +183,24 @@ namespace UniversalDownloader
         {
             if (files == null || files.Count == 0) return;
 
+            // Convert physical device coordinates to WPF DIPs based on display scaling
+            double dpiX = 1.0;
+            double dpiY = 1.0;
+            try
+            {
+                PresentationSource source = PresentationSource.FromVisual(this);
+                if (source?.CompositionTarget != null)
+                {
+                    dpiX = source.CompositionTarget.TransformToDevice.M11;
+                    dpiY = source.CompositionTarget.TransformToDevice.M22;
+                }
+            }
+            catch { }
+
             // 1. Try HitTest first to see if dropped directly over a specific drop zone or view
             try
             {
-                var wpfPoint = new System.Windows.Point(pt.X, pt.Y);
+                var wpfPoint = new System.Windows.Point(pt.X / dpiX, pt.Y / dpiY);
                 HitTestResult? hit = VisualTreeHelper.HitTest(this, wpfPoint);
                 if (hit != null && hit.VisualHit is DependencyObject hitObj)
                 {

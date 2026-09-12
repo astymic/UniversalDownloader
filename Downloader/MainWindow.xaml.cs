@@ -281,6 +281,9 @@ namespace UniversalDownloader
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            ApplyElevatedDragDropFix();
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(ApplyElevatedDragDropFix));
+
             LoadSettings();
 
             if (DirectoryPathTextBox != null && string.IsNullOrEmpty(SelectedDirectory))
