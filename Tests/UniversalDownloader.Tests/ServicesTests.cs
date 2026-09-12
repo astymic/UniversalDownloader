@@ -404,6 +404,50 @@ namespace UniversalDownloader.Tests
 
             Assert.Contains("-an", args);
         }
+
+        [Fact]
+        public void MediaDiscovery_FolderScanning_FiltersSupportedExtensions()
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), "UD_FolderScanTest_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                Directory.CreateDirectory(tempDir);
+                string subDir = Path.Combine(tempDir, "SubFolder");
+                Directory.CreateDirectory(subDir);
+
+                // Create dummy files
+                File.WriteAllText(Path.Combine(tempDir, "video1.mp4"), "dummy");
+                File.WriteAllText(Path.Combine(tempDir, "song.MP3"), "dummy");
+                File.WriteAllText(Path.Combine(tempDir, "document.txt"), "dummy");
+                File.WriteAllText(Path.Combine(tempDir, "app.exe"), "dummy");
+                File.WriteAllText(Path.Combine(subDir, "nested_clip.MKV"), "dummy");
+                File.WriteAllText(Path.Combine(subDir, "readme.md"), "dummy");
+
+                var supportedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".m4v", ".ts",
+                    ".mp3", ".m4a", ".flac", ".wav", ".aac", ".ogg", ".opus", ".wma"
+                };
+
+                var discovered = Directory.EnumerateFiles(tempDir, "*.*", SearchOption.AllDirectories)
+                    .Where(f => supportedExtensions.Contains(Path.GetExtension(f)))
+                    .Select(Path.GetFileName)
+                    .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                Assert.Equal(3, discovered.Count);
+                Assert.Contains("video1.mp4", discovered);
+                Assert.Contains("song.MP3", discovered);
+                Assert.Contains("nested_clip.MKV", discovered);
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir))
+                {
+                    try { Directory.Delete(tempDir, true); } catch { }
+                }
+            }
+        }
     }
 }
 

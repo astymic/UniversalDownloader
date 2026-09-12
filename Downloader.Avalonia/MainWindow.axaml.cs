@@ -1166,6 +1166,23 @@ namespace UniversalDownloader.Avalonia
 
         private void AddSingleFileToAvaloniaCompressor(string localPath)
         {
+            if (string.IsNullOrWhiteSpace(localPath)) return;
+
+            if (Directory.Exists(localPath))
+            {
+                try
+                {
+                    var dirFiles = Directory.EnumerateFiles(localPath, "*.*", SearchOption.AllDirectories)
+                        .OrderBy(f => f);
+                    foreach (var df in dirFiles)
+                    {
+                        AddSingleFileToAvaloniaCompressor(df);
+                    }
+                }
+                catch { }
+                return;
+            }
+
             if (File.Exists(localPath) && !AvaloniaCompressorItems.Any(i => i.InputPath.Equals(localPath, StringComparison.OrdinalIgnoreCase)))
             {
                 var fi = new FileInfo(localPath);

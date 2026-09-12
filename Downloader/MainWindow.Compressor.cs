@@ -6,8 +6,11 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using Microsoft.Win32;
 using UniversalDownloader.Controls;
 using UniversalDownloader.Models;
@@ -77,41 +80,105 @@ namespace UniversalDownloader
             }
         }
 
-        private void CompressorDropZone_Drop(object sender, DragEventArgs e)
+        private static readonly HashSet<string> SupportedCompressorExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            ".mp4", ".mkv", ".mov", ".webm", ".avi", ".flv", ".wmv", ".ts", ".m4v"
+        };
+
+        private void CompressorDropZone_PreviewDragEnter(object sender, DragEventArgs e)
+        {
+            if (CompressorDropZone != null)
             {
-                string[]? files = e.Data.GetData(DataFormats.FileDrop) as string[];
-                if (files != null && files.Length > 0)
-                {
-                    AddFilesToCompressor(files);
-                }
+                CompressorDropZone.BorderBrush = (Brush)FindResource("PrimaryBrush");
+                CompressorDropZone.Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x26));
+            }
+            CompressorDropZone_PreviewDragOver(sender, e);
+        }
+
+        private void CompressorDropZone_PreviewDragLeave(object sender, DragEventArgs e)
+        {
+            if (CompressorDropZone != null)
+            {
+                CompressorDropZone.BorderBrush = new SolidColorBrush(Color.FromRgb(0x3F, 0x3F, 0x46));
+                CompressorDropZone.Background = new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x18));
             }
         }
 
-        private void CompressorDropZone_DragOver(object sender, DragEventArgs e)
+        private void CompressorDropZone_PreviewDragOver(object sender, DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            if (e.Data.GetDataPresent(DataFormats.FileDrop, true) ||
+                e.Data.GetDataPresent("FileNameW", true) ||
+                e.Data.GetDataPresent("FileName", true) ||
+                e.Data.GetDataPresent(DataFormats.UnicodeText, true))
             {
                 e.Effects = DragDropEffects.Copy;
-                e.Handled = true;
             }
             else
             {
                 e.Effects = DragDropEffects.None;
             }
+            e.Handled = true;
         }
 
-        private void AddFilesToCompressor(string[] filePaths)
+        private void CompressorDropZone_PreviewDrop(object sender, DragEventArgs e)
         {
+            CompressorDropZone_PreviewDragLeave(sender, e);
+            var paths = ExtractDropPaths(e);
+            if (paths.Length > 0)
+            {
+                AddFilesToCompressor(paths);
+            }
+            e.Handled = true;
+        }
+
+        private void CompressorDropZone_Drop(object sender, DragEventArgs e)
+        {
+            CompressorDropZone_PreviewDrop(sender, e);
+        }
+
+        private void CompressorDropZone_DragOver(object sender, DragEventArgs e)
+        {
+            CompressorDropZone_PreviewDragOver(sender, e);
+        }
+
+        private void AddFilesToCompressor(IEnumerable<string> filePaths)
+        {
+            var filesToAdd = new List<string>();
+
             foreach (var path in filePaths)
             {
+                if (string.IsNullOrWhiteSpace(path)) continue;
+
                 if (File.Exists(path))
+                {
+                    filesToAdd.Add(path);
+                }
+                else if (Directory.Exists(path))
+                {
+                    try
+                    {
+                        var dirFiles = Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories)
+                            .Where(f => SupportedCompressorExtensions.Contains(Path.GetExtension(f)))
+                            .OrderBy(f => f);
+                        filesToAdd.AddRange(dirFiles);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[Compressor] Error enumerating folder '{path}': {ex.Message}");
+                    }
+                }
+            }
+
+            foreach (var path in filesToAdd)
+            {
+                if (CompressorItems.Any(i => i.InputPath.Equals(path, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                try
                 {
                     var fi = new FileInfo(path);
                     string ext = fi.Extension.ToLowerInvariant();
-                    bool isVideo = ext is ".mp4" or ".mkv" or ".mov" or ".webm" or ".avi" or ".flv" or ".wmv" or ".ts" or ".m4v";
-                    if (!isVideo) continue;
+                    if (!SupportedCompressorExtensions.Contains(ext)) continue;
 
                     string formattedSize = Utilities.FormatBytesOutput(fi.Length);
                     CompressorItems.Add(new VideoCompressorItem
@@ -122,6 +189,10 @@ namespace UniversalDownloader
                         OriginalSizeFormatted = formattedSize,
                         Status = "Ready to compress"
                     });
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Compressor] Error adding file '{path}': {ex.Message}");
                 }
             }
 

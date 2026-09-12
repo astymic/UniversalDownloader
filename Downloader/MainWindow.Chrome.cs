@@ -6,12 +6,37 @@ using System.Windows.Media;
 using System.Windows.Forms;
 using System.Windows.Controls;
 
+using System.Runtime.InteropServices;
+
 namespace UniversalDownloader
 {
     public partial class MainWindow
     {
         private const int WM_NCLBUTTONDBLCLK = 0x00A3;
         private const int HTCAPTION = 0x2;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool ChangeWindowMessageFilterEx(IntPtr hWnd, uint msg, uint action, IntPtr pChangeFilterStruct);
+
+        private const uint WM_DROPFILES = 0x0233;
+        private const uint WM_COPYDATA = 0x004A;
+        private const uint WM_COPYGLOBALDATA = 0x0049;
+        private const uint MSGFLT_ALLOW = 1;
+
+        private static void EnableDragDropUnderUAC(IntPtr hWnd)
+        {
+            try
+            {
+                ChangeWindowMessageFilterEx(hWnd, WM_DROPFILES, MSGFLT_ALLOW, IntPtr.Zero);
+                ChangeWindowMessageFilterEx(hWnd, WM_COPYDATA, MSGFLT_ALLOW, IntPtr.Zero);
+                ChangeWindowMessageFilterEx(hWnd, WM_COPYGLOBALDATA, MSGFLT_ALLOW, IntPtr.Zero);
+            }
+            catch
+            {
+                // Ignored on platforms or configurations where unsupported
+            }
+        }
 
         private bool _isManuallyPseudoMaximized = false;
         private Rect _normalWindowBoundsBeforePseudoMaximize;
@@ -31,6 +56,12 @@ namespace UniversalDownloader
             if (source != null)
             {
                 source.AddHook(WndProc);
+            }
+
+            var handle = new WindowInteropHelper(this).Handle;
+            if (handle != IntPtr.Zero)
+            {
+                EnableDragDropUnderUAC(handle);
             }
         }
 

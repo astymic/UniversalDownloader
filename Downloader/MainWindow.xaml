@@ -1324,7 +1324,15 @@
                 </ScrollViewer>
 
                 <!-- Media Converter View -->
-                <ScrollViewer x:Name="ConverterScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed">
+                <ScrollViewer x:Name="ConverterScrollViewer" 
+                              VerticalScrollBarVisibility="Auto" 
+                              HorizontalScrollBarVisibility="Disabled" 
+                              Visibility="Collapsed"
+                              AllowDrop="True"
+                              Drop="ConverterDropZone_Drop"
+                              DragOver="ConverterDropZone_DragOver"
+                              PreviewDragOver="ConverterDropZone_PreviewDragOver"
+                              PreviewDrop="ConverterDropZone_PreviewDrop">
                     <StackPanel Margin="40,20,40,90" MaxWidth="760">
                         <!-- Top Bar: Back Button -->
                         <Grid Margin="0,0,0,20">
@@ -1353,18 +1361,34 @@
                                 AllowDrop="True"
                                 Drop="ConverterDropZone_Drop"
                                 DragOver="ConverterDropZone_DragOver"
+                                PreviewDragOver="ConverterDropZone_PreviewDragOver"
+                                PreviewDragEnter="ConverterDropZone_PreviewDragEnter"
+                                PreviewDragLeave="ConverterDropZone_PreviewDragLeave"
+                                PreviewDrop="ConverterDropZone_PreviewDrop"
                                 Cursor="Hand"
                                 PreviewMouseLeftButtonDown="ConverterBrowseFiles_Click">
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <TextBlock Text="📁" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                                <TextBlock Text="Drag &amp; Drop audio or video files here" Foreground="{StaticResource TextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBlock Text="Drag &amp; Drop audio/video files or folders here" Foreground="{StaticResource TextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,4"/>
                                 <TextBlock Text="or click to browse local files (MP4, MKV, MP3, FLAC, WAV, M4A, AVI, WEBM, etc.)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" HorizontalAlignment="Center" Margin="0,0,0,12"/>
                                 <Button Content="Browse Files" Style="{StaticResource SecondaryButton}" Padding="16,6" FontSize="12" HorizontalAlignment="Center" Click="ConverterBrowseFiles_Click"/>
                             </StackPanel>
                         </Border>
 
                         <!-- Selected Files List -->
-                        <Border x:Name="ConverterFilesListBorder" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,20" Visibility="Collapsed">
+                        <Border x:Name="ConverterFilesListBorder" 
+                                Background="{StaticResource SurfaceBrush}" 
+                                BorderBrush="{StaticResource BorderBrush}" 
+                                BorderThickness="1" 
+                                CornerRadius="12" 
+                                Padding="20" 
+                                Margin="0,0,0,20" 
+                                Visibility="Collapsed"
+                                AllowDrop="True"
+                                Drop="ConverterDropZone_Drop"
+                                DragOver="ConverterDropZone_DragOver"
+                                PreviewDragOver="ConverterDropZone_PreviewDragOver"
+                                PreviewDrop="ConverterDropZone_PreviewDrop">
                             <StackPanel>
                                 <Grid Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>
@@ -1532,7 +1556,15 @@
                 </ScrollViewer>
 
                 <!-- Smart Video Compressor View -->
-                <ScrollViewer x:Name="CompressorScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed">
+                <ScrollViewer x:Name="CompressorScrollViewer" 
+                              VerticalScrollBarVisibility="Auto" 
+                              HorizontalScrollBarVisibility="Disabled" 
+                              Visibility="Collapsed"
+                              AllowDrop="True"
+                              Drop="CompressorDropZone_Drop"
+                              DragOver="CompressorDropZone_DragOver"
+                              PreviewDragOver="CompressorDropZone_PreviewDragOver"
+                              PreviewDrop="CompressorDropZone_PreviewDrop">
                     <StackPanel Margin="40,20,40,90" MaxWidth="760">
                         <!-- Top Bar: Back Button -->
                         <Grid Margin="0,0,0,20">
@@ -1561,18 +1593,34 @@
                                 AllowDrop="True"
                                 Drop="CompressorDropZone_Drop"
                                 DragOver="CompressorDropZone_DragOver"
+                                PreviewDragOver="CompressorDropZone_PreviewDragOver"
+                                PreviewDragEnter="CompressorDropZone_PreviewDragEnter"
+                                PreviewDragLeave="CompressorDropZone_PreviewDragLeave"
+                                PreviewDrop="CompressorDropZone_PreviewDrop"
                                 Cursor="Hand"
                                 PreviewMouseLeftButtonDown="CompressorBrowseFiles_Click">
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <TextBlock Text="🗜️" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                                <TextBlock Text="Drag &amp; Drop video files here to compress" Foreground="{StaticResource TextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBlock Text="Drag &amp; Drop video files or folders here to compress" Foreground="{StaticResource TextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,4"/>
                                 <TextBlock Text="or click to browse local files (MP4, MKV, MOV, WEBM, AVI, FLV, TS, WMV)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" HorizontalAlignment="Center" Margin="0,0,0,12"/>
                                 <Button Content="Browse Videos" Style="{StaticResource SecondaryButton}" Padding="16,6" FontSize="12" HorizontalAlignment="Center" Click="CompressorBrowseFiles_Click"/>
                             </StackPanel>
                         </Border>
 
                         <!-- Selected Files List -->
-                        <Border x:Name="CompressorFilesListBorder" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,20" Visibility="Collapsed">
+                        <Border x:Name="CompressorFilesListBorder" 
+                                Background="{StaticResource SurfaceBrush}" 
+                                BorderBrush="{StaticResource BorderBrush}" 
+                                BorderThickness="1" 
+                                CornerRadius="12" 
+                                Padding="20" 
+                                Margin="0,0,0,20" 
+                                Visibility="Collapsed"
+                                AllowDrop="True"
+                                Drop="CompressorDropZone_Drop"
+                                DragOver="CompressorDropZone_DragOver"
+                                PreviewDragOver="CompressorDropZone_PreviewDragOver"
+                                PreviewDrop="CompressorDropZone_PreviewDrop">
                             <StackPanel>
                                 <Grid Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>

@@ -6,8 +6,11 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using Microsoft.Win32;
 using UniversalDownloader.Controls;
 using UniversalDownloader.Models;
@@ -146,21 +149,90 @@ namespace UniversalDownloader
             }
         }
 
-        private void ConverterDropZone_Drop(object sender, DragEventArgs e)
+        private static readonly HashSet<string> SupportedConverterExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            ".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".m4v", ".ts", ".3gp", ".mts", ".m2ts", ".vob", ".ogv",
+            ".mp3", ".m4a", ".flac", ".wav", ".aac", ".ogg", ".opus", ".wma", ".aiff", ".alac", ".ape", ".m4b"
+        };
+
+        internal static string[] ExtractDropPaths(DragEventArgs e)
+        {
+            try
             {
-                var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                if (files != null && files.Length > 0)
+                if (e.Data.GetDataPresent(DataFormats.FileDrop, true))
                 {
-                    AddFilesToConverter(files);
+                    if (e.Data.GetData(DataFormats.FileDrop, true) is string[] files && files.Length > 0)
+                    {
+                        return files;
+                    }
+                    if (e.Data.GetData(DataFormats.FileDrop, true) is IEnumerable<string> enumerable)
+                    {
+                        var list = enumerable.ToArray();
+                        if (list.Length > 0) return list;
+                    }
                 }
+
+                if (e.Data.GetDataPresent("FileNameW", true))
+                {
+                    if (e.Data.GetData("FileNameW", true) is string singleFile && (File.Exists(singleFile) || Directory.Exists(singleFile)))
+                    {
+                        return new[] { singleFile };
+                    }
+                }
+
+                if (e.Data.GetDataPresent("FileName", true))
+                {
+                    if (e.Data.GetData("FileName", true) is string singleFile && (File.Exists(singleFile) || Directory.Exists(singleFile)))
+                    {
+                        return new[] { singleFile };
+                    }
+                }
+
+                if (e.Data.GetDataPresent(DataFormats.UnicodeText, true))
+                {
+                    if (e.Data.GetData(DataFormats.UnicodeText, true) is string text && !string.IsNullOrWhiteSpace(text))
+                    {
+                        var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                                        .Select(l => l.Trim().Trim('"'))
+                                        .Where(l => File.Exists(l) || Directory.Exists(l))
+                                        .ToArray();
+                        if (lines.Length > 0) return lines;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[DragDrop] Error extracting drop paths: {ex.Message}");
+            }
+
+            return Array.Empty<string>();
+        }
+
+        private void ConverterDropZone_PreviewDragEnter(object sender, DragEventArgs e)
+        {
+            if (ConverterDropZone != null)
+            {
+                ConverterDropZone.BorderBrush = (Brush)FindResource("PrimaryBrush");
+                ConverterDropZone.Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x26));
+            }
+            ConverterDropZone_PreviewDragOver(sender, e);
+        }
+
+        private void ConverterDropZone_PreviewDragLeave(object sender, DragEventArgs e)
+        {
+            if (ConverterDropZone != null)
+            {
+                ConverterDropZone.BorderBrush = new SolidColorBrush(Color.FromRgb(0x3F, 0x3F, 0x46));
+                ConverterDropZone.Background = new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x18));
             }
         }
 
-        private void ConverterDropZone_DragOver(object sender, DragEventArgs e)
+        private void ConverterDropZone_PreviewDragOver(object sender, DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            if (e.Data.GetDataPresent(DataFormats.FileDrop, true) ||
+                e.Data.GetDataPresent("FileNameW", true) ||
+                e.Data.GetDataPresent("FileName", true) ||
+                e.Data.GetDataPresent(DataFormats.UnicodeText, true))
             {
                 e.Effects = DragDropEffects.Copy;
             }
@@ -171,21 +243,78 @@ namespace UniversalDownloader
             e.Handled = true;
         }
 
-        private void AddFilesToConverter(string[] filePaths)
+        private void ConverterDropZone_PreviewDrop(object sender, DragEventArgs e)
         {
+            ConverterDropZone_PreviewDragLeave(sender, e);
+            var paths = ExtractDropPaths(e);
+            if (paths.Length > 0)
+            {
+                AddFilesToConverter(paths);
+            }
+            e.Handled = true;
+        }
+
+        private void ConverterDropZone_Drop(object sender, DragEventArgs e)
+        {
+            ConverterDropZone_PreviewDrop(sender, e);
+        }
+
+        private void ConverterDropZone_DragOver(object sender, DragEventArgs e)
+        {
+            ConverterDropZone_PreviewDragOver(sender, e);
+        }
+
+        private void AddFilesToConverter(IEnumerable<string> filePaths)
+        {
+            var filesToAdd = new List<string>();
+
             foreach (var path in filePaths)
             {
+                if (string.IsNullOrWhiteSpace(path)) continue;
+
                 if (File.Exists(path))
                 {
-                    var fi = new FileInfo(path);
+                    filesToAdd.Add(path);
+                }
+                else if (Directory.Exists(path))
+                {
+                    try
+                    {
+                        var dirFiles = Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories)
+                            .Where(f => SupportedConverterExtensions.Contains(Path.GetExtension(f)))
+                            .OrderBy(f => f);
+                        filesToAdd.AddRange(dirFiles);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[Converter] Error enumerating folder '{path}': {ex.Message}");
+                    }
+                }
+            }
+
+            foreach (var filePath in filesToAdd)
+            {
+                if (ConverterItems.Any(i => i.InputPath.Equals(filePath, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                try
+                {
+                    var fi = new FileInfo(filePath);
+                    if (!SupportedConverterExtensions.Contains(fi.Extension))
+                        continue;
+
                     string formattedSize = Utilities.FormatBytesOutput(fi.Length);
                     ConverterItems.Add(new MediaConverterItem
                     {
-                        InputPath = path,
+                        InputPath = filePath,
                         FileName = fi.Name,
                         FileSize = formattedSize,
                         Status = "Ready to convert"
                     });
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Converter] Error adding file '{filePath}': {ex.Message}");
                 }
             }
 
