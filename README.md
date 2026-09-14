@@ -133,6 +133,7 @@ A modern, high-performance, cross-platform desktop workstation (**Windows & Linu
 | 📦 [docs/PUBLISH.md](docs/PUBLISH.md) | How to publish a single-file portable executable |
 | 🎨 [docs/ICON.md](docs/ICON.md) | How to change application icons and assets |
 | 🏷️ [docs/VERSIONING.md](docs/VERSIONING.md) | Versioning and assembly metadata configuration |
+| 🛡️ [docs/PERMISSIONS_AND_DRAG_DROP.md](docs/PERMISSIONS_AND_DRAG_DROP.md) | Corporate PCs, UAC permission prompts & Drag-and-Drop fix |
 
 ---
 
@@ -163,7 +164,19 @@ A modern, high-performance, cross-platform desktop workstation (**Windows & Linu
 ---
 
 ## 🛡️ Windows Security & Corporate / Organization PCs
-If Windows SmartScreen shows *"Windows protected your PC"* when downloading from GitHub:
+
+### 🏢 Default Installation & Permission Fix (Corporate PCs)
+If you are running on a corporate, managed, or restricted PC:
+* **Default Recommended Location**: Always place or run the application from a **user-writable folder** such as `%LOCALAPPDATA%\UniversalDownloader\`, your **Desktop**, or `Downloads`.
+* **Avoid System Folders**: Do **not** place portable `.exe` files into `C:\Program Files (x86)\` or `C:\Program Files\`. Windows marks these system folders as administrator-only, triggering UAC elevation prompts and causing Windows UIPI to **block Drag-and-Drop** between File Explorer/browsers and the application.
+* **If Drag-and-Drop is Blocked or Asks for Permission**:
+  1. Move the application folder to your **Desktop** or `%LOCALAPPDATA%\UniversalDownloader\`.
+  2. Right-click `Universal Downloader.exe` ➔ **Properties** ➔ **Compatibility** tab ➔ ensure **"Run this program as an administrator"** is **UNCHECKED**.
+  3. Launch normally — Drag-and-Drop and silent updates will work without any UAC prompts.
+  4. See [docs/PERMISSIONS_AND_DRAG_DROP.md](docs/PERMISSIONS_AND_DRAG_DROP.md) for full technical details.
+
+### ⚠️ SmartScreen & Alternate Data Streams (Zone.Identifier)
+If Windows SmartScreen displays *"Windows protected your PC"*:
 1. **Unblock**: Right-click `Universal Downloader.exe` ➔ **Properties** ➔ Check **Unblock** at the bottom ➔ Click **Apply/OK**.
 2. **Or via PowerShell**:
    ```powershell
