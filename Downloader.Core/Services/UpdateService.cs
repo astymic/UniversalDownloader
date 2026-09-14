@@ -74,7 +74,7 @@ namespace UniversalDownloader.Services
             }
             catch { }
 
-            return "1.0.15";
+            return "1.0.16";
         }
 
         private static string NormalizeVersion(Version version)
@@ -234,34 +234,67 @@ namespace UniversalDownloader.Services
                 }
                 catch { }
 
-                // Write a robust cmd script with admin fallback for Program Files / corporate permission environments
-                string cmdScriptPath = Path.Combine(Path.GetTempPath(), $"updater_{Guid.NewGuid():N}.cmd");
-                string scriptContent = $@"@echo off
-setlocal enabledelayedexpansion
-timeout /t 1 /nobreak >nul
-:waitloop
-tasklist /fi ""PID eq {currentPid}"" 2>nul | find ""{currentPid}"" >nul
-if not errorlevel 1 (
-    timeout /t 1 /nobreak >nul
-    goto waitloop
-)
-copy /y ""{downloadedFilePath}"" ""{currentExecutablePath}"" >nul 2>&1
-if errorlevel 1 (
-    powershell -NoProfile -Command ""Start-Process cmd -ArgumentList '/c copy /y \""""{downloadedFilePath}\"""" \""""{currentExecutablePath}\"""" && powershell -NoProfile -Command Unblock-File -LiteralPath \""""{currentExecutablePath}\"""" && start \""""\"""" \""""{currentExecutablePath}\""""' -Verb RunAs""
-    exit
-)
-powershell -NoProfile -Command ""Unblock-File -LiteralPath '{currentExecutablePath.Replace("'", "''")}'"" >nul 2>&1
-start """" ""{currentExecutablePath}""
-del ""%~f0""
+                // Write a completely hidden PowerShell update script with admin fallback for Program Files
+                string psScriptPath = Path.Combine(Path.GetTempPath(), $"updater_{Guid.NewGuid():N}.ps1");
+                string psTarget = currentExecutablePath.Replace("'", "''");
+                string psSource = downloadedFilePath.Replace("'", "''");
+
+                string scriptContent = $@"
+$ErrorActionPreference = 'SilentlyContinue'
+$target = '{psTarget}'
+$source = '{psSource}'
+$pidToWait = {currentPid}
+
+while (Get-Process -Id $pidToWait -ErrorAction SilentlyContinue) {{
+    Start-Sleep -Milliseconds 400
+}}
+
+$isTargetWritable = $false
+try {{
+    $targetDir = Split-Path -Parent $target
+    $testFile = Join-Path $targetDir "".perm_test_$([Guid]::NewGuid().ToString('N'))""
+    [System.IO.File]::WriteAllText($testFile, 'test')
+    [System.IO.File]::Delete($testFile)
+    $isTargetWritable = $true
+}} catch {{
+    $isTargetWritable = $false
+}}
+
+if ($isTargetWritable) {{
+    try {{
+        Copy-Item -LiteralPath $source -Destination $target -Force
+        Unblock-File -LiteralPath $target
+        Start-Process -FilePath $target
+    }} catch {{
+        $fallbackDir = Join-Path $env:LOCALAPPDATA 'UniversalDownloader'
+        New-Item -ItemType Directory -Force -Path $fallbackDir | Out-Null
+        $fallbackExe = Join-Path $fallbackDir 'Universal Downloader.exe'
+        Copy-Item -LiteralPath $source -Destination $fallbackExe -Force
+        Unblock-File -LiteralPath $fallbackExe
+        Start-Process -FilePath $fallbackExe
+    }}
+}} else {{
+    # When installed in read-only folders (like Program Files on corporate PCs),
+    # NEVER ask for admin/UAC elevation (which triggers corporate restrictions and breaks drag-drop).
+    # Seamlessly fallback to the user's personal AppData folder where they have full rights!
+    $fallbackDir = Join-Path $env:LOCALAPPDATA 'UniversalDownloader'
+    New-Item -ItemType Directory -Force -Path $fallbackDir | Out-Null
+    $fallbackExe = Join-Path $fallbackDir 'Universal Downloader.exe'
+    Copy-Item -LiteralPath $source -Destination $fallbackExe -Force
+    Unblock-File -LiteralPath $fallbackExe
+    Start-Process -FilePath $fallbackExe
+}}
+
+Remove-Item -LiteralPath $MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
 ";
-                File.WriteAllText(cmdScriptPath, scriptContent);
+                File.WriteAllText(psScriptPath, scriptContent);
 
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c \"{cmdScriptPath}\"",
+                    FileName = "powershell.exe",
+                    Arguments = $"-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File \"{psScriptPath}\"",
                     CreateNoWindow = true,
-                    UseShellExecute = true,
+                    UseShellExecute = false,
                     WindowStyle = ProcessWindowStyle.Hidden
                 };
                 Process.Start(psi);

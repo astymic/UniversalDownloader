@@ -229,7 +229,7 @@ namespace UniversalDownloader.Services
                 psi.ArgumentList.Add("--ignore-config");
                 psi.ArgumentList.Add("--skip-download");
                 psi.ArgumentList.Add("--extractor-args");
-                psi.ArgumentList.Add("youtube:player_client=android,ios,mweb,web");
+                psi.ArgumentList.Add("youtube:player_client=default");
                 AppendStreamHeadersIfRequired(psi, url);
                 psi.ArgumentList.Add(url);
                 psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
@@ -870,8 +870,8 @@ namespace UniversalDownloader.Services
 
         private async Task<bool> ExecuteYtDlpDownloadAsync(string url, string? formatSelection, string tempDownloadFolder, string finalDestinationFolder, bool extractAudio, string audioFormat, bool useTrimming, double trimStartSeconds, double trimEndSeconds, CancellationToken cancellationToken, string? overrideFileName, string? cookiesFromBrowser, IProgress<DownloadProgressArgs>? progressCallback = null)
         {
-            // Create an isolated subfolder for this specific download job to avoid cross-job interference
-            string jobTempFolder = Path.Combine(tempDownloadFolder, $"dl_{Guid.NewGuid():N}");
+            // Create an isolated subfolder for this specific download job (short name to avoid Windows MAX_PATH limits)
+            string jobTempFolder = Path.Combine(tempDownloadFolder, $"d_{Guid.NewGuid().ToString("N").Substring(0, 8)}");
             Directory.CreateDirectory(jobTempFolder);
 
             // Apply filename template (defaults to {title} -> %(title)s.%(ext)s)
@@ -880,7 +880,6 @@ namespace UniversalDownloader.Services
             {
                 baseFileNameTemplate = "%(artist)s - %(title)s.%(ext)s";
             }
-            string outputTemplate = Path.Combine(jobTempFolder, baseFileNameTemplate);
 
             ProcessStartInfo psi = new ProcessStartInfo
             {
@@ -893,8 +892,15 @@ namespace UniversalDownloader.Services
                 StandardErrorEncoding = System.Text.Encoding.UTF8
             };
 
+            // Use -P for working directory and -o for filename template with --trim-filenames and --windows-filenames
+            // to strictly avoid MAX_PATH (260 char) truncation or illegal characters on Windows
+            psi.ArgumentList.Add("-P");
+            psi.ArgumentList.Add(jobTempFolder);
             psi.ArgumentList.Add("-o");
-            psi.ArgumentList.Add(outputTemplate);
+            psi.ArgumentList.Add(baseFileNameTemplate);
+            psi.ArgumentList.Add("--trim-filenames");
+            psi.ArgumentList.Add("60");
+            psi.ArgumentList.Add("--windows-filenames");
 
             if (extractAudio)
             {
@@ -927,7 +933,7 @@ namespace UniversalDownloader.Services
             psi.ArgumentList.Add("--file-access-retries");
             psi.ArgumentList.Add("5");
             psi.ArgumentList.Add("--extractor-args");
-            psi.ArgumentList.Add("youtube:player_client=android,web");
+            psi.ArgumentList.Add("youtube:player_client=default");
 
             if (EnableMultiConnectionAcceleration)
             {

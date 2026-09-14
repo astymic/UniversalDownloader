@@ -20,9 +20,9 @@ namespace Downloader
             // Clean up any RUNASADMIN shims placed by Windows Program Compatibility Assistant
             CleanupAppCompatFlags();
 
-            // Generate a unique temp folder path for this session
+            // Generate a compact unique temp folder path for this session (prevents MAX_PATH issues with deep paths)
             string tempPath = Path.GetTempPath();
-            AppTempDirectory = Path.Combine(tempPath, $"UniversalDownloader_{Guid.NewGuid()}");
+            AppTempDirectory = Path.Combine(tempPath, $"UD_{Guid.NewGuid().ToString("N").Substring(0, 8)}");
 
             try
             {

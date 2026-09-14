@@ -743,6 +743,46 @@ namespace UniversalDownloader.Tests
             Assert.Contains("level=\"asInvoker\"", content);
             Assert.Contains("uiAccess=\"false\"", content);
         }
+
+        [Fact]
+        public async Task YouTube_ShortUrl_Download_Investigation()
+        {
+            var depMgr = new UniversalDownloader.Services.DependencyManager();
+            var downloadService = new UniversalDownloader.Services.DownloadService(depMgr);
+            _ = depMgr.InitializeDependenciesAsync();
+            await depMgr.WaitForInitializationAsync();
+
+            string url = "https://youtu.be/dlUO-XJcIxc";
+            var (title, formatsJson) = await downloadService.GetYouTubeInfoAsync(url);
+            Assert.NotNull(formatsJson);
+
+            string tempDir = Path.Combine(Path.GetTempPath(), "test_yt_regress_" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            string destDir = Path.Combine(Path.GetTempPath(), "test_yt_regress_dest_" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            Directory.CreateDirectory(tempDir);
+            Directory.CreateDirectory(destDir);
+
+            try
+            {
+                bool success = await downloadService.DownloadWithYtDlpAsync(
+                    url,
+                    "bestvideo+bestaudio/best",
+                    tempDir,
+                    destDir,
+                    false,
+                    null,
+                    false,
+                    0,
+                    0,
+                    CancellationToken.None);
+
+                Assert.True(success);
+            }
+            finally
+            {
+                try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { }
+                try { if (Directory.Exists(destDir)) Directory.Delete(destDir, true); } catch { }
+            }
+        }
     }
 }
 

@@ -1340,7 +1340,7 @@ namespace UniversalDownloader
                     string initialArtist = "Unknown Artist";
                     string initialTitle = "Spotify Track";
 
-                    StatusTextBlock.Text = "Получение метаданных трека...";
+                    StatusTextBlock.Text = "Fetching track metadata...";
                     var metadata = await _downloadService.GetSpotifyMetadataAsync(url);
                     if (metadata != null)
                     {
@@ -1369,7 +1369,7 @@ namespace UniversalDownloader
                         }
                         else
                         {
-                            StatusTextBlock.Text = "Скачивание отменено пользователем.";
+                            StatusTextBlock.Text = "Download canceled by user.";
                             return;
                         }
                     }
@@ -1383,10 +1383,10 @@ namespace UniversalDownloader
                     string cleanQueryTitle = _currentItemTitle.Replace("\"", "").Replace("'", "");
                     string query = $"ytsearch1:{cleanQueryTitle}";
 
-                    StatusTextBlock.Text = $"Поиск '{_currentItemTitle}' на YouTube...";
+                    StatusTextBlock.Text = $"Searching for '{_currentItemTitle}' on YouTube...";
                     await _downloadService.DownloadWithYtDlpAsync(query, "bestaudio/best", Downloader.App.AppTempDirectory, SelectedDirectory, true, "mp3", false, 0, 0, _cancellationTokenSource.Token, _currentItemTitle);
                     
-                    StatusTextBlock.Text = $"Скачивание завершено: {_currentItemTitle}";
+                    StatusTextBlock.Text = $"Download complete: {_currentItemTitle}";
                 }
                 else if (_downloadService.IsKnownAudioPlatformLink(url))
                 {

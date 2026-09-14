@@ -26,3 +26,7 @@ release-assets/
 *.nupkg
 project.lock.json
 packages/
+
+scratch_test_dl/
+scratch_test_dl2/
+scratch_info.json
