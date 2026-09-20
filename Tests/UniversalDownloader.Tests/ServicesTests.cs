@@ -836,6 +836,67 @@ namespace UniversalDownloader.Tests
                 try { if (Directory.Exists(destDir)) Directory.Delete(destDir, true); } catch { }
             }
         }
+
+        [Fact]
+        public void GifWebpService_BuildFfmpegArguments_IncludesOverlayFilter_ForGifWebpAndTelegram()
+        {
+            string fakeVideo = Path.Combine(Path.GetTempPath(), "test_video.mp4");
+            string fakeOverlay = Path.Combine(Path.GetTempPath(), "test_overlay.png");
+            File.WriteAllText(fakeOverlay, "dummy png");
+
+            try
+            {
+                var formats = new[]
+                {
+                    GifWebpFormat.Gif,
+                    GifWebpFormat.Webp,
+                    GifWebpFormat.TelegramSticker
+                };
+
+                foreach (var format in formats)
+                {
+                    var options = new GifWebpOptions
+                    {
+                        Format = format,
+                        StartTime = TimeSpan.FromSeconds(1),
+                        EndTime = TimeSpan.FromSeconds(4),
+                        Width = 480,
+                        Fps = 25,
+                        OverlayImagePath = fakeOverlay,
+                        Crop = new VideoCropRect { X = 0.1, Y = 0.1, Width = 0.8, Height = 0.8 },
+                        OriginalVideoWidth = 1920,
+                        OriginalVideoHeight = 1080
+                    };
+
+                    string outExt = format switch
+                    {
+                        GifWebpFormat.Gif => ".gif",
+                        GifWebpFormat.Webp => ".webp",
+                        _ => ".webm"
+                    };
+                    string fakeOut = Path.Combine(Path.GetTempPath(), "out" + outExt);
+
+                    var args = GifWebpService.BuildFfmpegArguments(fakeVideo, fakeOut, options);
+
+                    // Check that overlay image is passed as second input
+                    int overlayInputIndex = args.IndexOf(fakeOverlay);
+                    Assert.True(overlayInputIndex > 0);
+                    Assert.Equal("-i", args[overlayInputIndex - 1]);
+
+                    // Check filter_complex contains overlay syntax
+                    int filterIdx = args.IndexOf("-filter_complex");
+                    Assert.True(filterIdx >= 0 && filterIdx < args.Count - 1);
+                    string filterStr = args[filterIdx + 1];
+
+                    Assert.Contains("[1:v] overlay=0:0", filterStr);
+                    Assert.Contains("crop=", filterStr);
+                }
+            }
+            finally
+            {
+                try { if (File.Exists(fakeOverlay)) File.Delete(fakeOverlay); } catch { }
+            }
+        }
     }
 }
 

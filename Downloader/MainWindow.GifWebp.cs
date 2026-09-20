@@ -46,6 +46,23 @@ namespace UniversalDownloader
         private int _sourceVideoWidth = 0;
         private int _sourceVideoHeight = 0;
 
+        private enum GifEditorTool { Cursor, Text, Crop }
+        private GifEditorTool _activeGifTool = GifEditorTool.Cursor;
+        private readonly List<GifTextLabelControl> _textLabelControls = new();
+
+        private string _currentFontFamily = "Segoe UI";
+        private double _currentFontSize = 28.0;
+        private bool _currentIsBold = true;
+        private bool _currentIsItalic = false;
+        private bool _currentIsUnderline = false;
+        private bool _currentIsStrikethrough = false;
+        private string _currentTextColor = "#FFFFFF";
+        private double _currentH = 0.0;
+        private double _currentS = 0.0;
+        private double _currentV = 1.0;
+        private bool _isUpdatingFormattingUI = false;
+        private bool _isUpdatingColorPickerUI = false;
+
         private string? _previewProxyVideo;
         private CancellationTokenSource? _proxyCts;
 
@@ -81,6 +98,8 @@ namespace UniversalDownloader
                 Interval = TimeSpan.FromMilliseconds(50)
             };
             _gifPlayerTimer.Tick += GifPlayerTimer_Tick;
+
+            InitializeTextFormattingRibbon();
         }
 
         public void OpenVideoInGifCreator(string filePath)
@@ -163,6 +182,10 @@ namespace UniversalDownloader
             _isTimerUpdatingScrubber = true;
             if (GifPlayerScrubber != null) GifPlayerScrubber.Value = 0;
             _isTimerUpdatingScrubber = false;
+
+            _textLabelControls.Clear();
+            if (GifTextCanvas != null) GifTextCanvas.Children.Clear();
+            SetActiveGifTool(GifEditorTool.Cursor);
 
             // Hide empty drop zone, show active studio editor
             if (GifDropZone != null) GifDropZone.Visibility = Visibility.Collapsed;
@@ -935,6 +958,9 @@ namespace UniversalDownloader
                     GifCropInfoText.Text = $"Full frame: {_sourceVideoWidth} × {_sourceVideoHeight}";
                 }
             }
+
+            UpdateCropInteractivity();
+            UpdateTextLabelsPositions();
         }
 
         private void CropCenter_DragDelta(object sender, DragDeltaEventArgs e)
@@ -1081,6 +1107,908 @@ namespace UniversalDownloader
         private void GifCropRatio16x9_Click(object sender, RoutedEventArgs e) => ApplyAspectRatioCrop(16.0 / 9.0);
         private void GifCropRatio9x16_Click(object sender, RoutedEventArgs e) => ApplyAspectRatioCrop(9.0 / 16.0);
         private void GifCropRatio4x3_Click(object sender, RoutedEventArgs e) => ApplyAspectRatioCrop(4.0 / 3.0);
+
+        // ==================== Editor Tools & Text Labels Overlay ====================
+
+        private void InitializeTextFormattingRibbon()
+        {
+            if (GifTextFontComboBox == null || GifTextFontSizeComboBox == null) return;
+
+            _isUpdatingFormattingUI = true;
+            try
+            {
+                var fonts = new[]
+                {
+                    "Segoe UI", "Impact", "Arial", "Comic Sans MS", "Times New Roman",
+                    "Verdana", "Trebuchet MS", "Consolas", "Georgia", "Courier New"
+                };
+                GifTextFontComboBox.ItemsSource = fonts;
+                GifTextFontComboBox.SelectedItem = _currentFontFamily;
+
+                var sizes = new[] { "12", "14", "16", "18", "20", "24", "28", "32", "36", "42", "48", "56", "64", "72", "96", "120" };
+                GifTextFontSizeComboBox.ItemsSource = sizes;
+                GifTextFontSizeComboBox.SelectedItem = _currentFontSize.ToString("0");
+                GifTextFontSizeComboBox.Text = _currentFontSize.ToString("0");
+
+                if (GifTextBoldBtn != null) GifTextBoldBtn.IsChecked = _currentIsBold;
+                if (GifTextItalicBtn != null) GifTextItalicBtn.IsChecked = _currentIsItalic;
+                if (GifTextUnderlineBtn != null) GifTextUnderlineBtn.IsChecked = _currentIsUnderline;
+                if (GifTextStrikethroughBtn != null) GifTextStrikethroughBtn.IsChecked = _currentIsStrikethrough;
+
+                UpdateColorSwatchAndHex(_currentTextColor);
+                UpdateTextFormattingBarVisibility();
+            }
+            finally
+            {
+                _isUpdatingFormattingUI = false;
+            }
+        }
+
+        private void UpdateTextFormattingBarVisibility()
+        {
+            if (GifTextFormattingBar == null) return;
+            bool isTextTool = _activeGifTool == GifEditorTool.Text;
+            bool hasSelectedLabel = _textLabelControls.Any(c => c.Model.IsSelected);
+            bool showTextBar = isTextTool || hasSelectedLabel;
+
+            GifTextFormattingBar.Visibility = showTextBar ? Visibility.Visible : Visibility.Collapsed;
+            if (GifEditorDefaultHeader != null)
+            {
+                GifEditorDefaultHeader.Visibility = showTextBar ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        private void SetActiveGifTool(GifEditorTool tool)
+        {
+            _activeGifTool = tool;
+
+            var activeBg = new SolidColorBrush(Color.FromRgb(56, 189, 248));
+            var activeFg = Brushes.Black;
+            var inactiveBg = Brushes.Transparent;
+            var inactiveFg = (Brush)FindResource("TextSecondaryBrush");
+
+            if (GifToolCursorBorder != null)
+                GifToolCursorBorder.Background = (tool == GifEditorTool.Cursor) ? activeBg : inactiveBg;
+            if (GifToolCursorBtn != null)
+                GifToolCursorBtn.Foreground = (tool == GifEditorTool.Cursor) ? activeFg : inactiveFg;
+
+            if (GifToolTextBorder != null)
+                GifToolTextBorder.Background = (tool == GifEditorTool.Text) ? activeBg : inactiveBg;
+            if (GifToolTextBtn != null)
+                GifToolTextBtn.Foreground = (tool == GifEditorTool.Text) ? activeFg : inactiveFg;
+
+            if (GifToolCropBorder != null)
+                GifToolCropBorder.Background = (tool == GifEditorTool.Crop) ? activeBg : inactiveBg;
+            if (GifToolCropBtn != null)
+                GifToolCropBtn.Foreground = (tool == GifEditorTool.Crop) ? activeFg : inactiveFg;
+
+            if (GifTextCanvas != null)
+            {
+                GifTextCanvas.Cursor = (tool == GifEditorTool.Text) ? Cursors.IBeam : Cursors.Arrow;
+            }
+
+            if (tool == GifEditorTool.Cursor)
+            {
+                // When switching to Cursor tool, finish active text editing (close edit box)
+                // but keep the selected text label active so resize handles & formatting ribbon remain accessible!
+                CommitOrPruneActiveEdit();
+            }
+            else
+            {
+                CommitOrPruneActiveEdit();
+                DeselectAllTextLabels();
+            }
+
+            UpdateCropInteractivity();
+            UpdateTextFormattingBarVisibility();
+        }
+
+        private void UpdateCropInteractivity()
+        {
+            bool isCrop = _activeGifTool == GifEditorTool.Crop;
+
+            if (CropCenterThumb != null)
+            {
+                CropCenterThumb.IsHitTestVisible = isCrop;
+            }
+
+            if (CropDimensionBadge != null)
+            {
+                CropDimensionBadge.Visibility = isCrop ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            Visibility handleVis = isCrop ? Visibility.Visible : Visibility.Collapsed;
+            if (CropHandleTop != null) CropHandleTop.Visibility = handleVis;
+            if (CropHandleBottom != null) CropHandleBottom.Visibility = handleVis;
+            if (CropHandleLeft != null) CropHandleLeft.Visibility = handleVis;
+            if (CropHandleRight != null) CropHandleRight.Visibility = handleVis;
+            if (CropHandleTopLeft != null) CropHandleTopLeft.Visibility = handleVis;
+            if (CropHandleTopRight != null) CropHandleTopRight.Visibility = handleVis;
+            if (CropHandleBottomLeft != null) CropHandleBottomLeft.Visibility = handleVis;
+            if (CropHandleBottomRight != null) CropHandleBottomRight.Visibility = handleVis;
+
+            if (CropBoxBorder != null)
+            {
+                CropBoxBorder.BorderBrush = isCrop
+                    ? new SolidColorBrush(Color.FromRgb(56, 189, 248))
+                    : (_cropRect.IsActive ? new SolidColorBrush(Color.FromArgb(120, 56, 189, 248)) : Brushes.Transparent);
+            }
+
+            if (GifTextCanvas != null)
+            {
+                GifTextCanvas.IsHitTestVisible = !isCrop;
+            }
+        }
+
+        private void GifToolCursor_Click(object sender, RoutedEventArgs e)
+        {
+            SetActiveGifTool(GifEditorTool.Cursor);
+        }
+
+        private void GifToolText_Click(object sender, RoutedEventArgs e)
+        {
+            SetActiveGifTool(GifEditorTool.Text);
+        }
+
+        private void GifToolCrop_Click(object sender, RoutedEventArgs e)
+        {
+            SetActiveGifTool(GifEditorTool.Crop);
+        }
+
+        private void GifTextCanvas_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Left) return;
+
+            // Commit or prune any currently editing label
+            CommitOrPruneActiveEdit();
+
+            if (_activeGifTool == GifEditorTool.Text)
+            {
+                Point clickPos = e.GetPosition(GifTextCanvas);
+                CreateNewTextLabel(clickPos);
+                e.Handled = true;
+            }
+            else if (_activeGifTool == GifEditorTool.Cursor)
+            {
+                DeselectAllTextLabels();
+            }
+        }
+
+        private void CommitOrPruneActiveEdit()
+        {
+            foreach (var ctrl in _textLabelControls.ToList())
+            {
+                if (ctrl.Model.IsEditing)
+                {
+                    ctrl.ExitEditMode();
+                }
+            }
+            UpdateTextFormattingBarVisibility();
+        }
+
+        private void CreateNewTextLabel(Point clickPos)
+        {
+            var (renderX, renderY, renderW, renderH) = GetRenderedVideoBounds();
+            double normVideoX = renderW > 0 ? (clickPos.X - renderX) / renderW : 0;
+            double normVideoY = renderH > 0 ? (clickPos.Y - renderY) / renderH : 0;
+
+            var model = new GifTextLabel
+            {
+                Text = "",
+                X = clickPos.X,
+                Y = clickPos.Y,
+                NormalizedX = normVideoX,
+                NormalizedY = normVideoY,
+                FontSize = _currentFontSize,
+                FontFamily = _currentFontFamily,
+                IsBold = _currentIsBold,
+                IsItalic = _currentIsItalic,
+                IsUnderline = _currentIsUnderline,
+                IsStrikethrough = _currentIsStrikethrough,
+                TextColor = _currentTextColor,
+                IsDraft = true
+            };
+
+            var control = new GifTextLabelControl(model)
+            {
+                IsCursorToolActive = () => _activeGifTool == GifEditorTool.Cursor,
+                IsTextToolActive = () => _activeGifTool == GifEditorTool.Text
+            };
+
+            control.DeleteRequested += OnTextLabelDeleteRequested;
+            control.Selected += OnTextLabelSelected;
+            control.CreateNewRequested += OnTextLabelCreateNewRequested;
+            control.PositionChanged += OnTextLabelPositionChanged;
+            control.FormattingChanged += (ctrl) =>
+            {
+                if (ctrl.Model.IsSelected)
+                {
+                    SyncFormattingBarWithModel(ctrl.Model);
+                }
+            };
+
+            Canvas.SetLeft(control, clickPos.X);
+            Canvas.SetTop(control, clickPos.Y);
+
+            _textLabelControls.Add(control);
+            GifTextCanvas?.Children.Add(control);
+
+            DeselectAllTextLabels();
+            control.EnterEditMode();
+            SyncFormattingBarWithModel(model);
+            UpdateTextFormattingBarVisibility();
+        }
+
+        private GifTextLabelControl? GetSelectedLabelControl()
+        {
+            return _textLabelControls.FirstOrDefault(c => c.Model.IsSelected);
+        }
+
+        private void SyncFormattingBarWithModel(GifTextLabel model)
+        {
+            _isUpdatingFormattingUI = true;
+            try
+            {
+                _currentFontFamily = model.FontFamily;
+                _currentFontSize = model.FontSize;
+                _currentIsBold = model.IsBold;
+                _currentIsItalic = model.IsItalic;
+                _currentIsUnderline = model.IsUnderline;
+                _currentIsStrikethrough = model.IsStrikethrough;
+                _currentTextColor = model.TextColor;
+
+                if (GifTextFontComboBox != null)
+                {
+                    GifTextFontComboBox.SelectedItem = model.FontFamily;
+                }
+                if (GifTextFontSizeComboBox != null)
+                {
+                    string szStr = model.FontSize.ToString("0");
+                    GifTextFontSizeComboBox.SelectedItem = szStr;
+                    GifTextFontSizeComboBox.Text = szStr;
+                }
+                if (GifTextBoldBtn != null)
+                {
+                    GifTextBoldBtn.IsChecked = model.IsBold;
+                }
+                if (GifTextItalicBtn != null)
+                {
+                    GifTextItalicBtn.IsChecked = model.IsItalic;
+                }
+                if (GifTextUnderlineBtn != null)
+                {
+                    GifTextUnderlineBtn.IsChecked = model.IsUnderline;
+                }
+                if (GifTextStrikethroughBtn != null)
+                {
+                    GifTextStrikethroughBtn.IsChecked = model.IsStrikethrough;
+                }
+                UpdateColorSwatchAndHex(model.TextColor);
+            }
+            finally
+            {
+                _isUpdatingFormattingUI = false;
+            }
+        }
+
+        private void GifTextFontComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingFormattingUI || GifTextFontComboBox.SelectedItem is not string font) return;
+            _currentFontFamily = font;
+            var sel = GetSelectedLabelControl();
+            if (sel != null)
+            {
+                sel.Model.FontFamily = font;
+                sel.RefreshFormatting();
+            }
+        }
+
+        private void GifTextFontSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingFormattingUI || GifTextFontSizeComboBox.SelectedItem is not string sizeStr) return;
+            if (double.TryParse(sizeStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double sz))
+            {
+                ApplyFontSizeToCurrent(sz);
+            }
+        }
+
+        private void GifTextFontSizeComboBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isUpdatingFormattingUI || GifTextFontSizeComboBox == null) return;
+            string text = GifTextFontSizeComboBox.Text?.Trim() ?? "";
+            if (double.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out double sz) && sz >= 6 && sz <= 200)
+            {
+                ApplyFontSizeToCurrent(sz);
+            }
+        }
+
+        private void ApplyFontSizeToCurrent(double size)
+        {
+            _currentFontSize = size;
+            var sel = GetSelectedLabelControl();
+            if (sel != null)
+            {
+                sel.ApplyFontSize(size);
+            }
+        }
+
+        private void GifTextFormatButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingFormattingUI) return;
+
+            _currentIsBold = GifTextBoldBtn?.IsChecked == true;
+            _currentIsItalic = GifTextItalicBtn?.IsChecked == true;
+            _currentIsUnderline = GifTextUnderlineBtn?.IsChecked == true;
+            _currentIsStrikethrough = GifTextStrikethroughBtn?.IsChecked == true;
+
+            var sel = GetSelectedLabelControl();
+            if (sel != null)
+            {
+                sel.Model.IsBold = _currentIsBold;
+                sel.Model.IsItalic = _currentIsItalic;
+                sel.Model.IsUnderline = _currentIsUnderline;
+                sel.Model.IsStrikethrough = _currentIsStrikethrough;
+                sel.RefreshFormatting();
+            }
+        }
+
+        // ==================== Circular Spectrum Color Picker ====================
+
+        private static BitmapSource? _cachedColorWheelBitmap;
+
+        private static BitmapSource GetColorWheelBitmap()
+        {
+            if (_cachedColorWheelBitmap != null) return _cachedColorWheelBitmap;
+
+            // Render at 360x360 for crisp, anti-aliased retina display on 180x180 element
+            int width = 360;
+            int height = 360;
+            int stride = width * 4;
+            byte[] pixels = new byte[height * stride];
+
+            double cx = width / 2.0;
+            double cy = height / 2.0;
+            double maxRadius = 170.0;
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    double dx = x - cx;
+                    double dy = y - cy;
+                    double dist = Math.Sqrt(dx * dx + dy * dy);
+                    int idx = (y * width + x) * 4;
+
+                    if (dist <= maxRadius)
+                    {
+                        double edgeFactor = 1.0;
+                        if (dist > maxRadius - 2.0)
+                        {
+                            double t = Math.Clamp((maxRadius - dist) / 2.0, 0.0, 1.0);
+                            edgeFactor = t * t * (3.0 - 2.0 * t); // smoothstep
+                        }
+
+                        double angleRad = Math.Atan2(dy, dx);
+                        double angleDeg = angleRad * (180.0 / Math.PI);
+                        if (angleDeg < 0) angleDeg += 360.0;
+
+                        double hue = angleDeg;
+                        double sat = Math.Min(1.0, dist / maxRadius);
+                        Color c = ColorFromHsv(hue, sat, 1.0);
+
+                        pixels[idx] = c.B;
+                        pixels[idx + 1] = c.G;
+                        pixels[idx + 2] = c.R;
+                        pixels[idx + 3] = (byte)Math.Clamp(Math.Round(255.0 * edgeFactor), 0, 255);
+                    }
+                    else
+                    {
+                        pixels[idx] = 0;
+                        pixels[idx + 1] = 0;
+                        pixels[idx + 2] = 0;
+                        pixels[idx + 3] = 0;
+                    }
+                }
+            }
+
+            _cachedColorWheelBitmap = BitmapSource.Create(
+                width, height, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
+            _cachedColorWheelBitmap.Freeze();
+            return _cachedColorWheelBitmap;
+        }
+
+        private static void RgbToHsv(Color c, out double h, out double s, out double v)
+        {
+            double r = c.R / 255.0;
+            double g = c.G / 255.0;
+            double b = c.B / 255.0;
+
+            double max = Math.Max(r, Math.Max(g, b));
+            double min = Math.Min(r, Math.Min(g, b));
+            double delta = max - min;
+
+            v = max;
+            s = (max == 0) ? 0 : delta / max;
+
+            if (delta == 0)
+            {
+                h = 0;
+            }
+            else if (Math.Abs(max - r) < 0.0001)
+            {
+                h = 60.0 * (((g - b) / delta) % 6);
+            }
+            else if (Math.Abs(max - g) < 0.0001)
+            {
+                h = 60.0 * (((b - r) / delta) + 2);
+            }
+            else
+            {
+                h = 60.0 * (((r - g) / delta) + 4);
+            }
+
+            if (h < 0) h += 360.0;
+        }
+
+        private void UpdateWheelThumbPosition()
+        {
+            if (GifColorWheelThumb == null) return;
+            double cx = 90.0;
+            double cy = 90.0;
+            double maxRadius = 85.0;
+
+            double angleRad = _currentH * (Math.PI / 180.0);
+            double dist = _currentS * maxRadius;
+
+            double tx = cx + dist * Math.Cos(angleRad);
+            double ty = cy + dist * Math.Sin(angleRad);
+
+            Canvas.SetLeft(GifColorWheelThumb, tx - 7);
+            Canvas.SetTop(GifColorWheelThumb, ty - 7);
+        }
+
+        private void UpdateColorFromWheelPoint(Point p)
+        {
+            double cx = 90.0;
+            double cy = 90.0;
+            double maxRadius = 85.0;
+
+            double dx = p.X - cx;
+            double dy = p.Y - cy;
+            double dist = Math.Sqrt(dx * dx + dy * dy);
+            if (dist > maxRadius) dist = maxRadius;
+
+            double angleRad = Math.Atan2(dy, dx);
+            double angleDeg = angleRad * (180.0 / Math.PI);
+            if (angleDeg < 0) angleDeg += 360.0;
+
+            _currentH = angleDeg;
+            _currentS = Math.Min(1.0, dist / maxRadius);
+
+            UpdateWheelThumbPosition();
+
+            Color col = ColorFromHsv(_currentH, _currentS, _currentV);
+            ApplyColorToUI(col, fromWheel: true);
+        }
+
+        private void GifColorWheelCanvas_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Left) return;
+            GifColorWheelCanvas.CaptureMouse();
+            UpdateColorFromWheelPoint(e.GetPosition(GifColorWheelCanvas));
+        }
+
+        private void GifColorWheelCanvas_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed && GifColorWheelCanvas.IsMouseCaptured)
+            {
+                UpdateColorFromWheelPoint(e.GetPosition(GifColorWheelCanvas));
+            }
+        }
+
+        private void GifColorWheelCanvas_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (GifColorWheelCanvas.IsMouseCaptured)
+            {
+                GifColorWheelCanvas.ReleaseMouseCapture();
+            }
+        }
+
+        private void UpdateBrightnessFromPoint(Point p)
+        {
+            if (GifColorBrightnessCanvas == null) return;
+            double w = GifColorBrightnessCanvas.ActualWidth;
+            if (w <= 0) w = 236.0;
+            double thumbW = 10.0;
+            double trackW = Math.Max(1.0, w - thumbW);
+
+            double val = Math.Clamp((p.X - thumbW / 2.0) / trackW, 0.0, 1.0);
+            _currentV = val;
+
+            UpdateBrightnessThumbPosition();
+
+            Color col = ColorFromHsv(_currentH, _currentS, _currentV);
+            ApplyColorToUI(col, fromSlider: true);
+        }
+
+        private void UpdateBrightnessThumbPosition()
+        {
+            if (GifColorBrightnessThumb == null || GifColorBrightnessCanvas == null) return;
+            double w = GifColorBrightnessCanvas.ActualWidth;
+            if (w <= 0) w = 236.0;
+            double thumbW = 10.0;
+            double trackW = Math.Max(1.0, w - thumbW);
+
+            double x = Math.Clamp(_currentV * trackW, 0.0, trackW);
+            Canvas.SetLeft(GifColorBrightnessThumb, x);
+            Canvas.SetTop(GifColorBrightnessThumb, 0);
+        }
+
+        private void GifColorBrightnessCanvas_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Left) return;
+            GifColorBrightnessCanvas.CaptureMouse();
+            UpdateBrightnessFromPoint(e.GetPosition(GifColorBrightnessCanvas));
+        }
+
+        private void GifColorBrightnessCanvas_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed && GifColorBrightnessCanvas.IsMouseCaptured)
+            {
+                UpdateBrightnessFromPoint(e.GetPosition(GifColorBrightnessCanvas));
+            }
+        }
+
+        private void GifColorBrightnessCanvas_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (GifColorBrightnessCanvas.IsMouseCaptured)
+            {
+                GifColorBrightnessCanvas.ReleaseMouseCapture();
+            }
+        }
+
+        private void ApplyColorToUI(Color col, bool fromWheel = false, bool fromSlider = false)
+        {
+            string hex = $"#{col.R:X2}{col.G:X2}{col.B:X2}";
+            _currentTextColor = hex;
+
+            _isUpdatingColorPickerUI = true;
+            try
+            {
+                if (GifColorInputR != null) GifColorInputR.Text = col.R.ToString();
+                if (GifColorInputG != null) GifColorInputG.Text = col.G.ToString();
+                if (GifColorInputB != null) GifColorInputB.Text = col.B.ToString();
+                if (GifColorInputHex != null) GifColorInputHex.Text = $"{col.R:X2}{col.G:X2}{col.B:X2}";
+                if (GifColorPreviewLarge != null) GifColorPreviewLarge.Background = new SolidColorBrush(col);
+                if (GifTextColorSwatch != null) GifTextColorSwatch.Background = new SolidColorBrush(col);
+                if (GifTextColorHexText != null) GifTextColorHexText.Text = hex;
+
+                if (GifColorBrightnessStop != null)
+                {
+                    GifColorBrightnessStop.Color = ColorFromHsv(_currentH, _currentS, 1.0);
+                }
+
+                if (!fromSlider)
+                {
+                    UpdateBrightnessThumbPosition();
+                }
+                if (!fromWheel)
+                {
+                    UpdateWheelThumbPosition();
+                }
+            }
+            finally
+            {
+                _isUpdatingColorPickerUI = false;
+            }
+
+            var sel = GetSelectedLabelControl();
+            if (sel != null)
+            {
+                sel.Model.TextColor = hex;
+                sel.RefreshFormatting();
+            }
+        }
+
+        private void GifTextColorButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (GifColorPickerPopup == null) return;
+
+            if (GifColorWheelImage != null && GifColorWheelImage.Source == null)
+            {
+                GifColorWheelImage.Source = GetColorWheelBitmap();
+            }
+
+            var sel = GetSelectedLabelControl();
+            if (sel != null && !string.IsNullOrEmpty(sel.Model.TextColor))
+            {
+                _currentTextColor = sel.Model.TextColor;
+            }
+
+            Color col = Colors.White;
+            try { col = (Color)ColorConverter.ConvertFromString(_currentTextColor); } catch { }
+
+            RgbToHsv(col, out _currentH, out _currentS, out _currentV);
+            ApplyColorToUI(col);
+
+            if (GifTextColorButton != null)
+            {
+                GifColorPickerPopup.PlacementTarget = GifTextColorButton;
+            }
+            GifColorPickerPopup.IsOpen = true;
+            Dispatcher.InvokeAsync(() => UpdateBrightnessThumbPosition(), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        private void GifColorRgbInput_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isUpdatingColorPickerUI) return;
+
+            if (byte.TryParse(GifColorInputR?.Text?.Trim(), out byte r) &&
+                byte.TryParse(GifColorInputG?.Text?.Trim(), out byte g) &&
+                byte.TryParse(GifColorInputB?.Text?.Trim(), out byte b))
+            {
+                Color col = Color.FromRgb(r, g, b);
+                RgbToHsv(col, out _currentH, out _currentS, out _currentV);
+                ApplyColorToUI(col);
+            }
+        }
+
+        private void GifColorHexInput_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isUpdatingColorPickerUI) return;
+
+            string raw = GifColorInputHex?.Text?.Trim().TrimStart('#') ?? "";
+            if (raw.Length == 6 && uint.TryParse(raw, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _))
+            {
+                try
+                {
+                    var col = (Color)ColorConverter.ConvertFromString("#" + raw);
+                    RgbToHsv(col, out _currentH, out _currentS, out _currentV);
+                    ApplyColorToUI(col);
+                }
+                catch { }
+            }
+        }
+
+        private void GifColorPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string hex)
+            {
+                Color col = Colors.White;
+                try { col = (Color)ColorConverter.ConvertFromString(hex); } catch { }
+                RgbToHsv(col, out _currentH, out _currentS, out _currentV);
+                ApplyColorToUI(col);
+            }
+        }
+
+        private void GifColorPickerDone_Click(object sender, RoutedEventArgs e)
+        {
+            if (GifColorPickerPopup != null) GifColorPickerPopup.IsOpen = false;
+        }
+
+        private void UpdateColorSwatchAndHex(string hex)
+        {
+            _currentTextColor = hex;
+            try
+            {
+                var col = (Color)ColorConverter.ConvertFromString(hex);
+                var brush = new SolidColorBrush(col);
+                if (GifTextColorSwatch != null) GifTextColorSwatch.Background = brush;
+                if (GifColorPreviewLarge != null) GifColorPreviewLarge.Background = brush;
+                if (GifTextColorHexText != null) GifTextColorHexText.Text = hex.ToUpperInvariant();
+            }
+            catch { }
+        }
+
+        private static Color ColorFromHsv(double hue, double saturation, double value)
+        {
+            saturation = Math.Clamp(saturation, 0.0, 1.0);
+            value = Math.Clamp(value, 0.0, 1.0);
+            while (hue < 0) hue += 360.0;
+            hue = hue % 360.0;
+
+            int hi = Convert.ToInt32(Math.Floor(hue / 60)) % 6;
+            double f = hue / 60 - Math.Floor(hue / 60);
+
+            double vVal = value * 255.0;
+            byte v = Convert.ToByte(Math.Clamp(vVal, 0, 255));
+            byte p = Convert.ToByte(Math.Clamp(vVal * (1 - saturation), 0, 255));
+            byte q = Convert.ToByte(Math.Clamp(vVal * (1 - f * saturation), 0, 255));
+            byte t = Convert.ToByte(Math.Clamp(vVal * (1 - (1 - f) * saturation), 0, 255));
+
+            return hi switch
+            {
+                0 => Color.FromRgb(v, t, p),
+                1 => Color.FromRgb(q, v, p),
+                2 => Color.FromRgb(p, v, t),
+                3 => Color.FromRgb(p, q, v),
+                4 => Color.FromRgb(t, p, v),
+                _ => Color.FromRgb(v, p, q)
+            };
+        }
+
+        private void OnTextLabelPositionChanged(GifTextLabelControl ctrl)
+        {
+            var (renderX, renderY, renderW, renderH) = GetRenderedVideoBounds();
+            double left = Canvas.GetLeft(ctrl);
+            double top = Canvas.GetTop(ctrl);
+            if (double.IsNaN(left)) left = ctrl.Model.X;
+            if (double.IsNaN(top)) top = ctrl.Model.Y;
+
+            if (renderW > 0 && renderH > 0)
+            {
+                ctrl.Model.NormalizedX = (left - renderX) / renderW;
+                ctrl.Model.NormalizedY = (top - renderY) / renderH;
+            }
+        }
+
+        private void OnTextLabelDeleteRequested(GifTextLabelControl ctrl)
+        {
+            _textLabelControls.Remove(ctrl);
+            GifTextCanvas?.Children.Remove(ctrl);
+            UpdateTextFormattingBarVisibility();
+        }
+
+        private void OnTextLabelSelected(GifTextLabelControl selectedCtrl)
+        {
+            foreach (var c in _textLabelControls)
+            {
+                if (c != selectedCtrl)
+                {
+                    c.SetSelected(false);
+                }
+            }
+
+            SyncFormattingBarWithModel(selectedCtrl.Model);
+            UpdateTextFormattingBarVisibility();
+        }
+
+        private void OnTextLabelCreateNewRequested(Point clickPos)
+        {
+            CreateNewTextLabel(clickPos);
+        }
+
+        private void DeselectAllTextLabels()
+        {
+            foreach (var c in _textLabelControls)
+            {
+                c.SetSelected(false);
+            }
+            UpdateTextFormattingBarVisibility();
+        }
+
+        private void UpdateTextLabelsPositions()
+        {
+            var (renderX, renderY, renderW, renderH) = GetRenderedVideoBounds();
+            if (renderW <= 10 || renderH <= 10) return;
+
+            double screenCropX = renderX + (_cropRect.IsActive ? _cropRect.X * renderW : 0);
+            double screenCropY = renderY + (_cropRect.IsActive ? _cropRect.Y * renderH : 0);
+            double screenCropW = _cropRect.IsActive ? Math.Max(24, _cropRect.Width * renderW) : renderW;
+            double screenCropH = _cropRect.IsActive ? Math.Max(24, _cropRect.Height * renderH) : renderH;
+
+            if (GifTextCanvas != null)
+            {
+                GifTextCanvas.Clip = new RectangleGeometry(new Rect(screenCropX, screenCropY, screenCropW, screenCropH));
+            }
+
+            foreach (var ctrl in _textLabelControls)
+            {
+                double newLeft = renderX + ctrl.Model.NormalizedX * renderW;
+                double newTop = renderY + ctrl.Model.NormalizedY * renderH;
+                Canvas.SetLeft(ctrl, newLeft);
+                Canvas.SetTop(ctrl, newTop);
+                ctrl.Model.X = newLeft;
+                ctrl.Model.Y = newTop;
+            }
+        }
+
+        private string? GenerateTextOverlayPng(GifWebpOptions options)
+        {
+            if (_textLabelControls.Count == 0) return null;
+
+            int cropPxX = 0;
+            int cropPxY = 0;
+            int cropPxW = _sourceVideoWidth;
+            int cropPxH = _sourceVideoHeight;
+
+            if (options.Crop != null && options.Crop.IsActive && options.OriginalVideoWidth > 0 && options.OriginalVideoHeight > 0)
+            {
+                var (cx, cy, cw, ch) = options.Crop.ToPixelCrop(options.OriginalVideoWidth, options.OriginalVideoHeight);
+                if (cw > 0 && ch > 0)
+                {
+                    cropPxX = cx;
+                    cropPxY = cy;
+                    cropPxW = cw;
+                    cropPxH = ch;
+                }
+            }
+
+            if (cropPxW <= 0 || cropPxH <= 0) return null;
+
+            var (renderX, renderY, renderW, renderH) = GetRenderedVideoBounds();
+            double fontScale = (renderW > 0 && _sourceVideoWidth > 0) ? ((double)_sourceVideoWidth / renderW) : 1.0;
+
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                foreach (var ctrl in _textLabelControls)
+                {
+                    var model = ctrl.Model;
+                    string text = model.Text?.Trim() ?? "";
+                    if (string.IsNullOrEmpty(text)) continue;
+
+                    // Absolute position on the full source video in pixels
+                    double videoPxX = model.NormalizedX * _sourceVideoWidth;
+                    double videoPxY = model.NormalizedY * _sourceVideoHeight;
+
+                    // Position relative to the cropped frame
+                    double cropRelativePxX = videoPxX - cropPxX;
+                    double cropRelativePxY = videoPxY - cropPxY;
+
+                    double targetFontSize = Math.Max(10.0, model.FontSize * fontScale);
+
+                    string fontName = string.IsNullOrWhiteSpace(model.FontFamily) ? "Segoe UI" : model.FontFamily;
+                    var typeface = new Typeface(
+                        new FontFamily($"{fontName}, Segoe UI, Segoe UI Emoji, sans-serif"),
+                        model.IsItalic ? FontStyles.Italic : FontStyles.Normal,
+                        model.IsBold ? FontWeights.Bold : FontWeights.Normal,
+                        FontStretches.Normal);
+
+                    // Parse text color
+                    Color textColor = Colors.White;
+                    try { textColor = (Color)ColorConverter.ConvertFromString(model.TextColor); } catch { }
+
+                    // Foreground text
+                    var foregroundText = new FormattedText(
+                        text,
+                        CultureInfo.InvariantCulture,
+                        FlowDirection.LeftToRight,
+                        typeface,
+                        targetFontSize,
+                        new SolidColorBrush(textColor),
+                        1.0);
+
+                    if (model.IsUnderline) foregroundText.SetTextDecorations(TextDecorations.Underline);
+                    if (model.IsStrikethrough) foregroundText.SetTextDecorations(TextDecorations.Strikethrough);
+
+                    // Shadow / outline for maximum contrast
+                    var shadowBrush = new SolidColorBrush(Color.FromArgb(230, 0, 0, 0));
+                    var shadowText = new FormattedText(
+                        text,
+                        CultureInfo.InvariantCulture,
+                        FlowDirection.LeftToRight,
+                        typeface,
+                        targetFontSize,
+                        shadowBrush,
+                        1.0);
+                    if (model.IsUnderline) shadowText.SetTextDecorations(TextDecorations.Underline);
+                    if (model.IsStrikethrough) shadowText.SetTextDecorations(TextDecorations.Strikethrough);
+
+                    double shadowOffset = Math.Max(2.0, targetFontSize * 0.05);
+                    dc.DrawText(shadowText, new Point(cropRelativePxX + shadowOffset, cropRelativePxY + shadowOffset));
+                    dc.DrawText(shadowText, new Point(cropRelativePxX - shadowOffset * 0.5, cropRelativePxY));
+                    dc.DrawText(shadowText, new Point(cropRelativePxX + shadowOffset * 0.5, cropRelativePxY));
+                    dc.DrawText(shadowText, new Point(cropRelativePxX, cropRelativePxY - shadowOffset * 0.5));
+                    dc.DrawText(shadowText, new Point(cropRelativePxX, cropRelativePxY + shadowOffset * 0.5));
+
+                    dc.DrawText(foregroundText, new Point(cropRelativePxX, cropRelativePxY));
+                }
+            }
+
+            var rtb = new RenderTargetBitmap(cropPxW, cropPxH, 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(visual);
+
+            string tempFile = Path.Combine(Downloader.App.AppTempDirectory, $"gif_overlay_{Guid.NewGuid():N}.png");
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(rtb));
+            using (var fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write))
+            {
+                encoder.Save(fs);
+            }
+
+            return tempFile;
+        }
 
         // ==================== Presets & Format Selection ====================
 
@@ -1433,6 +2361,11 @@ namespace UniversalDownloader
             {
                 if (_gifWebpService != null)
                 {
+                    if (_textLabelControls.Count > 0)
+                    {
+                        options.OverlayImagePath = GenerateTextOverlayPng(options);
+                    }
+
                     var result = await _gifWebpService.CreateClipAsync(
                         _currentGifSourceVideo,
                         finalOutputPath,

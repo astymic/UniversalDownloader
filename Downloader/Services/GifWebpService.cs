@@ -85,6 +85,7 @@ namespace UniversalDownloader.Services
         public VideoCropRect? Crop { get; set; } = null;
         public int OriginalVideoWidth { get; set; } = 0;
         public int OriginalVideoHeight { get; set; } = 0;
+        public string? OverlayImagePath { get; set; } = null;
 
         public TimeSpan ClipDuration => EndTime > StartTime ? EndTime - StartTime : TimeSpan.FromSeconds(1);
 
@@ -487,6 +488,13 @@ namespace UniversalDownloader.Services
 
             int fps = options.Fps > 0 ? options.Fps : 24;
 
+            bool hasOverlay = !string.IsNullOrWhiteSpace(options.OverlayImagePath) && File.Exists(options.OverlayImagePath);
+            if (hasOverlay)
+            {
+                args.Add("-i");
+                args.Add(options.OverlayImagePath!);
+            }
+
             if (options.Format == GifWebpFormat.Gif)
             {
                 // Dithering option for paletteuse
@@ -500,8 +508,15 @@ namespace UniversalDownloader.Services
 
                 int colors = Math.Clamp(options.MaxColors, 16, 256);
 
-                // Complex filter combining crop, split, palettegen and paletteuse in single pass
-                string filterComplex = $"[0:v] {cropFilter}{speedFilter}fps={fps},{scaleFilter},split [a][b];[a] palettegen=max_colors={colors}:stats_mode=diff [p];[b][p] paletteuse=dither={dither}";
+                string filterComplex;
+                if (hasOverlay)
+                {
+                    filterComplex = $"[0:v] {cropFilter}{speedFilter}fps={fps} [v_crop]; [v_crop][1:v] overlay=0:0 [v_over]; [v_over] {scaleFilter},split [a][b]; [a] palettegen=max_colors={colors}:stats_mode=diff [p]; [b][p] paletteuse=dither={dither}";
+                }
+                else
+                {
+                    filterComplex = $"[0:v] {cropFilter}{speedFilter}fps={fps},{scaleFilter},split [a][b];[a] palettegen=max_colors={colors}:stats_mode=diff [p];[b][p] paletteuse=dither={dither}";
+                }
 
                 args.Add("-filter_complex");
                 args.Add(filterComplex);
@@ -512,7 +527,16 @@ namespace UniversalDownloader.Services
             }
             else if (options.Format == GifWebpFormat.Webp)
             {
-                string filterComplex = $"[0:v] {cropFilter}{speedFilter}fps={fps},{scaleFilter}";
+                string filterComplex;
+                if (hasOverlay)
+                {
+                    filterComplex = $"[0:v] {cropFilter}{speedFilter}fps={fps} [v_crop]; [v_crop][1:v] overlay=0:0 [v_over]; [v_over] {scaleFilter}";
+                }
+                else
+                {
+                    filterComplex = $"[0:v] {cropFilter}{speedFilter}fps={fps},{scaleFilter}";
+                }
+
                 args.Add("-filter_complex");
                 args.Add(filterComplex);
 
@@ -545,7 +569,16 @@ namespace UniversalDownloader.Services
                 // Telegram Video Sticker: VP9, 512px constraint (one side 512, other <= 512), no audio, max 30 fps, < 256 KB
                 string tScaleFilter = "scale='if(gte(iw,ih),512,-2)':'if(gte(iw,ih),-2,512)':flags=lanczos";
                 int stickerFps = Math.Min(30, fps > 0 ? fps : 30);
-                string filterComplex = $"[0:v] {cropFilter}{speedFilter}fps={stickerFps},{tScaleFilter}";
+
+                string filterComplex;
+                if (hasOverlay)
+                {
+                    filterComplex = $"[0:v] {cropFilter}{speedFilter}fps={stickerFps} [v_crop]; [v_crop][1:v] overlay=0:0 [v_over]; [v_over] {tScaleFilter}";
+                }
+                else
+                {
+                    filterComplex = $"[0:v] {cropFilter}{speedFilter}fps={stickerFps},{tScaleFilter}";
+                }
 
                 args.Add("-filter_complex");
                 args.Add(filterComplex);
@@ -792,6 +825,11 @@ namespace UniversalDownloader.Services
                 lock (_processLock)
                 {
                     _currentProcess = null;
+                }
+
+                if (!string.IsNullOrWhiteSpace(options.OverlayImagePath) && File.Exists(options.OverlayImagePath))
+                {
+                    try { File.Delete(options.OverlayImagePath); } catch { }
                 }
             }
         }

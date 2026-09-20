@@ -498,6 +498,244 @@
             </Setter>
         </Style>
 
+        <Style x:Key="GifToolbarButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GifToggleButtonStyle" TargetType="ToggleButton">
+            <Setter Property="Background" Value="#27272A"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+            <Setter Property="BorderBrush" Value="#3F3F46"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Border" 
+                                Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="5">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#38BDF8"/>
+                                <Setter Property="Foreground" Value="Black"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#38BDF8"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#71717A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Non-editable Ribbon ComboBox (Font Family) -->
+        <Style x:Key="GifRibbonComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Background" Value="#27272A"/>
+            <Setter Property="BorderBrush" Value="#3F3F46"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="MaxDropDownHeight" Value="240"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton" 
+                                          Focusable="False" 
+                                          IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" 
+                                          ClickMode="Press" 
+                                          Cursor="Hand">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="MainBorder" 
+                                                Background="#27272A" 
+                                                BorderBrush="#3F3F46" 
+                                                BorderThickness="1" 
+                                                CornerRadius="5">
+                                            <Grid Margin="8,0,8,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Path x:Name="Arrow" 
+                                                      Grid.Column="1"
+                                                      Data="M0,0 L3.5,3.5 L7,0" 
+                                                      Stroke="#A1A1AA" 
+                                                      StrokeThickness="1.5" 
+                                                      HorizontalAlignment="Center" 
+                                                      VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="#71717A"/>
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="#38BDF8"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Grid Margin="8,0,24,0" IsHitTestVisible="False" VerticalAlignment="Center">
+                                <ContentPresenter x:Name="ContentSite" 
+                                                  IsHitTestVisible="False" 
+                                                  Content="{TemplateBinding SelectionBoxItem}" 
+                                                  ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" 
+                                                  ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" 
+                                                  VerticalAlignment="Center" 
+                                                  HorizontalAlignment="Left" 
+                                                  SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}">
+                                    <ContentPresenter.Resources>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="#FFFFFF"/>
+                                            <Setter Property="FontSize" Value="12"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                        </Style>
+                                    </ContentPresenter.Resources>
+                                </ContentPresenter>
+                            </Grid>
+                            <Popup x:Name="Popup" 
+                                   Placement="Bottom" 
+                                   IsOpen="{TemplateBinding IsDropDownOpen}" 
+                                   AllowsTransparency="True" 
+                                   Focusable="False" 
+                                   PopupAnimation="Slide" 
+                                   StaysOpen="False">
+                                <Grid MaxHeight="{TemplateBinding MaxDropDownHeight}" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <Border Background="#18181B" 
+                                            BorderBrush="#3F3F46" 
+                                            BorderThickness="1" 
+                                            CornerRadius="6" 
+                                            Margin="0,4,0,4"
+                                            Padding="4">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="16" ShadowDepth="4" Color="Black" Opacity="0.7"/>
+                                        </Border.Effect>
+                                        <ScrollViewer SnapsToDevicePixels="True" VerticalScrollBarVisibility="Auto">
+                                            <StackPanel IsItemsHost="True"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Editable Ribbon ComboBox (Font Size pt) -->
+        <Style x:Key="GifRibbonEditableComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Background" Value="#27272A"/>
+            <Setter Property="BorderBrush" Value="#3F3F46"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="MaxDropDownHeight" Value="200"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="MainBorder" 
+                                    Background="#27272A" 
+                                    BorderBrush="#3F3F46" 
+                                    BorderThickness="1" 
+                                    CornerRadius="5"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="20"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="PART_EditableTextBox" 
+                                         Grid.Column="0"
+                                         Background="Transparent" 
+                                         Foreground="#FFFFFF" 
+                                         CaretBrush="#FFFFFF"
+                                         BorderThickness="0" 
+                                         VerticalAlignment="Center" 
+                                         Padding="7,0,2,0" 
+                                         FontSize="12"
+                                         FontWeight="SemiBold"
+                                         IsReadOnly="{TemplateBinding IsReadOnly}"/>
+                                <ToggleButton Grid.Column="1" 
+                                              Focusable="False" 
+                                              IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" 
+                                              ClickMode="Press" 
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              Cursor="Hand">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Border Background="Transparent">
+                                                <Path Data="M0,0 L3.5,3.5 L7,0" 
+                                                      Stroke="#A1A1AA" 
+                                                      StrokeThickness="1.5" 
+                                                      HorizontalAlignment="Center" 
+                                                      VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                </ToggleButton>
+                            </Grid>
+                            <Popup x:Name="Popup" 
+                                   Placement="Bottom" 
+                                   IsOpen="{TemplateBinding IsDropDownOpen}" 
+                                   AllowsTransparency="True" 
+                                   Focusable="False" 
+                                   PopupAnimation="Slide" 
+                                   StaysOpen="False">
+                                <Grid MaxHeight="200" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <Border Background="#18181B" 
+                                            BorderBrush="#3F3F46" 
+                                            BorderThickness="1" 
+                                            CornerRadius="6" 
+                                            Margin="0,4,0,4"
+                                            Padding="4">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="12" ShadowDepth="4" Color="Black" Opacity="0.7"/>
+                                        </Border.Effect>
+                                        <ScrollViewer SnapsToDevicePixels="True" VerticalScrollBarVisibility="Auto">
+                                            <StackPanel IsItemsHost="True"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="#71717A"/>
+                            </Trigger>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="#38BDF8"/>
+                            </Trigger>
+                            <Trigger Property="IsDropDownOpen" Value="True">
+                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="#38BDF8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="CheckBox" x:Key="ModernCheckBox">
             <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
             <Setter Property="FontSize" Value="14"/>
@@ -1235,7 +1473,7 @@
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="Universal Downloader" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold"/>
-                                                <TextBlock x:Name="SettingsAppVersionText" Text=" (v1.0.16)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="SettingsAppVersionText" Text=" (v1.0.17)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                             </StackPanel>
                                             <TextBlock x:Name="SettingsUpdateStatusText" Text="Check for newer releases on GitHub" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
                                         </StackPanel>
@@ -2167,82 +2405,413 @@
                             </Border>
 
                             <!-- Video Preview Player Card -->
-                            <Border Background="#0E0E12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,16">
+                            <Border Background="#0E0E12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Margin="0,0,0,16" ClipToBounds="True">
                                 <StackPanel>
-                                    <!-- Video Viewport with Interactive Crop Overlay -->
-                                    <Border Background="#000000" CornerRadius="8" Height="300" ClipToBounds="True" Margin="0,0,0,12">
-                                        <Grid x:Name="GifPlayerViewportGrid" SizeChanged="GifPlayerViewportGrid_SizeChanged">
-                                            <!-- Video Player -->
-                                            <MediaElement x:Name="GifMediaPlayer" 
-                                                          LoadedBehavior="Manual" 
-                                                          UnloadedBehavior="Stop" 
-                                                          MediaOpened="GifPlayer_MediaOpened" 
-                                                          MediaEnded="GifPlayer_MediaEnded" 
-                                                          Stretch="Uniform" 
-                                                          HorizontalAlignment="Center" 
-                                                          VerticalAlignment="Center"/>
+                                    <!-- Top Studio Header (Integrated solid top bar with bottom border line) -->
+                                    <Border x:Name="GifEditorTopHeader" 
+                                            Height="36" 
+                                            Background="#121216" 
+                                            BorderBrush="{StaticResource BorderBrush}" 
+                                            BorderThickness="0,0,0,1" 
+                                            Padding="14,0">
+                                        <Grid VerticalAlignment="Center">
+                                            <!-- Default State: Empty clean solid header (no prompt text) -->
+                                            <Grid x:Name="GifEditorDefaultHeader" Visibility="Visible"/>
 
-                                            <!-- Dedicated Frame Preview Image (Scrubbing / Seeking / Paused) -->
-                                            <Image x:Name="GifFramePreviewImage" 
-                                                   Stretch="Uniform" 
-                                                   HorizontalAlignment="Center" 
-                                                   VerticalAlignment="Center" 
-                                                   Visibility="Collapsed" 
-                                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                                            <!-- Active State: Text Formatting & Color Settings Ribbon -->
+                                            <Grid x:Name="GifTextFormattingBar" Visibility="Collapsed">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
 
-                                            <!-- Crop Overlay Canvas -->
-                                            <Canvas x:Name="GifCropCanvas" ClipToBounds="True" Visibility="Visible">
-                                                <!-- Dimmed Shroud Outside Crop Box -->
-                                                <Rectangle x:Name="CropMaskTop" Fill="#90000000" IsHitTestVisible="False"/>
-                                                <Rectangle x:Name="CropMaskBottom" Fill="#90000000" IsHitTestVisible="False"/>
-                                                <Rectangle x:Name="CropMaskLeft" Fill="#90000000" IsHitTestVisible="False"/>
-                                                <Rectangle x:Name="CropMaskRight" Fill="#90000000" IsHitTestVisible="False"/>
+                                            <!-- Left side: Font, Size, Styles, Color -->
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="TEXT" Foreground="#71717A" FontSize="10.5" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"/>
 
-                                                <!-- The Resizable Crop Box -->
-                                                <Border x:Name="CropBoxBorder" BorderBrush="#38BDF8" BorderThickness="2" Background="#01FFFFFF">
-                                                    <!-- Inside the crop box: Grid with Rule of Thirds guidelines and Center Drag Thumb -->
-                                                    <Grid>
-                                                        <Grid.RowDefinitions>
-                                                            <RowDefinition Height="*"/>
-                                                            <RowDefinition Height="*"/>
-                                                            <RowDefinition Height="*"/>
-                                                        </Grid.RowDefinitions>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
+                                                <!-- Font Family -->
+                                                <ComboBox x:Name="GifTextFontComboBox" 
+                                                          Width="135" Height="28" 
+                                                          Style="{StaticResource GifRibbonComboBoxStyle}" 
+                                                          SelectionChanged="GifTextFontComboBox_SelectionChanged" 
+                                                          Margin="0,0,8,0" 
+                                                          ToolTip="Font Family"/>
 
-                                                        <!-- Subtle rule-of-thirds lines -->
-                                                        <Border Grid.Row="0" Grid.ColumnSpan="3" BorderBrush="#20FFFFFF" BorderThickness="0,0,0,1" IsHitTestVisible="False"/>
-                                                        <Border Grid.Row="1" Grid.ColumnSpan="3" BorderBrush="#20FFFFFF" BorderThickness="0,0,0,1" IsHitTestVisible="False"/>
-                                                        <Border Grid.Column="0" Grid.RowSpan="3" BorderBrush="#20FFFFFF" BorderThickness="0,0,1,0" IsHitTestVisible="False"/>
-                                                        <Border Grid.Column="1" Grid.RowSpan="3" BorderBrush="#20FFFFFF" BorderThickness="0,0,1,0" IsHitTestVisible="False"/>
+                                                <!-- Font Size pt -->
+                                                <ComboBox x:Name="GifTextFontSizeComboBox" 
+                                                          Width="64" Height="28" 
+                                                          IsEditable="True" 
+                                                          Style="{StaticResource GifRibbonEditableComboBoxStyle}" 
+                                                          SelectionChanged="GifTextFontSizeComboBox_SelectionChanged" 
+                                                          TextBoxBase.TextChanged="GifTextFontSizeComboBox_TextChanged"
+                                                          Margin="0,0,8,0" 
+                                                          ToolTip="Font Size (pt)"/>
 
-                                                        <!-- Center Drag Thumb to move the whole crop rectangle -->
-                                                        <Thumb x:Name="CropCenterThumb" Grid.RowSpan="3" Grid.ColumnSpan="3" Style="{StaticResource CropCenterThumbStyle}" Cursor="SizeAll" DragDelta="CropCenter_DragDelta" ToolTip="Drag to move crop area"/>
+                                                <Border Width="1" Height="20" Background="#27272A" Margin="0,0,8,0"/>
 
-                                                        <!-- Dimension Tag Badge inside crop box -->
-                                                        <Border x:Name="CropDimensionBadge" Grid.RowSpan="3" Grid.ColumnSpan="3" Background="#D918181B" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,6,0,0" IsHitTestVisible="False">
-                                                            <TextBlock x:Name="CropDimensionText" Text="512 × 512" Foreground="#38BDF8" FontSize="10.5" FontWeight="Bold"/>
-                                                        </Border>
-                                                    </Grid>
+                                                <!-- Bold -->
+                                                <ToggleButton x:Name="GifTextBoldBtn" Width="28" Height="28" 
+                                                              Style="{StaticResource GifToggleButtonStyle}" 
+                                                              Click="GifTextFormatButton_Click" 
+                                                              Margin="0,0,4,0" 
+                                                              ToolTip="Bold">
+                                                    <TextBlock Text="B" FontWeight="ExtraBold" FontSize="13"/>
+                                                </ToggleButton>
+
+                                                <!-- Italic -->
+                                                <ToggleButton x:Name="GifTextItalicBtn" Width="28" Height="28" 
+                                                              Style="{StaticResource GifToggleButtonStyle}" 
+                                                              Click="GifTextFormatButton_Click" 
+                                                              Margin="0,0,4,0" 
+                                                              ToolTip="Italic (Cursive)">
+                                                    <TextBlock Text="I" FontStyle="Italic" FontWeight="Bold" FontSize="13"/>
+                                                </ToggleButton>
+
+                                                <!-- Underline -->
+                                                <ToggleButton x:Name="GifTextUnderlineBtn" Width="28" Height="28" 
+                                                              Style="{StaticResource GifToggleButtonStyle}" 
+                                                              Click="GifTextFormatButton_Click" 
+                                                              Margin="0,0,4,0" 
+                                                              ToolTip="Underline">
+                                                    <TextBlock Text="U" TextDecorations="Underline" FontWeight="Bold" FontSize="13"/>
+                                                </ToggleButton>
+
+                                                <!-- Strikethrough -->
+                                                <ToggleButton x:Name="GifTextStrikethroughBtn" Width="28" Height="28" 
+                                                              Style="{StaticResource GifToggleButtonStyle}" 
+                                                              Click="GifTextFormatButton_Click" 
+                                                              Margin="0,0,8,0" 
+                                                              ToolTip="Strikethrough">
+                                                    <TextBlock Text="S" TextDecorations="Strikethrough" FontWeight="Bold" FontSize="13"/>
+                                                </ToggleButton>
+
+                                                <Border Width="1" Height="20" Background="#27272A" Margin="0,0,8,0"/>
+
+                                                <!-- Color Picker Trigger Button -->
+                                                <Button x:Name="GifTextColorButton" 
+                                                        Style="{StaticResource SecondaryButton}" 
+                                                        Padding="6,3" Height="28" 
+                                                        Click="GifTextColorButton_Click" 
+                                                        ToolTip="Color Picker (Spectrum Circle, Brightness, RGB &amp; Hex)">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Border x:Name="GifTextColorSwatch" Width="14" Height="14" CornerRadius="3" Background="White" BorderBrush="#000000" BorderThickness="1" Margin="0,0,6,0"/>
+                                                        <TextBlock x:Name="GifTextColorHexText" Text="#FFFFFF" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+
+                                                <!-- Circular Spectrum Color Picker Popup -->
+                                                <Popup x:Name="GifColorPickerPopup" 
+                                                       PlacementTarget="{Binding ElementName=GifTextColorButton}" 
+                                                       Placement="Bottom" 
+                                                       StaysOpen="False" 
+                                                       AllowsTransparency="True" 
+                                                       PopupAnimation="Fade">
+                                                    <Border Background="#18181B" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="10" Padding="14" Width="264" Margin="0,6,0,0">
+                                                        <Border.Effect>
+                                                            <DropShadowEffect Color="#000000" BlurRadius="16" ShadowDepth="4" Opacity="0.85"/>
+                                                        </Border.Effect>
+                                                        <StackPanel>
+                                                            <!-- Header -->
+                                                            <Grid Margin="0,0,0,8">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Text="Color Picker" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                                <Border x:Name="GifColorPreviewLarge" Grid.Column="1" Width="40" Height="20" CornerRadius="4" Background="White" BorderBrush="#3F3F46" BorderThickness="1"/>
+                                                            </Grid>
+
+                                                            <!-- Color Wheel Circle with all Spectrums -->
+                                                            <TextBlock Text="COLOR SPECTRUM" Foreground="#71717A" FontSize="9.5" FontWeight="Bold" Margin="0,0,0,6"/>
+                                                            <Grid Width="180" Height="180" HorizontalAlignment="Center" Margin="0,0,0,10">
+                                                                <Image x:Name="GifColorWheelImage" Width="180" Height="180" IsHitTestVisible="False" RenderOptions.BitmapScalingMode="HighQuality">
+                                                                    <Image.Clip>
+                                                                        <EllipseGeometry Center="90,90" RadiusX="85" RadiusY="85"/>
+                                                                    </Image.Clip>
+                                                                </Image>
+                                                                <Ellipse Width="170" Height="170" Stroke="#3F3F46" StrokeThickness="1" IsHitTestVisible="False"/>
+                                                                <Canvas x:Name="GifColorWheelCanvas" Width="180" Height="180" Background="Transparent" Cursor="Cross"
+                                                                        MouseDown="GifColorWheelCanvas_MouseDown"
+                                                                        MouseMove="GifColorWheelCanvas_MouseMove"
+                                                                        MouseUp="GifColorWheelCanvas_MouseUp">
+                                                                    <Border x:Name="GifColorWheelThumb" Width="14" Height="14" CornerRadius="7" 
+                                                                            BorderBrush="White" BorderThickness="2" Background="Transparent" 
+                                                                            IsHitTestVisible="False">
+                                                                        <Border.Effect>
+                                                                            <DropShadowEffect Color="Black" BlurRadius="3" ShadowDepth="1" Opacity="0.9"/>
+                                                                        </Border.Effect>
+                                                                    </Border>
+                                                                </Canvas>
+                                                            </Grid>
+
+                                                            <!-- Brightness Slider -->
+                                                            <TextBlock Text="BRIGHTNESS" Foreground="#71717A" FontSize="9.5" FontWeight="Bold" Margin="0,0,0,4"/>
+                                                            <Grid Height="18" Margin="0,0,0,10">
+                                                                <Border Height="14" CornerRadius="7" BorderBrush="#3F3F46" BorderThickness="1" VerticalAlignment="Center">
+                                                                    <Border.Background>
+                                                                        <LinearGradientBrush x:Name="GifColorBrightnessGradient" StartPoint="0,0.5" EndPoint="1,0.5">
+                                                                            <GradientStop Color="#000000" Offset="0.0"/>
+                                                                            <GradientStop x:Name="GifColorBrightnessStop" Color="#FFFFFF" Offset="1.0"/>
+                                                                        </LinearGradientBrush>
+                                                                    </Border.Background>
+                                                                </Border>
+                                                                <Canvas x:Name="GifColorBrightnessCanvas" Height="18" Background="Transparent" Cursor="Hand"
+                                                                        MouseDown="GifColorBrightnessCanvas_MouseDown"
+                                                                        MouseMove="GifColorBrightnessCanvas_MouseMove"
+                                                                        MouseUp="GifColorBrightnessCanvas_MouseUp">
+                                                                    <Border x:Name="GifColorBrightnessThumb" Width="10" Height="18" CornerRadius="4"
+                                                                            Background="#FFFFFF" BorderBrush="#18181B" BorderThickness="1.5"
+                                                                            IsHitTestVisible="False">
+                                                                        <Border.Effect>
+                                                                            <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="1" Opacity="0.85"/>
+                                                                        </Border.Effect>
+                                                                    </Border>
+                                                                </Canvas>
+                                                            </Grid>
+
+                                                            <!-- Quick Swatches -->
+                                                            <TextBlock Text="PRESETS" Foreground="#71717A" FontSize="9.5" FontWeight="Bold" Margin="0,0,0,4"/>
+                                                            <WrapPanel Margin="0,0,0,10">
+                                                                <Button Width="18" Height="18" Margin="0,0,4,4" Background="#FFFFFF" BorderBrush="#3F3F46" BorderThickness="1" Tag="#FFFFFF" Click="GifColorPreset_Click" Cursor="Hand"/>
+                                                                <Button Width="18" Height="18" Margin="0,0,4,4" Background="#000000" BorderBrush="#3F3F46" BorderThickness="1" Tag="#000000" Click="GifColorPreset_Click" Cursor="Hand"/>
+                                                                <Button Width="18" Height="18" Margin="0,0,4,4" Background="#EF4444" BorderBrush="#3F3F46" BorderThickness="1" Tag="#EF4444" Click="GifColorPreset_Click" Cursor="Hand"/>
+                                                                <Button Width="18" Height="18" Margin="0,0,4,4" Background="#F97316" BorderBrush="#3F3F46" BorderThickness="1" Tag="#F97316" Click="GifColorPreset_Click" Cursor="Hand"/>
+                                                                <Button Width="18" Height="18" Margin="0,0,4,4" Background="#FACC15" BorderBrush="#3F3F46" BorderThickness="1" Tag="#FACC15" Click="GifColorPreset_Click" Cursor="Hand"/>
+                                                                <Button Width="18" Height="18" Margin="0,0,4,4" Background="#22C55E" BorderBrush="#3F3F46" BorderThickness="1" Tag="#22C55E" Click="GifColorPreset_Click" Cursor="Hand"/>
+                                                                <Button Width="18" Height="18" Margin="0,0,4,4" Background="#06B6D4" BorderBrush="#3F3F46" BorderThickness="1" Tag="#06B6D4" Click="GifColorPreset_Click" Cursor="Hand"/>
+                                                                <Button Width="18" Height="18" Margin="0,0,4,4" Background="#3B82F6" BorderBrush="#3F3F46" BorderThickness="1" Tag="#3B82F6" Click="GifColorPreset_Click" Cursor="Hand"/>
+                                                                <Button Width="18" Height="18" Margin="0,0,4,4" Background="#8B5CF6" BorderBrush="#3F3F46" BorderThickness="1" Tag="#8B5CF6" Click="GifColorPreset_Click" Cursor="Hand"/>
+                                                                <Button Width="18" Height="18" Margin="0,0,4,4" Background="#EC4899" BorderBrush="#3F3F46" BorderThickness="1" Tag="#EC4899" Click="GifColorPreset_Click" Cursor="Hand"/>
+                                                            </WrapPanel>
+
+                                                            <!-- RGB Values (0-255) -->
+                                                            <TextBlock Text="RGB VALUES (0 - 255)" Foreground="#71717A" FontSize="9.5" FontWeight="Bold" Margin="0,0,0,4"/>
+                                                            <Grid Margin="0,0,0,8">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="6"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="6"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <StackPanel Grid.Column="0">
+                                                                    <TextBlock Text="R" Foreground="#A1A1AA" FontSize="9.5" Margin="2,0,0,2"/>
+                                                                    <TextBox x:Name="GifColorInputR" Style="{StaticResource ModernTextBox}" Height="26" Padding="4,2" FontSize="11" Text="255" TextAlignment="Center" TextChanged="GifColorRgbInput_TextChanged"/>
+                                                                </StackPanel>
+                                                                <StackPanel Grid.Column="2">
+                                                                    <TextBlock Text="G" Foreground="#A1A1AA" FontSize="9.5" Margin="2,0,0,2"/>
+                                                                    <TextBox x:Name="GifColorInputG" Style="{StaticResource ModernTextBox}" Height="26" Padding="4,2" FontSize="11" Text="255" TextAlignment="Center" TextChanged="GifColorRgbInput_TextChanged"/>
+                                                                </StackPanel>
+                                                                <StackPanel Grid.Column="4">
+                                                                    <TextBlock Text="B" Foreground="#A1A1AA" FontSize="9.5" Margin="2,0,0,2"/>
+                                                                    <TextBox x:Name="GifColorInputB" Style="{StaticResource ModernTextBox}" Height="26" Padding="4,2" FontSize="11" Text="255" TextAlignment="Center" TextChanged="GifColorRgbInput_TextChanged"/>
+                                                                </StackPanel>
+                                                            </Grid>
+
+                                                            <!-- HEX Code -->
+                                                            <TextBlock Text="HEX COLOR" Foreground="#71717A" FontSize="9.5" FontWeight="Bold" Margin="0,0,0,4"/>
+                                                            <Grid Margin="0,0,0,10">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <Border Grid.Column="0" Background="#27272A" CornerRadius="4,0,0,4" Padding="6,2" BorderBrush="#3F3F46" BorderThickness="1,1,0,1">
+                                                                    <TextBlock Text="#" Foreground="#A1A1AA" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                                <TextBox x:Name="GifColorInputHex" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="26" Padding="6,2" FontSize="11.5" Text="FFFFFF" TextChanged="GifColorHexInput_TextChanged"/>
+                                                            </Grid>
+
+                                                            <!-- Done / Close Button -->
+                                                            <Button Content="Done" Height="28" FontSize="12" FontWeight="SemiBold" Foreground="White" Cursor="Hand" Click="GifColorPickerDone_Click">
+                                                                <Button.Template>
+                                                                    <ControlTemplate TargetType="Button">
+                                                                        <Border x:Name="BtnBorder" Background="{StaticResource PrimaryGradient}" CornerRadius="6" Padding="0">
+                                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                        </Border>
+                                                                        <ControlTemplate.Triggers>
+                                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                                <Setter TargetName="BtnBorder" Property="Opacity" Value="0.9"/>
+                                                                            </Trigger>
+                                                                            <Trigger Property="IsPressed" Value="True">
+                                                                                <Setter TargetName="BtnBorder" Property="Opacity" Value="0.75"/>
+                                                                            </Trigger>
+                                                                        </ControlTemplate.Triggers>
+                                                                    </ControlTemplate>
+                                                                </Button.Template>
+                                                            </Button>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </Popup>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Editor Card Body (Left: Separate Tool Bar, Center: Video Viewport, Bottom: Controls) -->
+                                <StackPanel Margin="16,14,16,16">
+                                    <!-- Editor Main Work Area (Left: Separate Tool Bar, Right: Video Viewport) -->
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <!-- Separate Left Side Tool Bar -->
+                                            <ColumnDefinition Width="Auto"/>
+                                            <!-- Video Viewport -->
+                                            <ColumnDefinition Width="*"/>
+                                            <!-- Right Side Border Frame -->
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Tool Pick-up Bar (Left Side) -->
+                                        <Border x:Name="GifToolPickerBar" 
+                                                Grid.Column="0"
+                                                VerticalAlignment="Top" 
+                                                Margin="0,0,12,0"
+                                                Background="#141418" 
+                                                BorderBrush="#27272A" 
+                                                BorderThickness="1"
+                                                CornerRadius="10" 
+                                                Padding="4">
+                                            <Border.Effect>
+                                                <DropShadowEffect Color="#000000" BlurRadius="10" ShadowDepth="2" Opacity="0.6"/>
+                                            </Border.Effect>
+                                            <StackPanel Orientation="Vertical">
+                                                <!-- Tool 1: Cursor (Default) -->
+                                                <Border x:Name="GifToolCursorBorder" CornerRadius="7" Background="#38BDF8" Margin="0,0,0,4">
+                                                    <Button x:Name="GifToolCursorBtn" Style="{StaticResource GifToolbarButtonStyle}"
+                                                            Width="46" Height="42"
+                                                            Foreground="Black"
+                                                            Click="GifToolCursor_Click" ToolTip="Cursor (Default): Move, double-click to edit, or drag handles to resize text labels">
+                                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                            <TextBlock Text="↖" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                            <TextBlock Text="Cursor" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,1,0,0"/>
+                                                        </StackPanel>
+                                                    </Button>
                                                 </Border>
 
-                                                <!-- 4 Edge Handles -->
-                                                <Thumb x:Name="CropHandleTop" Style="{StaticResource CropEdgeThumbStyle}" Width="28" Height="8" Cursor="SizeNS" DragDelta="CropEdge_DragDelta" Tag="Top" ToolTip="Drag top border"/>
-                                                <Thumb x:Name="CropHandleBottom" Style="{StaticResource CropEdgeThumbStyle}" Width="28" Height="8" Cursor="SizeNS" DragDelta="CropEdge_DragDelta" Tag="Bottom" ToolTip="Drag bottom border"/>
-                                                <Thumb x:Name="CropHandleLeft" Style="{StaticResource CropEdgeThumbStyle}" Width="8" Height="28" Cursor="SizeWE" DragDelta="CropEdge_DragDelta" Tag="Left" ToolTip="Drag left border"/>
-                                                <Thumb x:Name="CropHandleRight" Style="{StaticResource CropEdgeThumbStyle}" Width="8" Height="28" Cursor="SizeWE" DragDelta="CropEdge_DragDelta" Tag="Right" ToolTip="Drag right border"/>
+                                                <!-- Tool 2: Text Tool (T) -->
+                                                <Border x:Name="GifToolTextBorder" CornerRadius="7" Background="Transparent" Margin="0,0,0,4">
+                                                    <Button x:Name="GifToolTextBtn" Style="{StaticResource GifToolbarButtonStyle}"
+                                                            Width="46" Height="42"
+                                                            Foreground="{StaticResource TextSecondaryBrush}"
+                                                            Click="GifToolText_Click" ToolTip="Text (T): Click on video to add a text label">
+                                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                            <TextBlock Text="T" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                            <TextBlock Text="Text" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,1,0,0"/>
+                                                        </StackPanel>
+                                                    </Button>
+                                                </Border>
 
-                                                <!-- 4 Corner Handles (Moves 2 sides simultaneously) -->
-                                                <Thumb x:Name="CropHandleTopLeft" Style="{StaticResource CropCornerThumbStyle}" Width="12" Height="12" Cursor="SizeNWSE" DragDelta="CropCorner_DragDelta" Tag="TopLeft" ToolTip="Drag corner"/>
-                                                <Thumb x:Name="CropHandleTopRight" Style="{StaticResource CropCornerThumbStyle}" Width="12" Height="12" Cursor="SizeNESW" DragDelta="CropCorner_DragDelta" Tag="TopRight" ToolTip="Drag corner"/>
-                                                <Thumb x:Name="CropHandleBottomLeft" Style="{StaticResource CropCornerThumbStyle}" Width="12" Height="12" Cursor="SizeNESW" DragDelta="CropCorner_DragDelta" Tag="BottomLeft" ToolTip="Drag corner"/>
-                                                <Thumb x:Name="CropHandleBottomRight" Style="{StaticResource CropCornerThumbStyle}" Width="12" Height="12" Cursor="SizeNWSE" DragDelta="CropCorner_DragDelta" Tag="BottomRight" ToolTip="Drag corner"/>
-                                            </Canvas>
-                                        </Grid>
-                                    </Border>
+                                                <!-- Tool 3: Crop -->
+                                                <Border x:Name="GifToolCropBorder" CornerRadius="7" Background="Transparent">
+                                                    <Button x:Name="GifToolCropBtn" Style="{StaticResource GifToolbarButtonStyle}"
+                                                            Width="46" Height="42"
+                                                            Foreground="{StaticResource TextSecondaryBrush}"
+                                                            Click="GifToolCrop_Click" ToolTip="Crop: Adjust video crop boundary and dimensions">
+                                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                            <TextBlock Text="⛶" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                            <TextBlock Text="Crop" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,1,0,0"/>
+                                                        </StackPanel>
+                                                    </Button>
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Video Viewport with Interactive Crop Overlay & Text Canvas -->
+                                        <Border Grid.Column="1" Background="#000000" CornerRadius="8" Height="300" ClipToBounds="True">
+                                            <Grid x:Name="GifPlayerViewportGrid" SizeChanged="GifPlayerViewportGrid_SizeChanged">
+                                                <!-- Video Player -->
+                                                <MediaElement x:Name="GifMediaPlayer" 
+                                                              LoadedBehavior="Manual" 
+                                                              UnloadedBehavior="Stop" 
+                                                              MediaOpened="GifPlayer_MediaOpened" 
+                                                              MediaEnded="GifPlayer_MediaEnded" 
+                                                              Stretch="Uniform" 
+                                                              HorizontalAlignment="Center" 
+                                                              VerticalAlignment="Center"/>
+
+                                                <!-- Dedicated Frame Preview Image (Scrubbing / Seeking / Paused) -->
+                                                <Image x:Name="GifFramePreviewImage" 
+                                                       Stretch="Uniform" 
+                                                       HorizontalAlignment="Center" 
+                                                       VerticalAlignment="Center" 
+                                                       Visibility="Collapsed" 
+                                                       RenderOptions.BitmapScalingMode="HighQuality"/>
+
+                                                <!-- Crop Overlay Canvas -->
+                                                <Canvas x:Name="GifCropCanvas" ClipToBounds="True" Visibility="Visible">
+                                                    <!-- Dimmed Shroud Outside Crop Box -->
+                                                    <Rectangle x:Name="CropMaskTop" Fill="#90000000" IsHitTestVisible="False"/>
+                                                    <Rectangle x:Name="CropMaskBottom" Fill="#90000000" IsHitTestVisible="False"/>
+                                                    <Rectangle x:Name="CropMaskLeft" Fill="#90000000" IsHitTestVisible="False"/>
+                                                    <Rectangle x:Name="CropMaskRight" Fill="#90000000" IsHitTestVisible="False"/>
+
+                                                    <!-- The Resizable Crop Box -->
+                                                    <Border x:Name="CropBoxBorder" BorderBrush="#38BDF8" BorderThickness="2" Background="#01FFFFFF">
+                                                        <!-- Inside the crop box: Grid with Rule of Thirds guidelines and Center Drag Thumb -->
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="*"/>
+                                                                <RowDefinition Height="*"/>
+                                                                <RowDefinition Height="*"/>
+                                                            </Grid.RowDefinitions>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <!-- Subtle rule-of-thirds lines -->
+                                                            <Border Grid.Row="0" Grid.ColumnSpan="3" BorderBrush="#20FFFFFF" BorderThickness="0,0,0,1" IsHitTestVisible="False"/>
+                                                            <Border Grid.Row="1" Grid.ColumnSpan="3" BorderBrush="#20FFFFFF" BorderThickness="0,0,0,1" IsHitTestVisible="False"/>
+                                                            <Border Grid.Column="0" Grid.RowSpan="3" BorderBrush="#20FFFFFF" BorderThickness="0,0,1,0" IsHitTestVisible="False"/>
+                                                            <Border Grid.Column="1" Grid.RowSpan="3" BorderBrush="#20FFFFFF" BorderThickness="0,0,1,0" IsHitTestVisible="False"/>
+
+                                                            <!-- Center Drag Thumb to move the whole crop rectangle -->
+                                                            <Thumb x:Name="CropCenterThumb" Grid.RowSpan="3" Grid.ColumnSpan="3" Style="{StaticResource CropCenterThumbStyle}" Cursor="SizeAll" DragDelta="CropCenter_DragDelta" ToolTip="Drag to move crop area"/>
+
+                                                            <!-- Dimension Tag Badge inside crop box -->
+                                                            <Border x:Name="CropDimensionBadge" Grid.RowSpan="3" Grid.ColumnSpan="3" Background="#D918181B" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,6,0,0" IsHitTestVisible="False">
+                                                                <TextBlock x:Name="CropDimensionText" Text="512 × 512" Foreground="#38BDF8" FontSize="10.5" FontWeight="Bold"/>
+                                                            </Border>
+                                                        </Grid>
+                                                    </Border>
+
+                                                    <!-- 4 Edge Handles -->
+                                                    <Thumb x:Name="CropHandleTop" Style="{StaticResource CropEdgeThumbStyle}" Width="28" Height="8" Cursor="SizeNS" DragDelta="CropEdge_DragDelta" Tag="Top" ToolTip="Drag top border"/>
+                                                    <Thumb x:Name="CropHandleBottom" Style="{StaticResource CropEdgeThumbStyle}" Width="28" Height="8" Cursor="SizeNS" DragDelta="CropEdge_DragDelta" Tag="Bottom" ToolTip="Drag bottom border"/>
+                                                    <Thumb x:Name="CropHandleLeft" Style="{StaticResource CropEdgeThumbStyle}" Width="8" Height="28" Cursor="SizeWE" DragDelta="CropEdge_DragDelta" Tag="Left" ToolTip="Drag left border"/>
+                                                    <Thumb x:Name="CropHandleRight" Style="{StaticResource CropEdgeThumbStyle}" Width="8" Height="28" Cursor="SizeWE" DragDelta="CropEdge_DragDelta" Tag="Right" ToolTip="Drag right border"/>
+
+                                                    <!-- 4 Corner Handles (Moves 2 sides simultaneously) -->
+                                                    <Thumb x:Name="CropHandleTopLeft" Style="{StaticResource CropCornerThumbStyle}" Width="12" Height="12" Cursor="SizeNWSE" DragDelta="CropCorner_DragDelta" Tag="TopLeft" ToolTip="Drag corner"/>
+                                                    <Thumb x:Name="CropHandleTopRight" Style="{StaticResource CropCornerThumbStyle}" Width="12" Height="12" Cursor="SizeNESW" DragDelta="CropCorner_DragDelta" Tag="TopRight" ToolTip="Drag corner"/>
+                                                    <Thumb x:Name="CropHandleBottomLeft" Style="{StaticResource CropCornerThumbStyle}" Width="12" Height="12" Cursor="SizeNESW" DragDelta="CropCorner_DragDelta" Tag="BottomLeft" ToolTip="Drag corner"/>
+                                                    <Thumb x:Name="CropHandleBottomRight" Style="{StaticResource CropCornerThumbStyle}" Width="12" Height="12" Cursor="SizeNWSE" DragDelta="CropCorner_DragDelta" Tag="BottomRight" ToolTip="Drag corner"/>
+                                                </Canvas>
+
+                                                <!-- Text Overlay Canvas -->
+                                                <Canvas x:Name="GifTextCanvas" 
+                                                        ClipToBounds="True" 
+                                                        Background="Transparent" 
+                                                        MouseDown="GifTextCanvas_MouseDown"/>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Right Side Border Frame (Matching border, less width) -->
+                                        <Border x:Name="GifRightSideBar" 
+                                                Grid.Column="2"
+                                                VerticalAlignment="Top" 
+                                                Margin="12,0,0,0"
+                                                Width="28"
+                                                Height="{Binding ElementName=GifToolPickerBar, Path=ActualHeight}"
+                                                Background="#141418" 
+                                                BorderBrush="#27272A" 
+                                                BorderThickness="1"
+                                                CornerRadius="10">
+                                            <Border.Effect>
+                                                <DropShadowEffect Color="#000000" BlurRadius="10" ShadowDepth="2" Opacity="0.6"/>
+                                            </Border.Effect>
+                                        </Border>
+                                    </Grid>
 
                                     <!-- Interactive Crop Toolbar -->
                                     <Grid Margin="0,0,0,12">
@@ -2368,7 +2937,8 @@
                                                    Margin="12,0,0,0"/>
                                     </Grid>
                                 </StackPanel>
-                            </Border>
+                            </StackPanel>
+                        </Border>
 
                             <!-- Interactive Precision Trimming Section -->
                             <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,16">
