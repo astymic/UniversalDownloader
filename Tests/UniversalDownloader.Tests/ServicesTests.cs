@@ -783,6 +783,59 @@ namespace UniversalDownloader.Tests
                 try { if (Directory.Exists(destDir)) Directory.Delete(destDir, true); } catch { }
             }
         }
+
+        [Fact]
+        public async Task YouTube_PlayerClientFallback_FetchesRestrictedUrls()
+        {
+            var depMgr = new UniversalDownloader.Services.DependencyManager();
+            var downloadService = new UniversalDownloader.Services.DownloadService(depMgr);
+            _ = depMgr.InitializeDependenciesAsync();
+            await depMgr.WaitForInitializationAsync();
+
+            string[] testUrls = new[]
+            {
+                "https://youtu.be/1Pagm4Ldnb4",
+                "https://youtu.be/m5mGJIbmapo"
+            };
+
+            foreach (var url in testUrls)
+            {
+                var (status, formatsJson) = await downloadService.GetYouTubeInfoAsync(url);
+                Assert.NotNull(formatsJson);
+                Assert.False(string.IsNullOrWhiteSpace(formatsJson));
+
+                string? title = await downloadService.GetTitleWithYtDlpAsync(url);
+                Assert.NotNull(title);
+                Assert.False(string.IsNullOrWhiteSpace(title));
+            }
+
+            string tempDir = Path.Combine(Path.GetTempPath(), "test_yt_kids_" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            string destDir = Path.Combine(Path.GetTempPath(), "test_yt_kids_dest_" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            Directory.CreateDirectory(tempDir);
+            Directory.CreateDirectory(destDir);
+
+            try
+            {
+                bool success = await downloadService.DownloadWithYtDlpAsync(
+                    testUrls[0],
+                    "bestaudio/best",
+                    tempDir,
+                    destDir,
+                    true,
+                    "mp3",
+                    false,
+                    0,
+                    5,
+                    CancellationToken.None);
+
+                Assert.True(success);
+            }
+            finally
+            {
+                try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { }
+                try { if (Directory.Exists(destDir)) Directory.Delete(destDir, true); } catch { }
+            }
+        }
     }
 }
 

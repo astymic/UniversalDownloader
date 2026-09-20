@@ -228,8 +228,7 @@ namespace UniversalDownloader.Services
                 psi.ArgumentList.Add("--no-warnings");
                 psi.ArgumentList.Add("--ignore-config");
                 psi.ArgumentList.Add("--skip-download");
-                psi.ArgumentList.Add("--extractor-args");
-                psi.ArgumentList.Add("youtube:player_client=default");
+                AppendYouTubeExtractorArgs(psi);
                 AppendStreamHeadersIfRequired(psi, url);
                 psi.ArgumentList.Add(url);
                 psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
@@ -315,6 +314,7 @@ namespace UniversalDownloader.Services
             psi.ArgumentList.Add("--no-playlist");
             psi.ArgumentList.Add("--retries");
             psi.ArgumentList.Add("5");
+            AppendYouTubeExtractorArgs(psi);
 
             if (!string.IsNullOrWhiteSpace(cookiesFromBrowser))
             {
@@ -370,6 +370,7 @@ namespace UniversalDownloader.Services
                 psi.ArgumentList.Add("-J");
                 psi.ArgumentList.Add("--no-warnings");
                 psi.ArgumentList.Add("--ignore-config");
+                AppendYouTubeExtractorArgs(psi);
                 psi.ArgumentList.Add(url);
                 psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
 
@@ -932,8 +933,7 @@ namespace UniversalDownloader.Services
             psi.ArgumentList.Add("10");
             psi.ArgumentList.Add("--file-access-retries");
             psi.ArgumentList.Add("5");
-            psi.ArgumentList.Add("--extractor-args");
-            psi.ArgumentList.Add("youtube:player_client=default");
+            AppendYouTubeExtractorArgs(psi);
 
             if (EnableMultiConnectionAcceleration)
             {
@@ -1145,6 +1145,14 @@ namespace UniversalDownloader.Services
                 psi.ArgumentList.Add("--user-agent");
                 psi.ArgumentList.Add("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36");
             }
+        }
+
+        private static void AppendYouTubeExtractorArgs(ProcessStartInfo psi)
+        {
+            psi.ArgumentList.Add("--js-runtimes");
+            psi.ArgumentList.Add("node,deno,quickjs,bun");
+            psi.ArgumentList.Add("--extractor-args");
+            psi.ArgumentList.Add("youtube:player_client=web,mweb,android,ios");
         }
 
         private static bool IsTemporaryOrPartFile(string filePath)
