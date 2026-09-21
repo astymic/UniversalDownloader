@@ -213,49 +213,69 @@ namespace UniversalDownloader.Services
             // 3. Robust yt-dlp print title fallback
             try
             {
-                ProcessStartInfo psi = new ProcessStartInfo
-                {
-                    FileName = _dependencyManager.YtDlpExecutablePath,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = System.Text.Encoding.UTF8
-                };
-                psi.ArgumentList.Add("--print");
-                psi.ArgumentList.Add("%(title)s");
-                psi.ArgumentList.Add("--no-playlist");
-                psi.ArgumentList.Add("--no-warnings");
-                psi.ArgumentList.Add("--ignore-config");
-                psi.ArgumentList.Add("--skip-download");
-                AppendYouTubeExtractorArgs(psi);
-                AppendStreamHeadersIfRequired(psi, url);
-                psi.ArgumentList.Add(url);
-                psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+                string? title = await FetchTitleInternalAsync(url, useFallbackClients: false);
+                if (!string.IsNullOrWhiteSpace(title)) return title;
 
-                using (Process process = Process.Start(psi))
+                if (IsYouTubeLink(url))
                 {
-                    string titleOutput = await process.StandardOutput.ReadToEndAsync();
-                    await process.WaitForExitAsync();
-                    if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(titleOutput))
-                    {
-                        var lines = titleOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                        foreach (var line in lines)
-                        {
-                            string cleaned = line.Trim();
-                            if (!string.IsNullOrWhiteSpace(cleaned) && 
-                                !cleaned.StartsWith("WARNING", StringComparison.OrdinalIgnoreCase) && 
-                                !cleaned.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase))
-                            {
-                                return System.Net.WebUtility.HtmlDecode(cleaned);
-                            }
-                        }
-                    }
+                    return await FetchTitleInternalAsync(url, useFallbackClients: true);
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error fetching title: {ex.Message}");
+                if (IsYouTubeLink(url))
+                {
+                    try
+                    {
+                        return await FetchTitleInternalAsync(url, useFallbackClients: true);
+                    }
+                    catch { }
+                }
+            }
+            return null;
+        }
+
+        private async Task<string?> FetchTitleInternalAsync(string url, bool useFallbackClients)
+        {
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = _dependencyManager.YtDlpExecutablePath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = System.Text.Encoding.UTF8
+            };
+            psi.ArgumentList.Add("--print");
+            psi.ArgumentList.Add("%(title)s");
+            psi.ArgumentList.Add("--no-playlist");
+            psi.ArgumentList.Add("--no-warnings");
+            psi.ArgumentList.Add("--ignore-config");
+            psi.ArgumentList.Add("--skip-download");
+            AppendYouTubeExtractorArgs(psi, useFallbackClients);
+            AppendStreamHeadersIfRequired(psi, url);
+            psi.ArgumentList.Add(url);
+            psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+
+            using (Process process = Process.Start(psi)!)
+            {
+                string titleOutput = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+                if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(titleOutput))
+                {
+                    var lines = titleOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var line in lines)
+                    {
+                        string cleaned = line.Trim();
+                        if (!string.IsNullOrWhiteSpace(cleaned) && 
+                            !cleaned.StartsWith("WARNING", StringComparison.OrdinalIgnoreCase) && 
+                            !cleaned.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return System.Net.WebUtility.HtmlDecode(cleaned);
+                        }
+                    }
+                }
             }
             return null;
         }
@@ -271,10 +291,20 @@ namespace UniversalDownloader.Services
 
             try
             {
-                var result = await RunYtDlpJsonAsync(url, null);
+                var result = await RunYtDlpJsonAsync(url, null, useFallbackClients: false);
                 if (result.Success && !string.IsNullOrWhiteSpace(result.FormatsJson))
                 {
                     return ("Success", result.FormatsJson);
+                }
+
+                if (IsYouTubeLink(url))
+                {
+                    // Fallback for restricted/kids/age-gated YouTube videos
+                    var fallbackResult = await RunYtDlpJsonAsync(url, null, useFallbackClients: true);
+                    if (fallbackResult.Success && !string.IsNullOrWhiteSpace(fallbackResult.FormatsJson))
+                    {
+                        return ("Success", fallbackResult.FormatsJson);
+                    }
                 }
 
                 if (IsInstagramLink(url))
@@ -287,6 +317,19 @@ namespace UniversalDownloader.Services
             }
             catch (Exception ex)
             {
+                if (IsYouTubeLink(url))
+                {
+                    try
+                    {
+                        var fallbackResult = await RunYtDlpJsonAsync(url, null, useFallbackClients: true);
+                        if (fallbackResult.Success && !string.IsNullOrWhiteSpace(fallbackResult.FormatsJson))
+                        {
+                            return ("Success", fallbackResult.FormatsJson);
+                        }
+                    }
+                    catch { }
+                }
+
                 if (IsInstagramLink(url))
                 {
                     return ("Success", null);
@@ -295,7 +338,7 @@ namespace UniversalDownloader.Services
             }
         }
 
-        private async Task<(bool Success, string? FormatsJson, string? ErrorMessage)> RunYtDlpJsonAsync(string url, string? cookiesFromBrowser)
+        private async Task<(bool Success, string? FormatsJson, string? ErrorMessage)> RunYtDlpJsonAsync(string url, string? cookiesFromBrowser, bool useFallbackClients = false)
         {
             ProcessStartInfo psi = new ProcessStartInfo
             {
@@ -314,7 +357,7 @@ namespace UniversalDownloader.Services
             psi.ArgumentList.Add("--no-playlist");
             psi.ArgumentList.Add("--retries");
             psi.ArgumentList.Add("5");
-            AppendYouTubeExtractorArgs(psi);
+            AppendYouTubeExtractorArgs(psi, useFallbackClients);
 
             if (!string.IsNullOrWhiteSpace(cookiesFromBrowser))
             {
@@ -356,40 +399,60 @@ namespace UniversalDownloader.Services
 
             try
             {
-                ProcessStartInfo psi = new ProcessStartInfo
-                {
-                    FileName = _dependencyManager.YtDlpExecutablePath,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = System.Text.Encoding.UTF8,
-                    StandardErrorEncoding = System.Text.Encoding.UTF8
-                };
-                psi.ArgumentList.Add("--flat-playlist");
-                psi.ArgumentList.Add("-J");
-                psi.ArgumentList.Add("--no-warnings");
-                psi.ArgumentList.Add("--ignore-config");
-                AppendYouTubeExtractorArgs(psi);
-                psi.ArgumentList.Add(url);
-                psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+                var json = await RunPlaylistInfoInternalAsync(url, useFallbackClients: false);
+                if (!string.IsNullOrWhiteSpace(json)) return json;
 
-                using (Process process = Process.Start(psi))
+                if (IsYouTubeLink(url))
                 {
-                    string jsonOutput = await process.StandardOutput.ReadToEndAsync();
-                    await process.WaitForExitAsync();
-
-                    if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(jsonOutput))
-                    {
-                        return null;
-                    }
-                    return jsonOutput;
+                    return await RunPlaylistInfoInternalAsync(url, useFallbackClients: true);
                 }
+                return null;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error fetching playlist info: {ex.Message}");
+                if (IsYouTubeLink(url))
+                {
+                    try
+                    {
+                        return await RunPlaylistInfoInternalAsync(url, useFallbackClients: true);
+                    }
+                    catch { }
+                }
                 return null;
+            }
+        }
+
+        private async Task<string?> RunPlaylistInfoInternalAsync(string url, bool useFallbackClients)
+        {
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = _dependencyManager.YtDlpExecutablePath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = System.Text.Encoding.UTF8,
+                StandardErrorEncoding = System.Text.Encoding.UTF8
+            };
+            psi.ArgumentList.Add("--flat-playlist");
+            psi.ArgumentList.Add("-J");
+            psi.ArgumentList.Add("--no-warnings");
+            psi.ArgumentList.Add("--ignore-config");
+            AppendYouTubeExtractorArgs(psi, useFallbackClients);
+            psi.ArgumentList.Add(url);
+            psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+
+            using (Process process = Process.Start(psi)!)
+            {
+                string jsonOutput = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(jsonOutput))
+                {
+                    return null;
+                }
+                return jsonOutput;
             }
         }
 
@@ -869,7 +932,7 @@ namespace UniversalDownloader.Services
             }
         }
 
-        private async Task<bool> ExecuteYtDlpDownloadAsync(string url, string? formatSelection, string tempDownloadFolder, string finalDestinationFolder, bool extractAudio, string audioFormat, bool useTrimming, double trimStartSeconds, double trimEndSeconds, CancellationToken cancellationToken, string? overrideFileName, string? cookiesFromBrowser, IProgress<DownloadProgressArgs>? progressCallback = null)
+        private async Task<bool> ExecuteYtDlpDownloadAsync(string url, string? formatSelection, string tempDownloadFolder, string finalDestinationFolder, bool extractAudio, string audioFormat, bool useTrimming, double trimStartSeconds, double trimEndSeconds, CancellationToken cancellationToken, string? overrideFileName, string? cookiesFromBrowser, IProgress<DownloadProgressArgs>? progressCallback = null, bool useFallbackClients = false)
         {
             // Create an isolated subfolder for this specific download job (short name to avoid Windows MAX_PATH limits)
             string jobTempFolder = Path.Combine(tempDownloadFolder, $"d_{Guid.NewGuid().ToString("N").Substring(0, 8)}");
@@ -933,7 +996,7 @@ namespace UniversalDownloader.Services
             psi.ArgumentList.Add("10");
             psi.ArgumentList.Add("--file-access-retries");
             psi.ArgumentList.Add("5");
-            AppendYouTubeExtractorArgs(psi);
+            AppendYouTubeExtractorArgs(psi, useFallbackClients);
 
             if (EnableMultiConnectionAcceleration)
             {
@@ -1088,6 +1151,20 @@ namespace UniversalDownloader.Services
                     else
                     {
                         CleanDirectory(jobTempFolder);
+
+                        if (!useFallbackClients && IsYouTubeLink(url) && !cancellationToken.IsCancellationRequested)
+                        {
+                            try
+                            {
+                                return await ExecuteYtDlpDownloadAsync(url, formatSelection, tempDownloadFolder, finalDestinationFolder, extractAudio, audioFormat, useTrimming, trimStartSeconds, trimEndSeconds, cancellationToken, overrideFileName, cookiesFromBrowser, progressCallback, useFallbackClients: true);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch { /* fallback failed, proceed to report error */ }
+                        }
+
                         string errorMsg = stderrOutput.ToString();
                         var errorLines = errorMsg.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                                                .Where(line => line.ToLower().Contains("error") || line.ToLower().Contains("failed"))
@@ -1147,12 +1224,19 @@ namespace UniversalDownloader.Services
             }
         }
 
-        private static void AppendYouTubeExtractorArgs(ProcessStartInfo psi)
+        private static void AppendYouTubeExtractorArgs(ProcessStartInfo psi, bool useFallbackClients = false)
         {
             psi.ArgumentList.Add("--js-runtimes");
             psi.ArgumentList.Add("node,deno,quickjs,bun");
             psi.ArgumentList.Add("--extractor-args");
-            psi.ArgumentList.Add("youtube:player_client=web,mweb,android,ios");
+            if (useFallbackClients)
+            {
+                psi.ArgumentList.Add("youtube:player_client=android,ios,web");
+            }
+            else
+            {
+                psi.ArgumentList.Add("youtube:player_client=default");
+            }
         }
 
         private static bool IsTemporaryOrPartFile(string filePath)

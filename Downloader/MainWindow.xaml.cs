@@ -1053,37 +1053,37 @@ namespace UniversalDownloader
                  var formats = videoInfo["formats"] as Newtonsoft.Json.Linq.JArray;
                  if (formats != null)
                  {
-                     var uniqueHeights = new System.Collections.Generic.HashSet<int>();
-                     foreach (var format in formats)
+                     var seenLabels = new System.Collections.Generic.HashSet<string>();
+                     var validFormats = formats
+                         .Where(f => f["vcodec"] != null && f["vcodec"]?.ToString() != "none" && (f["height"]?.ToObject<int>() ?? 0) > 0)
+                         .OrderByDescending(f => f["height"]?.ToObject<int>() ?? 0);
+
+                     foreach (var format in validFormats)
                      {
-                         var vcodec = format["vcodec"]?.ToString();
-                         // Accept ANY video stream regardless of container — --merge-output-format mp4 handles remux
-                         if (vcodec != null && vcodec != "none")
+                         int height = format["height"]?.ToObject<int>() ?? 0;
+                         int width = format["width"]?.ToObject<int>() ?? 0;
+                         int maxDim = Math.Max(width, height);
+
+                         string label = $"{height}p Quality";
+                         if (maxDim >= 3840 || height >= 2160) label = "4K Quality";
+                         else if (maxDim >= 2560 || height >= 1440) label = "1440p Quality";
+                         else if (maxDim >= 1920 || height >= 1080) label = "1080p Quality";
+                         else if (maxDim >= 1280 || height >= 720) label = "720p Quality";
+                         else if (maxDim >= 854 || height >= 480) label = "480p Quality";
+                         else if (maxDim >= 640 || height >= 360) label = "360p Quality";
+                         else if (maxDim >= 426 || height >= 240) label = "240p Quality";
+                         else if (maxDim >= 256 || height >= 144) label = "144p Quality";
+
+                         if (seenLabels.Add(label) && (height >= 144 || maxDim >= 256))
                          {
-                             int height = format["height"]?.ToObject<int>() ?? 0;
-                             int width = format["width"]?.ToObject<int>() ?? 0;
-                             
-                             if (height >= 360 && uniqueHeights.Add(height))
+                             // No [ext=] filter — let yt-dlp pick the best codec; --merge-output-format mp4 ensures the final output is MP4
+                             list.Add(new YouTubeQualityItem
                              {
-                                 int maxDim = Math.Max(width, height);
-                                 string label = $"{height}p Quality";
-                                 
-                                 if (maxDim >= 3840) label = "4K Quality";
-                                 else if (maxDim >= 2560) label = "1440p Quality";
-                                 else if (maxDim >= 1920) label = "1080p Quality";
-                                 else if (maxDim >= 1280) label = "720p Quality";
-                                 else if (maxDim >= 854) label = "480p Quality";
-                                 else if (maxDim >= 640) label = "360p Quality";
-                                 
-                                 // No [ext=] filter — let yt-dlp pick the best codec; --merge-output-format mp4 ensures the final output is MP4
-                                 list.Add(new YouTubeQualityItem 
-                                 { 
-                                     Label = label, 
-                                     FormatCode = $"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best",
-                                     IsAudioOnly = false, 
-                                     SortPriority = height 
-                                 });
-                             }
+                                 Label = label,
+                                 FormatCode = $"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best",
+                                 IsAudioOnly = false,
+                                 SortPriority = height
+                             });
                          }
                      }
                  }

@@ -838,6 +838,37 @@ namespace UniversalDownloader.Tests
         }
 
         [Fact]
+        public async Task YouTube_StandardVideo_ReturnsFullQualitiesList()
+        {
+            var depMgr = new UniversalDownloader.Services.DependencyManager();
+            var downloadService = new UniversalDownloader.Services.DownloadService(depMgr);
+            _ = depMgr.InitializeDependenciesAsync();
+            await depMgr.WaitForInitializationAsync();
+
+            string url = "https://youtu.be/GIiOjh5EZzk";
+            var (title, formatsJson) = await downloadService.GetYouTubeInfoAsync(url);
+            Assert.NotNull(formatsJson);
+
+            var videoInfo = Newtonsoft.Json.Linq.JObject.Parse(formatsJson);
+            var formats = videoInfo["formats"] as Newtonsoft.Json.Linq.JArray;
+            Assert.NotNull(formats);
+
+            var heights = formats
+                .Where(f => f["vcodec"] != null && f["vcodec"]?.ToString() != "none" && (f["height"]?.ToObject<int>() ?? 0) > 0)
+                .Select(f => f["height"]!.ToObject<int>())
+                .Distinct()
+                .OrderByDescending(h => h)
+                .ToList();
+
+            // Must include multiple resolutions, not just 360p
+            Assert.True(heights.Count > 1, $"Expected multiple qualities, but only got: {string.Join(", ", heights)}");
+            Assert.Contains(heights, h => h >= 1080);
+            Assert.Contains(heights, h => h >= 720);
+            Assert.Contains(heights, h => h >= 480);
+            Assert.Contains(heights, h => h >= 360);
+        }
+
+        [Fact]
         public void GifWebpService_BuildFfmpegArguments_IncludesOverlayFilter_ForGifWebpAndTelegram()
         {
             string fakeVideo = Path.Combine(Path.GetTempPath(), "test_video.mp4");
