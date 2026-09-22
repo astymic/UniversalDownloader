@@ -111,6 +111,7 @@ jobs:
             A modern, fast, multi-platform media downloader, converter, and audio identification workstation for **Windows** and **Linux**.
 
             ### ✨ What's New in ${{ github.ref_name }}:
+            * 📂 **Google Drive Shared Folder Downloader & Interactive Structure Explorer** — Full support for public Google Drive shared folders with multi-level subfolders. Features an interactive folder tree drawer with tri-state selection checkboxes, live total size and file counts, "Download All" and "Download Selected" actions, automatic large-file (>100MB) virus scan bypass, concurrent folder crawling, and 1:1 disk structure preservation.
             * 🎥 **Full YouTube Video Qualities Restored (4K, 1440p, 1080p, 720p, 480p, 360p)** — Fixed video quality dropdown restricting formats to 360p by introducing a smart primary/fallback client architecture that fetches all high-resolution streams for standard videos while preserving full compatibility for restricted and kids content.
             * 🎨 **Interactive Text Label Studio for GIF & WebP** — Add and customize text overlays directly on videos with movable labels, 8-point drag-and-drop resize handles, auto-deletion of empty labels, and dedicated cursor / text selection tools.
             * 🌈 **Circular Spectrum Color Picker** — Full-spectrum hue/saturation color wheel with high-resolution visual indicator, dedicated vertical brightness slider, live preview swatch, and precise Hex/RGB inputs.
