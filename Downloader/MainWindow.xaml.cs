@@ -714,6 +714,11 @@ namespace UniversalDownloader
                 await LoadAnimeSeriesAsync(url);
                 return;
             }
+            if (GoogleDriveFolderService.IsGoogleDriveFolderUrl(url))
+            {
+                await LoadGoogleDriveFolderAsync(url);
+                return;
+            }
 
 
             // ── Playlist check FIRST (before single video) ──
@@ -1232,6 +1237,11 @@ namespace UniversalDownloader
             if (YummyAnimeService.IsYummyAnimeUrl(url))
             {
                 await LoadAnimeSeriesAsync(url);
+                return;
+            }
+            if (GoogleDriveFolderService.IsGoogleDriveFolderUrl(url))
+            {
+                await LoadGoogleDriveFolderAsync(url);
                 return;
             }
 

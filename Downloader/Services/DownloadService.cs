@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -548,6 +549,135 @@ namespace UniversalDownloader.Services
                     }
                 }
                 catch { }
+            }
+        }
+
+        public async Task DownloadGoogleDriveFileWithStructureAsync(string fileId, string destinationFilePath, CancellationToken cancellationToken, IProgress<DownloadProgressArgs>? progress = null)
+        {
+            string? dir = Path.GetDirectoryName(destinationFilePath);
+            if (!string.IsNullOrEmpty(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            string tempFilePath = destinationFilePath + ".tmp_" + Guid.NewGuid().ToString("N");
+            string fileName = Path.GetFileName(destinationFilePath);
+
+            var cookieContainer = new CookieContainer();
+            using var handler = new HttpClientHandler
+            {
+                CookieContainer = cookieContainer,
+                AllowAutoRedirect = true,
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+            };
+            using var client = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromMinutes(30)
+            };
+            client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+
+            try
+            {
+                string directUrl = $"https://drive.google.com/uc?export=download&confirm=t&id={fileId}";
+                var response = await client.GetAsync(directUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                response.EnsureSuccessStatusCode();
+
+                // Check if Google showed virus scan warning / confirmation HTML page
+                string mediaType = response.Content.Headers.ContentType?.MediaType ?? "";
+                if (mediaType.Equals("text/html", StringComparison.OrdinalIgnoreCase))
+                {
+                    string html = await response.Content.ReadAsStringAsync(cancellationToken);
+                    response.Dispose();
+
+                    // Parse download-form: action and inputs
+                    var formMatch = Regex.Match(html, @"<form[^>]+id=""download-form""[^>]+action=""([^""]+)""", RegexOptions.IgnoreCase);
+                    string actionUrl = formMatch.Success ? formMatch.Groups[1].Value : "https://drive.usercontent.google.com/download";
+                    if (!actionUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                    {
+                        actionUrl = "https://drive.usercontent.google.com" + (actionUrl.StartsWith("/") ? "" : "/") + actionUrl;
+                    }
+
+                    var inputMatches = Regex.Matches(html, @"<input[^>]+name=""([^""]+)""[^>]+value=""([^""]*)""", RegexOptions.IgnoreCase);
+                    var queryParams = new List<string>();
+                    foreach (Match im in inputMatches)
+                    {
+                        string k = im.Groups[1].Value;
+                        string v = im.Groups[2].Value;
+                        queryParams.Add($"{Uri.EscapeDataString(k)}={Uri.EscapeDataString(v)}");
+                    }
+
+                    string confirmUrl = queryParams.Count > 0 ? $"{actionUrl}?{string.Join("&", queryParams)}" : actionUrl;
+
+                    response = await client.GetAsync(confirmUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                    response.EnsureSuccessStatusCode();
+                }
+
+                long? totalBytes = response.Content.Headers.ContentLength;
+                int lastPercentage = -1;
+
+                using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+                using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
+                {
+                    byte[] buffer = new byte[81920];
+                    int bytesRead;
+                    long totalBytesRead = 0;
+
+                    while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        await fileStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                        totalBytesRead += bytesRead;
+
+                        if (totalBytes.HasValue && totalBytes.Value > 0)
+                        {
+                            double percentage = (double)totalBytesRead / totalBytes.Value * 100;
+                            if ((int)percentage != lastPercentage)
+                            {
+                                string msg = $"{percentage:F1}% of {Utilities.FormatBytesOutput(totalBytes.Value)}";
+                                var args = new DownloadProgressArgs(percentage, false, msg, fileName);
+                                progress?.Report(args);
+                                ProgressChanged?.Invoke(this, args);
+                                lastPercentage = (int)percentage;
+                            }
+                        }
+                        else
+                        {
+                            string msg = $"{Utilities.FormatBytesOutput(totalBytesRead)} downloaded";
+                            var args = new DownloadProgressArgs(0, true, msg, fileName);
+                            progress?.Report(args);
+                            ProgressChanged?.Invoke(this, args);
+                        }
+                    }
+                }
+
+                response.Dispose();
+
+                if (File.Exists(destinationFilePath))
+                {
+                    File.Delete(destinationFilePath);
+                }
+                File.Move(tempFilePath, destinationFilePath);
+                FileDownloaded?.Invoke(destinationFilePath, directUrl);
+
+                var doneArgs = new DownloadProgressArgs(100, false, "Download complete", fileName);
+                progress?.Report(doneArgs);
+                ProgressChanged?.Invoke(this, doneArgs);
+            }
+            catch (OperationCanceledException)
+            {
+                if (File.Exists(tempFilePath))
+                {
+                    try { File.Delete(tempFilePath); } catch { }
+                }
+                throw;
+            }
+            catch (Exception ex)
+            {
+                if (File.Exists(tempFilePath))
+                {
+                    try { File.Delete(tempFilePath); } catch { }
+                }
+                throw new Exception($"Google Drive Download Error: {ex.Message}");
             }
         }
 
