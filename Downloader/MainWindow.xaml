@@ -3594,12 +3594,13 @@
                                                                FontSize="11.5" 
                                                                HorizontalAlignment="Left"
                                                                TextTrimming="CharacterEllipsis"/>
-                                                    <TextBlock Text="{Binding Url}" 
+                                                    <TextBlock Text="{Binding DisplayPathOrUrl}" 
                                                                Foreground="#71717A" 
                                                                FontSize="11" 
                                                                HorizontalAlignment="Right" 
                                                                TextTrimming="CharacterEllipsis" 
-                                                               MaxWidth="300"/>
+                                                               ToolTip="{Binding DisplayPathOrUrl}"
+                                                               MaxWidth="320"/>
                                                 </Grid>
                                             </Grid>
 
@@ -5128,16 +5129,16 @@
                                                         <Style TargetType="Border">
                                                             <Setter Property="Visibility" Value="Visible"/>
                                                             <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding SizeString}" Value="{x:Null}">
+                                                                <DataTrigger Binding="{Binding DisplaySizeString}" Value="{x:Null}">
                                                                     <Setter Property="Visibility" Value="Collapsed"/>
                                                                 </DataTrigger>
-                                                                <DataTrigger Binding="{Binding SizeString}" Value="">
+                                                                <DataTrigger Binding="{Binding DisplaySizeString}" Value="">
                                                                     <Setter Property="Visibility" Value="Collapsed"/>
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
                                                     </Border.Style>
-                                                    <TextBlock Text="{Binding SizeString}" Foreground="#38BDF8" FontSize="10.5" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding DisplaySizeString}" Foreground="#38BDF8" FontSize="10.5" FontWeight="SemiBold"/>
                                                 </Border>
                                             </Grid>
                                         </HierarchicalDataTemplate>

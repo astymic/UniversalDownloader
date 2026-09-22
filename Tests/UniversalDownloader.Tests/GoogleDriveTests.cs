@@ -188,6 +188,88 @@ namespace UniversalDownloader.Tests
             var anyMusicFile = music.Children.FirstOrDefault(c => !c.IsFolder);
             Assert.NotNull(anyMusicFile);
             Assert.EndsWith(".mp3", anyMusicFile.Name, StringComparison.OrdinalIgnoreCase);
+            Assert.False(string.IsNullOrEmpty(anyMusicFile.SizeString), $"SizeString was empty: {anyMusicFile.SizeString}");
+            Assert.True(anyMusicFile.SizeBytes > 0, "Music file SizeBytes was 0");
+            Assert.True(music.TotalSizeBytes > 0, "Music folder TotalSizeBytes was 0");
+            Assert.False(string.IsNullOrEmpty(music.DisplaySizeString), "Music DisplaySizeString was empty");
+            Assert.True(footage.TotalSizeBytes > 0, "Footage folder TotalSizeBytes was 0");
+            Assert.False(string.IsNullOrEmpty(footage.DisplaySizeString), "Footage DisplaySizeString was empty");
+            Assert.True(result.TotalBytes > 0, "RootResult TotalBytes was 0");
+            Assert.False(string.IsNullOrEmpty(result.TotalSizeString), "RootResult TotalSizeString was empty");
+        }
+
+        [Theory]
+        [InlineData("4,9 MB", 5138022)]
+        [InlineData("4.9 MB", 5138022)]
+        [InlineData("1 GB", 1073741824)]
+        [InlineData("1.5 GB", 1610612736)]
+        [InlineData("350 KB", 358400)]
+        [InlineData("500 B", 500)]
+        [InlineData("2 TB", 2199023255552)]
+        [InlineData("—", 0)]
+        [InlineData("", 0)]
+        [InlineData(null, 0)]
+        public void ParseSizeToBytes_ParsesVariousFormats(string? input, long expectedBytes)
+        {
+            long bytes = GoogleDriveItem.ParseSizeToBytes(input);
+            Assert.Equal(expectedBytes, bytes);
+        }
+
+        [Theory]
+        [InlineData(500, "500 B")]
+        [InlineData(358400, "350 KB")]
+        [InlineData(5138022, "4.9 MB")]
+        [InlineData(1073741824, "1 GB")]
+        public void FormatBytes_FormatsSizesAccurately(long bytes, string expected)
+        {
+            string formatted = GoogleDriveItem.FormatBytes(bytes);
+            Assert.Equal(expected, formatted);
+        }
+
+        [Fact]
+        public void Folder_TotalSizeBytes_RecursivelySumsChildren()
+        {
+            var rootFolder = new GoogleDriveItem { Id = "root", Name = "Root", IsFolder = true };
+            var subFolder1 = new GoogleDriveItem { Id = "sub1", Name = "Sub1", IsFolder = true, Parent = rootFolder };
+            var file1 = new GoogleDriveItem { Id = "f1", Name = "Video1.mp4", IsFolder = false, SizeBytes = 200 * 1024 * 1024, Parent = subFolder1 };
+            var file2 = new GoogleDriveItem { Id = "f2", Name = "Video2.mp4", IsFolder = false, SizeBytes = 300 * 1024 * 1024, Parent = subFolder1 };
+            subFolder1.Children.Add(file1);
+            subFolder1.Children.Add(file2);
+
+            var subFolder2 = new GoogleDriveItem { Id = "sub2", Name = "Sub2", IsFolder = true, Parent = rootFolder };
+            var file3 = new GoogleDriveItem { Id = "f3", Name = "Audio.mp3", IsFolder = false, SizeBytes = 50 * 1024 * 1024, Parent = subFolder2 };
+            subFolder2.Children.Add(file3);
+
+            rootFolder.Children.Add(subFolder1);
+            rootFolder.Children.Add(subFolder2);
+
+            Assert.Equal(500 * 1024 * 1024, subFolder1.TotalSizeBytes);
+            Assert.Equal("500 MB", subFolder1.DisplaySizeString);
+
+            Assert.Equal(50 * 1024 * 1024, subFolder2.TotalSizeBytes);
+            Assert.Equal("50 MB", subFolder2.DisplaySizeString);
+
+            Assert.Equal(550 * 1024 * 1024, rootFolder.TotalSizeBytes);
+            Assert.Equal("550 MB", rootFolder.DisplaySizeString);
+        }
+
+        [Fact]
+        public void DownloadQueueItem_GoogleDriveProperties_SetAndFormatCorrectly()
+        {
+            var item = new DownloadQueueItem
+            {
+                Title = "AA000101.MXF",
+                Url = "https://drive.google.com/file/d/12345abcde/view",
+                GoogleDriveFileId = "12345abcde",
+                RelativePath = "Footage/Canon/AA000101.MXF",
+                TargetFilePath = @"C:\Downloads\Footage\Canon\AA000101.MXF",
+                FileSizeString = "285 MB"
+            };
+
+            Assert.Equal("Google Drive", item.Platform);
+            Assert.Equal("DRIVE", item.PlatformBadgeText);
+            Assert.Equal("#1E88E5", item.PlatformBadgeBg);
+            Assert.Equal("Footage/Canon/AA000101.MXF", item.DisplayPathOrUrl);
         }
     }
 }

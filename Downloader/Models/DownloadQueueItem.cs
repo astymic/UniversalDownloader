@@ -78,6 +78,7 @@ namespace UniversalDownloader.Models
             "TikTok" => "TikTok",
             "SoundCloud" => "SoundCloud",
             "Instagram" => "Instagram",
+            "Google Drive" or "GoogleDrive" or "GDrive" => "DRIVE",
             _ => IsAudioOnly ? AudioFormat.ToUpper() : "VIDEO"
         };
 
@@ -88,6 +89,7 @@ namespace UniversalDownloader.Models
             "TikTok" => "#111115",
             "SoundCloud" => "#FF5500",
             "Instagram" => "#E1306C",
+            "Google Drive" or "GoogleDrive" or "GDrive" => "#1E88E5",
             _ => "#8B5CF6"
         };
 
@@ -187,6 +189,12 @@ namespace UniversalDownloader.Models
         public System.Collections.Generic.List<SubtitleTrackInfo> SubtitleTracks { get; set; } = new();
 
 
+        public string? GoogleDriveFileId { get; set; }
+        public string? TargetFilePath { get; set; }
+        public string? RelativePath { get; set; }
+        public string? FileSizeString { get; set; }
+        public string DisplayPathOrUrl => !string.IsNullOrEmpty(RelativePath) ? RelativePath : Url;
+
         public void UpdatePlatformFromUrl()
         {
             if (string.IsNullOrWhiteSpace(_url)) return;
@@ -195,6 +203,10 @@ namespace UniversalDownloader.Models
             {
                 Platform = "Spotify";
                 IsAudioOnly = true;
+            }
+            else if (u.Contains("drive.google.com") || u.Contains("docs.google.com"))
+            {
+                Platform = "Google Drive";
             }
             else if (u.Contains("youtube.com") || u.Contains("youtu.be"))
             {

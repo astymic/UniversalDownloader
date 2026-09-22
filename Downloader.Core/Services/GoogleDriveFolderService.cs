@@ -88,6 +88,7 @@ namespace UniversalDownloader.Services
 
             rootResult.TotalFilesCount = CountTotalFiles(rootResult.Items);
             rootResult.TotalFoldersCount = CountTotalFolders(rootResult.Items);
+            rootResult.TotalBytes = CountTotalBytes(rootResult.Items);
 
             return rootResult;
         }
@@ -241,6 +242,8 @@ namespace UniversalDownloader.Services
 
                         string relPath = string.IsNullOrEmpty(currentPath) ? name : $"{currentPath}/{name}";
 
+                        long sizeBytes = !isFolder ? GoogleDriveItem.ParseSizeToBytes(sizeStr) : 0;
+
                         var driveItem = new GoogleDriveItem
                         {
                             Id = id,
@@ -248,6 +251,7 @@ namespace UniversalDownloader.Services
                             IsFolder = isFolder,
                             MimeType = mime,
                             SizeString = sizeStr,
+                            SizeBytes = sizeBytes,
                             RelativePath = relPath,
                             Parent = parentItem,
                             IsSelected = true,
@@ -335,6 +339,17 @@ namespace UniversalDownloader.Services
                 }
             }
             return count;
+        }
+
+        private long CountTotalBytes(IEnumerable<GoogleDriveItem> items)
+        {
+            long total = 0;
+            foreach (var it in items)
+            {
+                if (!it.IsFolder) total += it.SizeBytes;
+                else total += CountTotalBytes(it.Children);
+            }
+            return total;
         }
     }
 }

@@ -55,7 +55,8 @@ namespace UniversalDownloader
                 await Dispatcher.InvokeAsync(() =>
                 {
                     GoogleDriveDrawerTitleText.Text = result.RootTitle;
-                    GoogleDriveDrawerMetaText.Text = $"{result.TotalFoldersCount} folders • {result.TotalFilesCount} files";
+                    string totalSizePart = result.TotalBytes > 0 ? $" • Total {result.TotalSizeString}" : "";
+                    GoogleDriveDrawerMetaText.Text = $"{result.TotalFoldersCount} folders • {result.TotalFilesCount} files{totalSizePart}";
                     GoogleDriveTreeView.ItemsSource = result.Items;
                     GoogleDriveLoadingPanel.Visibility = Visibility.Collapsed;
                     GoogleDriveTreeBorder.Visibility = Visibility.Visible;
@@ -94,8 +95,29 @@ namespace UniversalDownloader
             }
 
             var selectedFiles = GetSelectedFiles(_currentGoogleDriveResult.Items);
-            GoogleDriveSelectedCountText.Text = $"Selected: {selectedFiles.Count} of {_currentGoogleDriveResult.TotalFilesCount} files";
+            long selectedBytes = selectedFiles.Sum(f => f.TotalSizeBytes);
+            string selectedSizeStr = GoogleDriveItem.FormatBytes(selectedBytes);
+
+            long totalBytes = _currentGoogleDriveResult.TotalBytes > 0
+                ? _currentGoogleDriveResult.TotalBytes
+                : GetAllFiles(_currentGoogleDriveResult.Items).Sum(f => f.TotalSizeBytes);
+            string totalSizeStr = GoogleDriveItem.FormatBytes(totalBytes);
+
+            if (selectedBytes > 0)
+            {
+                GoogleDriveSelectedCountText.Text = $"Selected: {selectedFiles.Count} of {_currentGoogleDriveResult.TotalFilesCount} files • {selectedSizeStr}";
+                GoogleDriveDownloadSelectedButton.Content = $"⬇ Download Selected ({selectedSizeStr})";
+            }
+            else
+            {
+                GoogleDriveSelectedCountText.Text = $"Selected: {selectedFiles.Count} of {_currentGoogleDriveResult.TotalFilesCount} files";
+                GoogleDriveDownloadSelectedButton.Content = "⬇ Download Selected";
+            }
+
             GoogleDriveDownloadSelectedButton.IsEnabled = selectedFiles.Count > 0;
+            GoogleDriveDownloadAllButton.Content = totalBytes > 0
+                ? $"⬇ Download All ({totalSizeStr})"
+                : "⬇ Download All";
         }
 
         private List<GoogleDriveItem> GetSelectedFiles(IEnumerable<GoogleDriveItem> items)
@@ -193,39 +215,25 @@ namespace UniversalDownloader
             GoogleDriveDrawerOverlay.Visibility = Visibility.Collapsed;
         }
 
-        private async void GoogleDriveDownloadAll_Click(object sender, RoutedEventArgs e)
+        private void GoogleDriveDownloadAll_Click(object sender, RoutedEventArgs e)
         {
             if (_currentGoogleDriveResult == null) return;
             var allFiles = GetAllFiles(_currentGoogleDriveResult.Items);
-            await DownloadGoogleDriveFilesAsync(allFiles, isDownloadAll: true);
+            DownloadGoogleDriveFilesToQueue(allFiles, isDownloadAll: true);
         }
 
-        private async void GoogleDriveDownloadSelected_Click(object sender, RoutedEventArgs e)
+        private void GoogleDriveDownloadSelected_Click(object sender, RoutedEventArgs e)
         {
             if (_currentGoogleDriveResult == null) return;
             var selectedFiles = GetSelectedFiles(_currentGoogleDriveResult.Items);
-            await DownloadGoogleDriveFilesAsync(selectedFiles, isDownloadAll: false);
+            DownloadGoogleDriveFilesToQueue(selectedFiles, isDownloadAll: false);
         }
 
-        private async Task DownloadGoogleDriveFilesAsync(List<GoogleDriveItem> filesToDownload, bool isDownloadAll)
+        private void DownloadGoogleDriveFilesToQueue(List<GoogleDriveItem> filesToDownload, bool isDownloadAll)
         {
             if (filesToDownload.Count == 0 || _currentGoogleDriveResult == null) return;
 
             GoogleDriveDrawerOverlay.Visibility = Visibility.Collapsed;
-
-            if (_isDownloadingFile)
-            {
-                ShowToast("A download is already in progress.");
-                return;
-            }
-
-            _isDownloadingFile = true;
-            _cancellationTokenSource = new CancellationTokenSource();
-            var token = _cancellationTokenSource.Token;
-
-            UpdateUiElementStates("Starting Google Drive download...");
-            DownloadProgressBar.Value = 0;
-            DownloadProgressBar.IsIndeterminate = false;
 
             // Determine root path rule:
             // Single subfolder selected -> place directly inside SelectedDirectory / Subfolder
@@ -258,67 +266,36 @@ namespace UniversalDownloader
                 baseTargetDir = Path.Combine(SelectedDirectory, safeRootTitle);
             }
 
-            int successCount = 0;
-            int total = filesToDownload.Count;
-
-            try
+            var queueItems = new List<DownloadQueueItem>();
+            foreach (var fileItem in filesToDownload)
             {
-                for (int i = 0; i < total; i++)
+                string relativePathNormalized = fileItem.RelativePath.Replace('/', Path.DirectorySeparatorChar);
+                string targetFilePath = Path.Combine(baseTargetDir, relativePathNormalized);
+
+                var qItem = new DownloadQueueItem
                 {
-                    token.ThrowIfCancellationRequested();
+                    Id = Guid.NewGuid().ToString("N"),
+                    Title = fileItem.Name,
+                    Url = $"https://drive.google.com/file/d/{fileItem.Id}/view",
+                    Platform = "Google Drive",
+                    GoogleDriveFileId = fileItem.Id,
+                    TargetFilePath = targetFilePath,
+                    RelativePath = fileItem.RelativePath,
+                    DestinationFolder = Path.GetDirectoryName(targetFilePath) ?? baseTargetDir,
+                    FileSizeString = fileItem.DisplaySizeString,
+                    FormatCode = "original",
+                    IsAudioOnly = false,
+                    Progress = 0,
+                    Status = QueueItemStatus.Queued,
+                    StatusText = !string.IsNullOrEmpty(fileItem.DisplaySizeString) ? $"Queued ({fileItem.DisplaySizeString})" : "Queued"
+                };
 
-                    var fileItem = filesToDownload[i];
-                    string relativePathNormalized = fileItem.RelativePath.Replace('/', Path.DirectorySeparatorChar);
-                    string targetFilePath = Path.Combine(baseTargetDir, relativePathNormalized);
-
-                    _currentItemTitle = fileItem.Name;
-                    _downloadingItemTitle = fileItem.Name;
-                    FileNameTextBlock.Text = $"[{i + 1}/{total}] {fileItem.Name}";
-                    FileNameTextBlock.Visibility = Visibility.Visible;
-                    StatusTextBlock.Text = $"Downloading {i + 1} of {total}: {fileItem.Name}...";
-                    DownloadProgressBar.Value = (double)i / total * 100;
-
-                    var progress = new Progress<DownloadProgressArgs>(args =>
-                    {
-                        Dispatcher.InvokeAsync(() =>
-                        {
-                            if (!string.IsNullOrWhiteSpace(args.StatusMessage))
-                            {
-                                StatusTextBlock.Text = $"[{i + 1}/{total}] {args.StatusMessage}";
-                            }
-                            if (args.Percentage > 0)
-                            {
-                                DownloadProgressBar.Value = ((double)i / total * 100) + (args.Percentage / total);
-                            }
-                        });
-                    });
-
-                    await _downloadService.DownloadGoogleDriveFileWithStructureAsync(fileItem.Id, targetFilePath, token, progress);
-                    successCount++;
-                }
-
-                DownloadProgressBar.Value = 100;
-                StatusTextBlock.Text = $"Google Drive complete — {successCount} files downloaded.";
-                ShowToast($"Successfully downloaded {successCount} files! 📁");
+                queueItems.Add(qItem);
             }
-            catch (OperationCanceledException)
-            {
-                StatusTextBlock.Text = $"Download canceled ({successCount}/{total} completed).";
-            }
-            catch (Exception ex)
-            {
-                StatusTextBlock.Text = $"Download error: {ex.Message}";
-                Debug.WriteLine($"[GDRIVE DOWNLOAD ERROR] {ex}");
-                ShowToast($"Download error: {ex.Message}");
-            }
-            finally
-            {
-                _isDownloadingFile = false;
-                _downloadingItemTitle = "";
-                _cancellationTokenSource?.Dispose();
-                _cancellationTokenSource = null;
-                UpdateUiElementStates();
-            }
+
+            _queueManager.EnqueueRange(queueItems);
+            ShowQueueView();
+            ShowToast($"Added {queueItems.Count} files to Download Queue 📥");
         }
 
         private string SanitizeSafePath(string name)

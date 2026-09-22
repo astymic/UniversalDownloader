@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -210,9 +211,92 @@ namespace UniversalDownloader.Services
                             Application.Current?.Dispatcher?.Invoke(() =>
                             {
                                 nextItem.Status = QueueItemStatus.Downloading;
-                                nextItem.StatusText = "Downloading...";
+                                nextItem.StatusText = "Connecting...";
                                 QueueChanged?.Invoke();
                             });
+
+                            bool isGoogleDrive = !string.IsNullOrEmpty(nextItem.GoogleDriveFileId) ||
+                                                 nextItem.Platform == "Google Drive" ||
+                                                 (!string.IsNullOrWhiteSpace(nextItem.Url) && nextItem.Url.Contains("drive.google.com"));
+
+                            if (isGoogleDrive)
+                            {
+                                string fileId = nextItem.GoogleDriveFileId ?? "";
+                                if (string.IsNullOrEmpty(fileId))
+                                {
+                                    var match = Regex.Match(nextItem.Url, @"(?:folders/|file/d/|[?&]id=)([a-zA-Z0-9_-]{10,})", RegexOptions.IgnoreCase);
+                                    if (match.Success) fileId = match.Groups[1].Value;
+                                }
+
+                                string targetPath = !string.IsNullOrEmpty(nextItem.TargetFilePath)
+                                    ? nextItem.TargetFilePath
+                                    : Path.Combine(nextItem.DestinationFolder, nextItem.Title);
+
+                                var gdriveProgress = new Progress<DownloadProgressArgs>(args =>
+                                {
+                                    if (nextItem.Status != QueueItemStatus.Downloading) return;
+
+                                    Application.Current?.Dispatcher?.Invoke(() =>
+                                    {
+                                        if (args.Percentage >= 0)
+                                        {
+                                            nextItem.Progress = args.Percentage;
+                                        }
+                                        if (!string.IsNullOrWhiteSpace(args.StatusMessage))
+                                        {
+                                            nextItem.StatusText = args.StatusMessage;
+                                        }
+                                    });
+                                });
+
+                                await _downloadService.DownloadGoogleDriveFileWithStructureAsync(
+                                    fileId,
+                                    targetPath,
+                                    cts.Token,
+                                    gdriveProgress);
+
+                                bool fileExists = File.Exists(targetPath) && new FileInfo(targetPath).Length > 0;
+                                if (fileExists)
+                                {
+                                    Application.Current?.Dispatcher?.Invoke(() =>
+                                    {
+                                        nextItem.Status = QueueItemStatus.Completed;
+                                        nextItem.StatusText = "Completed";
+                                        nextItem.Progress = 100;
+                                        nextItem.DownloadedFilePath = targetPath;
+                                        QueueChanged?.Invoke();
+                                    });
+
+                                    try
+                                    {
+                                        var fi = new FileInfo(targetPath);
+                                        await _historyService.AddItemAsync(new DownloadHistoryItem
+                                        {
+                                            Title = nextItem.Title,
+                                            Url = nextItem.Url,
+                                            Platform = "Google Drive",
+                                            FilePath = targetPath,
+                                            FileSizeBytes = fi.Length,
+                                            FormattedSize = Utilities.FormatBytesOutput(fi.Length),
+                                            DownloadDate = DateTime.Now
+                                        });
+                                    }
+                                    catch { }
+
+                                    ItemCompleted?.Invoke(nextItem);
+                                }
+                                else
+                                {
+                                    Application.Current?.Dispatcher?.Invoke(() =>
+                                    {
+                                        nextItem.Status = QueueItemStatus.Failed;
+                                        nextItem.StatusText = "Download failed";
+                                        QueueChanged?.Invoke();
+                                    });
+                                    ItemFailed?.Invoke(nextItem);
+                                }
+                                continue;
+                            }
 
                             string tempDir = Path.Combine(Path.GetTempPath(), "UD_Queue_" + Guid.NewGuid().ToString("N"));
                             Directory.CreateDirectory(tempDir);
