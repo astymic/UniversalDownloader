@@ -34,9 +34,7 @@ namespace UniversalDownloader
 
         private string GetSettingsFilePath()
         {
-            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string appFolder = Path.Combine(appDataPath, "UniversalDownloader");
-            Directory.CreateDirectory(appFolder);
+            string appFolder = DependencyManager.GetSettingsDirectory();
             return Path.Combine(appFolder, "settings.json");
         }
 
@@ -365,6 +363,27 @@ namespace UniversalDownloader
                 {
                     SettingsUpdateStatusText.Text = $"You're on the latest version (v{UpdateService.GetCurrentAppVersion()}).";
                 }
+            }
+        }
+
+        private void OpenToolsFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string dir = DependencyManager.GetSettingsDirectory();
+                if (Directory.Exists(dir))
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "explorer.exe",
+                        Arguments = $"\"{dir}\"",
+                        UseShellExecute = true
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to open tools folder: {ex.Message}");
             }
         }
     }

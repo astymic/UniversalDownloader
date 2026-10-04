@@ -404,13 +404,14 @@ namespace UniversalDownloader.Services
             return time.TotalHours >= 1 ? time.ToString(@"hh\:mm\:ss") : time.ToString(@"mm\:ss");
         }
 
-        private static List<YouTubeQualityItem> GetDefaultQualitiesForPlatform(string platform)
+        public static List<YouTubeQualityItem> GetDefaultQualitiesForPlatform(string platform)
         {
             if (string.Equals(platform, "SoundCloud", StringComparison.OrdinalIgnoreCase))
             {
                 return new List<YouTubeQualityItem>
                 {
                     new YouTubeQualityItem { Label = "Download as MP3", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "mp3", SortPriority = 100 },
+                    new YouTubeQualityItem { Label = "Download as FLAC", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "flac", SortPriority = 95 },
                     new YouTubeQualityItem { Label = "Original Audio", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "best", SortPriority = 90 }
                 };
             }
@@ -421,6 +422,7 @@ namespace UniversalDownloader.Services
                 new YouTubeQualityItem { Label = "1080p Full HD", FormatCode = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 1080 },
                 new YouTubeQualityItem { Label = "720p HD", FormatCode = "bestvideo[height<=720]+bestaudio/best[height<=720]/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 720 },
                 new YouTubeQualityItem { Label = "Download as MP3", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "mp3", SortPriority = 48 },
+                new YouTubeQualityItem { Label = "Download as FLAC", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "flac", SortPriority = 47 },
                 new YouTubeQualityItem { Label = "Best Audio Only", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "best", SortPriority = 49 }
             };
         }

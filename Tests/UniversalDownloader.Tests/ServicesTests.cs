@@ -730,6 +730,62 @@ namespace UniversalDownloader.Tests
             Assert.False(string.IsNullOrWhiteSpace(dir));
             Assert.True(Directory.Exists(dir));
             Assert.True(UniversalDownloader.Services.DependencyManager.HasWriteAccess(dir));
+            Assert.Equal(UniversalDownloader.Services.DependencyManager.GetSettingsDirectory(), dir);
+        }
+
+        [Fact]
+        public void DependencyManager_TargetPaths_PointToSettingsDirectory()
+        {
+            var depMgr = new UniversalDownloader.Services.DependencyManager();
+            string settingsDir = UniversalDownloader.Services.DependencyManager.GetSettingsDirectory();
+
+            Assert.Equal(Path.Combine(settingsDir, "yt-dlp.exe"), depMgr.YtDlpExecutablePath);
+            Assert.Equal(Path.Combine(settingsDir, "ffmpeg.exe"), depMgr.FfmpegExecutablePath);
+            Assert.Equal(Path.Combine(settingsDir, "ffprobe.exe"), depMgr.FfprobeExecutablePath);
+        }
+
+        [Fact]
+        public void SearchService_DefaultQualities_IncludeFlacFormat()
+        {
+            var youtubeQualities = UniversalDownloader.Services.SearchService.GetDefaultQualitiesForPlatform("YouTube");
+            var flacItem = youtubeQualities.FirstOrDefault(q => q.AudioFormat == "flac");
+            Assert.NotNull(flacItem);
+            Assert.True(flacItem.IsAudioOnly);
+            Assert.Equal("Download as FLAC", flacItem.Label);
+            Assert.Equal("bestaudio/best", flacItem.FormatCode);
+
+            var soundCloudQualities = UniversalDownloader.Services.SearchService.GetDefaultQualitiesForPlatform("SoundCloud");
+            var scFlacItem = soundCloudQualities.FirstOrDefault(q => q.AudioFormat == "flac");
+            Assert.NotNull(scFlacItem);
+            Assert.True(scFlacItem.IsAudioOnly);
+            Assert.Equal("Download as FLAC", scFlacItem.Label);
+            Assert.Equal("bestaudio/best", scFlacItem.FormatCode);
+        }
+
+        [Fact]
+        public void DependencyManager_AutoMigrate_CleansUpOldBinFolder()
+        {
+            string settingsDir = UniversalDownloader.Services.DependencyManager.GetSettingsDirectory();
+            string oldBinDir = Path.Combine(settingsDir, "bin");
+            Directory.CreateDirectory(oldBinDir);
+
+            string dummyOldFile = Path.Combine(oldBinDir, "ffprobe.exe");
+            string targetFile = Path.Combine(settingsDir, "ffprobe.exe");
+
+            bool targetExisted = File.Exists(targetFile);
+            if (!targetExisted)
+            {
+                File.WriteAllText(dummyOldFile, "test-content");
+            }
+
+            var depMgr = new UniversalDownloader.Services.DependencyManager();
+
+            if (!targetExisted)
+            {
+                Assert.True(File.Exists(targetFile));
+                Assert.False(File.Exists(dummyOldFile));
+                try { File.Delete(targetFile); } catch { }
+            }
         }
 
         [Fact]

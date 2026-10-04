@@ -19,13 +19,16 @@ namespace UniversalDownloader.Services
         private const string YtDlpVersionApiUrl = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest";
 
         private readonly string _ffmpegFileName;
+        private readonly string _ffprobeFileName;
         private const string FfmpegZipDownloadUrlWindows = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
 
         public string YtDlpExecutablePath { get; private set; }
         public string FfmpegExecutablePath { get; private set; }
+        public string FfprobeExecutablePath { get; private set; }
 
         public bool IsYtDlpReady { get; private set; }
         public bool IsFfmpegReady { get; private set; }
+        public bool IsFfprobeReady { get; private set; }
 
         private readonly TaskCompletionSource<bool> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -52,6 +55,25 @@ namespace UniversalDownloader.Services
 
         public event Action<string>? ProgressUpdated;
 
+        public static string GetSettingsDirectory()
+        {
+            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (string.IsNullOrWhiteSpace(appDataPath))
+            {
+                appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share");
+            }
+            string appFolder = Path.Combine(appDataPath, "UniversalDownloader");
+            try
+            {
+                if (!Directory.Exists(appFolder))
+                {
+                    Directory.CreateDirectory(appFolder);
+                }
+            }
+            catch { }
+            return appFolder;
+        }
+
         public DependencyManager()
         {
             _isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
@@ -62,38 +84,106 @@ namespace UniversalDownloader.Services
                 : "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
 
             _ffmpegFileName = _isLinux ? "ffmpeg" : "ffmpeg.exe";
+            _ffprobeFileName = _isLinux ? "ffprobe" : "ffprobe.exe";
 
-            // Determine base storage directory
+            // Determine target storage directory in user settings folder
+            string targetDir = GetSettingsDirectory();
             string baseDir = AppContext.BaseDirectory;
-            if (!HasWriteAccess(baseDir))
+
+            string targetYtDlp = Path.Combine(targetDir, _ytDlpFileName);
+            string targetFfmpeg = Path.Combine(targetDir, _ffmpegFileName);
+            string targetFfprobe = Path.Combine(targetDir, _ffprobeFileName);
+
+            // Auto-migrate from baseDir or old bin/ subfolder
+            MigrateBinaryIfPresent(Path.Combine(baseDir, _ytDlpFileName), targetYtDlp);
+            MigrateBinaryIfPresent(Path.Combine(targetDir, "bin", _ytDlpFileName), targetYtDlp);
+
+            MigrateBinaryIfPresent(Path.Combine(baseDir, _ffmpegFileName), targetFfmpeg);
+            MigrateBinaryIfPresent(Path.Combine(targetDir, "bin", _ffmpegFileName), targetFfmpeg);
+
+            MigrateBinaryIfPresent(Path.Combine(baseDir, _ffprobeFileName), targetFfprobe);
+            MigrateBinaryIfPresent(Path.Combine(targetDir, "bin", _ffprobeFileName), targetFfprobe);
+
+            try
             {
-                string localData = _isLinux
-                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "UniversalDownloader", "bin")
-                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UniversalDownloader", "bin");
-                Directory.CreateDirectory(localData);
-                baseDir = localData;
+                string oldBin = Path.Combine(targetDir, "bin");
+                if (Directory.Exists(oldBin) && !Directory.EnumerateFileSystemEntries(oldBin).Any())
+                {
+                    Directory.Delete(oldBin);
+                }
             }
+            catch { }
 
-            YtDlpExecutablePath = Path.Combine(baseDir, _ytDlpFileName);
-            FfmpegExecutablePath = Path.Combine(baseDir, _ffmpegFileName);
+            YtDlpExecutablePath = targetYtDlp;
+            FfmpegExecutablePath = targetFfmpeg;
+            FfprobeExecutablePath = targetFfprobe;
 
-            // If system-wide installed on Linux, prioritize system binary
+            // If system-wide installed on Linux, use system binary if not present in settings dir
             if (_isLinux)
             {
-                string? sysYtDlp = FindSystemBinary("yt-dlp");
-                if (sysYtDlp != null) YtDlpExecutablePath = sysYtDlp;
+                if (!File.Exists(YtDlpExecutablePath))
+                {
+                    string? sysYtDlp = FindSystemBinary("yt-dlp");
+                    if (sysYtDlp != null) YtDlpExecutablePath = sysYtDlp;
+                }
 
-                string? sysFfmpeg = FindSystemBinary("ffmpeg");
-                if (sysFfmpeg != null) FfmpegExecutablePath = sysFfmpeg;
+                if (!File.Exists(FfmpegExecutablePath))
+                {
+                    string? sysFfmpeg = FindSystemBinary("ffmpeg");
+                    if (sysFfmpeg != null) FfmpegExecutablePath = sysFfmpeg;
+                }
+
+                if (!File.Exists(FfprobeExecutablePath))
+                {
+                    string? sysFfprobe = FindSystemBinary("ffprobe");
+                    if (sysFfprobe != null) FfprobeExecutablePath = sysFfprobe;
+                }
             }
 
             if (File.Exists(YtDlpExecutablePath))
             {
+                EnsureExecutablePermissions(YtDlpExecutablePath);
                 IsYtDlpReady = true;
             }
             if (File.Exists(FfmpegExecutablePath))
             {
+                EnsureExecutablePermissions(FfmpegExecutablePath);
                 IsFfmpegReady = true;
+            }
+            if (File.Exists(FfprobeExecutablePath))
+            {
+                EnsureExecutablePermissions(FfprobeExecutablePath);
+                IsFfprobeReady = true;
+            }
+        }
+
+        private static void MigrateBinaryIfPresent(string sourcePath, string destinationPath)
+        {
+            try
+            {
+                if (!File.Exists(sourcePath)) return;
+                if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(destinationPath), StringComparison.OrdinalIgnoreCase)) return;
+
+                if (!File.Exists(destinationPath))
+                {
+                    try
+                    {
+                        File.Move(sourcePath, destinationPath);
+                        return;
+                    }
+                    catch
+                    {
+                        File.Copy(sourcePath, destinationPath, true);
+                        try { File.Delete(sourcePath); } catch { }
+                    }
+                }
+                else
+                {
+                    try { File.Delete(sourcePath); } catch { }
+                }
+            }
+            catch
+            {
             }
         }
 
@@ -343,8 +433,14 @@ namespace UniversalDownloader.Services
                 {
                     FfmpegExecutablePath = sysFfmpeg;
                     IsFfmpegReady = true;
-                    return;
                 }
+                string? sysFfprobe = FindSystemBinary("ffprobe");
+                if (sysFfprobe != null)
+                {
+                    FfprobeExecutablePath = sysFfprobe;
+                    IsFfprobeReady = true;
+                }
+                if (IsFfmpegReady) return;
             }
 
             // On Windows, auto-download static build
@@ -379,8 +475,10 @@ namespace UniversalDownloader.Services
                     var ffprobeEntry = archive.Entries.FirstOrDefault(e => e.Name.Equals("ffprobe.exe", StringComparison.OrdinalIgnoreCase));
                     if (ffprobeEntry != null)
                     {
-                        string ffprobePath = Path.Combine(Path.GetDirectoryName(FfmpegExecutablePath) ?? "", "ffprobe.exe");
+                        string ffprobePath = Path.Combine(Path.GetDirectoryName(FfmpegExecutablePath) ?? GetSettingsDirectory(), "ffprobe.exe");
                         ffprobeEntry.ExtractToFile(ffprobePath, true);
+                        FfprobeExecutablePath = ffprobePath;
+                        IsFfprobeReady = true;
                     }
                 }
 

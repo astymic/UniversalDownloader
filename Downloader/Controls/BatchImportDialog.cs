@@ -198,6 +198,7 @@ namespace UniversalDownloader.Controls
             _formatComboBox = CreateDarkComboBox();
             _formatComboBox.Items.Add("Auto / Best Video + Audio");
             _formatComboBox.Items.Add("Audio (MP3 320kbps)");
+            _formatComboBox.Items.Add("Audio (FLAC Lossless)");
             _formatComboBox.Items.Add("Audio (Best Quality / M4A)");
             _formatComboBox.Items.Add("Video (1080p Full HD)");
             _formatComboBox.Items.Add("Video (720p HD)");
@@ -650,14 +651,15 @@ namespace UniversalDownloader.Controls
             }
 
             int formatIndex = _formatComboBox.SelectedIndex;
-            bool isAudioOnly = formatIndex == 1 || formatIndex == 2;
-            string audioFormat = formatIndex == 1 ? "mp3" : "best";
+            bool isAudioOnly = formatIndex == 1 || formatIndex == 2 || formatIndex == 3;
+            string audioFormat = formatIndex == 1 ? "mp3" : (formatIndex == 2 ? "flac" : "best");
             string formatCode = formatIndex switch
             {
                 1 => "bestaudio/best",
                 2 => "bestaudio/best",
-                3 => "bestvideo[height<=1080]+bestaudio/best",
-                4 => "bestvideo[height<=720]+bestaudio/best",
+                3 => "bestaudio/best",
+                4 => "bestvideo[height<=1080]+bestaudio/best",
+                5 => "bestvideo[height<=720]+bestaudio/best",
                 _ => "bestvideo+bestaudio/best"
             };
 

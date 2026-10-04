@@ -943,7 +943,8 @@ namespace UniversalDownloader
                     {
                         new YouTubeQualityItem { Label = "Best Video + Audio", FormatCode = "bestvideo+bestaudio/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 9999 },
                         new YouTubeQualityItem { Label = "Best Audio Only", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "best", SortPriority = 49 },
-                        new YouTubeQualityItem { Label = "Download as MP3", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "mp3", SortPriority = 48 }
+                        new YouTubeQualityItem { Label = "Download as MP3", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "mp3", SortPriority = 48 },
+                        new YouTubeQualityItem { Label = "Download as FLAC", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "flac", SortPriority = 47 }
                     };
                     YouTubeQualityComboBox.ItemsSource = fallbackQualities;
                     QualitySection.Visibility = Visibility.Visible;
@@ -1054,6 +1055,7 @@ namespace UniversalDownloader
                  // Audio-only options at the bottom
                  list.Add(new YouTubeQualityItem { Label = "Best Audio Only",   FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "best", SortPriority = 49 });
                  list.Add(new YouTubeQualityItem { Label = "Download as MP3",    FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "mp3",  SortPriority = 48 });
+                 list.Add(new YouTubeQualityItem { Label = "Download as FLAC",   FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "flac", SortPriority = 47 });
 
                  var formats = videoInfo["formats"] as Newtonsoft.Json.Linq.JArray;
                  if (formats != null)
@@ -1484,6 +1486,7 @@ namespace UniversalDownloader
                 new YouTubeQualityItem { Label = "480p", FormatCode = "bestvideo[height<=480]+bestaudio/best[height<=480]/best", IsAudioOnly = false, AudioFormat = "best", SortPriority = 480 },
                 new YouTubeQualityItem { Label = "Best Audio", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "best", SortPriority = 49 },
                 new YouTubeQualityItem { Label = "MP3", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "mp3", SortPriority = 48 },
+                new YouTubeQualityItem { Label = "FLAC", FormatCode = "bestaudio/best", IsAudioOnly = true, AudioFormat = "flac", SortPriority = 47 },
             };
         }
 
