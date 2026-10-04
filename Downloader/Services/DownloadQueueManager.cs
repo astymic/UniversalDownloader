@@ -183,6 +183,16 @@ namespace UniversalDownloader.Services
             });
         }
 
+        public void ClearAll()
+        {
+            CancelAll();
+            Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                _items.Clear();
+                QueueChanged?.Invoke();
+            });
+        }
+
         private async Task ProcessQueueAsync()
         {
             if (_isProcessing) return;

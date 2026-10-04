@@ -206,13 +206,25 @@
             <Setter Property="Width" Value="Auto"/>
             <Setter Property="Height" Value="36"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#2D1217"/>
-                    <Setter Property="Foreground" Value="#FCA5A5"/>
-                    <Setter Property="BorderBrush" Value="#7F1D1D"/>
-                </Trigger>
-            </Style.Triggers>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="14" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#2D1217"/>
+                                <Setter Property="Foreground" Value="#FCA5A5"/>
+                                <Setter Property="BorderBrush" Value="#F43F5E"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Primary Outline / Play Button Style -->
@@ -3495,8 +3507,8 @@
                                         Click="ClearCompletedQueue_Click"
                                         ToolTip="Remove completed, failed and canceled items from list"/>
                                 <Button Content="⏹ Cancel All" 
-                                        Style="{StaticResource MinimalistCancelButton}" 
-                                        Padding="12,8" 
+                                        Style="{StaticResource DangerButton}" 
+                                        Padding="14,8" 
                                         FontSize="12" 
                                         Margin="0,0,0,6"
                                         Click="CancelAllQueue_Click"
@@ -3663,7 +3675,9 @@
                                                         Click="QueueCancelItem_Click"
                                                         Margin="0,0,6,0">
                                                     <Button.Style>
-                                                        <Style TargetType="Button" BasedOn="{StaticResource MinimalistCancelButton}">
+                                                        <Style TargetType="Button" BasedOn="{StaticResource DangerButton}">
+                                                            <Setter Property="Height" Value="28"/>
+                                                            <Setter Property="Padding" Value="10,4"/>
                                                             <Setter Property="Visibility" Value="Collapsed"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding CanCancel}" Value="True">

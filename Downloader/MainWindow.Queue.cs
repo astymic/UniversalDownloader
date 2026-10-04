@@ -148,10 +148,24 @@ namespace UniversalDownloader
 
         private void CancelAllQueue_Click(object sender, RoutedEventArgs e)
         {
-            var result = ModernMessageBox.Show("Cancel all queued and active downloads?", "Cancel All Downloads", MessageBoxButton.YesNo, MessageBoxImage.Question, this);
-            if (result == MessageBoxResult.Yes)
+            if (_queueManager.Items.Count == 0) return;
+
+            bool hasActive = _queueManager.Items.Any(x => x.Status == QueueItemStatus.Downloading || x.Status == QueueItemStatus.Queued);
+            if (hasActive)
             {
-                _queueManager.CancelAll();
+                var result = ModernMessageBox.Show("Cancel all queued and active downloads?", "Cancel All Downloads", MessageBoxButton.YesNo, MessageBoxImage.Question, this);
+                if (result == MessageBoxResult.Yes)
+                {
+                    _queueManager.CancelAll();
+                }
+            }
+            else
+            {
+                var result = ModernMessageBox.Show("Clear all items from the queue?", "Clear Queue", MessageBoxButton.YesNo, MessageBoxImage.Question, this);
+                if (result == MessageBoxResult.Yes)
+                {
+                    _queueManager.ClearAll();
+                }
             }
         }
 
