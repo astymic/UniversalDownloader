@@ -23,7 +23,7 @@
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="50"
-                      CornerRadius="0"
+                      CornerRadius="20"
                       GlassFrameThickness="1"
                       UseAeroCaptionButtons="False"
                       ResizeBorderThickness="7"/>
@@ -39,15 +39,15 @@
         
         <!-- Surface and Backgrounds -->
         <SolidColorBrush x:Key="BackgroundBrush" Color="#09090B"/> <!-- Very Dark Gray -->
-        <SolidColorBrush x:Key="SurfaceBrush" Color="#18181B"/> <!-- Slightly lighter -->
-        <SolidColorBrush x:Key="SurfaceHoverBrush" Color="#27272A"/> 
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#14141A"/> <!-- Sleek obsidian card surface -->
+        <SolidColorBrush x:Key="SurfaceHoverBrush" Color="#20202A"/> 
         
         <!-- Text -->
         <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FAFAFA"/>
         <SolidColorBrush x:Key="TextSecondaryBrush" Color="#A1A1AA"/>
         
         <!-- Borders -->
-        <SolidColorBrush x:Key="BorderBrush" Color="#3F3F46"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="#262634"/> <!-- Modern subtle dark border -->
         
         <SolidColorBrush x:Key="ScrollBarThumbIdleBrush" Color="#52525B"/>
         <SolidColorBrush x:Key="ScrollBarThumbHoverBrush" Color="#71717A"/>
@@ -64,8 +64,8 @@
         </LinearGradientBrush>
         
         <LinearGradientBrush x:Key="GlassGradient" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#15FFFFFF" Offset="0"/>
-            <GradientStop Color="#05FFFFFF" Offset="1"/>
+            <GradientStop Color="#14FFFFFF" Offset="0"/>
+            <GradientStop Color="#06FFFFFF" Offset="1"/>
         </LinearGradientBrush>
 
         <!-- Modern Button Style -->
@@ -82,7 +82,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="12" Padding="{TemplateBinding Padding}">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="22" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -90,8 +90,8 @@
                                 <Setter Property="Opacity" Value="0.9"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Background" Value="#3F3F46"/>
-                                <Setter Property="Foreground" Value="#71717A"/>
+                                <Setter Property="Background" Value="#181822"/>
+                                <Setter Property="Foreground" Value="#525262"/>
                                 <Setter Property="Effect" Value="{x:Null}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -134,13 +134,38 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="14" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="Background" Value="{StaticResource SurfaceHoverBrush}"/>
                                 <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Pill Secondary Button Style for Queue Action -->
+        <Style TargetType="Button" x:Key="PillSecondaryButton" BasedOn="{StaticResource SecondaryButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="23" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource SurfaceHoverBrush}"/>
+                                <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -156,6 +181,21 @@
             <Setter Property="Width" Value="{Binding Path=ActualHeight, RelativeSource={RelativeSource Self}}"/>
             <Setter Property="Content" Value="✕"/>
             <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="23">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#2D1217"/>
+                                <Setter Property="BorderBrush" Value="#F43F5E"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Modern Danger / Clear Button Style -->
@@ -425,13 +465,13 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
-                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="12" Padding="{TemplateBinding Padding}">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="14" Padding="{TemplateBinding Padding}">
                             <ScrollViewer x:Name="PART_ContentHost" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsFocused" Value="True">
                                 <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
-                                <Setter Property="Background" Value="#111115"/>
+                                <Setter Property="Background" Value="#0E0E14"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="BorderBrush" Value="{StaticResource TextSecondaryBrush}"/>
@@ -657,10 +697,10 @@
                     <ControlTemplate TargetType="ComboBox">
                         <Grid>
                             <Border x:Name="MainBorder" 
-                                    Background="#27272A" 
-                                    BorderBrush="#3F3F46" 
+                                    Background="{StaticResource SurfaceBrush}" 
+                                    BorderBrush="{StaticResource BorderBrush}" 
                                     BorderThickness="1" 
-                                    CornerRadius="5"/>
+                                    CornerRadius="12"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -673,7 +713,7 @@
                                          CaretBrush="#FFFFFF"
                                          BorderThickness="0" 
                                          VerticalAlignment="Center" 
-                                         Padding="7,0,2,0" 
+                                         Padding="10,0,2,0" 
                                          FontSize="12"
                                          FontWeight="SemiBold"
                                          IsReadOnly="{TemplateBinding IsReadOnly}"/>
@@ -682,7 +722,7 @@
                                               IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" 
                                               ClickMode="Press" 
                                               Background="Transparent"
-                                              BorderThickness="0"
+                                              BorderThickness="0" 
                                               Cursor="Hand">
                                     <ToggleButton.Template>
                                         <ControlTemplate TargetType="ToggleButton">
@@ -705,14 +745,14 @@
                                    PopupAnimation="Slide" 
                                    StaysOpen="False">
                                 <Grid MaxHeight="200" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
-                                    <Border Background="#18181B" 
-                                            BorderBrush="#3F3F46" 
+                                    <Border Background="#14141A" 
+                                            BorderBrush="{StaticResource BorderBrush}" 
                                             BorderThickness="1" 
-                                            CornerRadius="6" 
+                                            CornerRadius="12" 
                                             Margin="0,4,0,4"
                                             Padding="4">
                                         <Border.Effect>
-                                            <DropShadowEffect BlurRadius="12" ShadowDepth="4" Color="Black" Opacity="0.7"/>
+                                            <DropShadowEffect BlurRadius="16" ShadowDepth="4" Color="Black" Opacity="0.7"/>
                                         </Border.Effect>
                                         <ScrollViewer SnapsToDevicePixels="True" VerticalScrollBarVisibility="Auto">
                                             <StackPanel IsItemsHost="True"/>
@@ -723,13 +763,13 @@
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="#71717A"/>
+                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="{StaticResource TextSecondaryBrush}"/>
                             </Trigger>
                             <Trigger Property="IsFocused" Value="True">
-                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="#38BDF8"/>
+                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
                             </Trigger>
                             <Trigger Property="IsDropDownOpen" Value="True">
-                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="#38BDF8"/>
+                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -746,7 +786,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
-                            <Border x:Name="CheckBoxBorder" Width="20" Height="20" CornerRadius="4" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Background="{StaticResource SurfaceBrush}" VerticalAlignment="Center">
+                            <Border x:Name="CheckBoxBorder" Width="20" Height="20" CornerRadius="6" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Background="{StaticResource SurfaceBrush}" VerticalAlignment="Center">
                                 <Path x:Name="CheckMark" Data="M 4 10 L 8 14 L 16 6" Stroke="White" StrokeThickness="2" Stretch="None" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
@@ -1092,18 +1132,18 @@
         </Style>
 
         <Style TargetType="ProgressBar" x:Key="ModernProgressBar">
-            <Setter Property="Height" Value="6"/>
-            <Setter Property="Background" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Height" Value="8"/>
+            <Setter Property="Background" Value="#161622"/>
             <Setter Property="Foreground" Value="{StaticResource PrimaryGradient}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ProgressBar">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="3" ClipToBounds="True">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4" ClipToBounds="True">
                             <Grid>
-                                <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="3"/>
-                                <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="3" HorizontalAlignment="Left">
+                                <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="4"/>
+                                <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="4" HorizontalAlignment="Left">
                                     <Border.Effect>
-                                        <DropShadowEffect BlurRadius="10" ShadowDepth="0" Color="#EC4899" Opacity="0.5"/>
+                                        <DropShadowEffect BlurRadius="12" ShadowDepth="0" Color="#EC4899" Opacity="0.6"/>
                                     </Border.Effect>
                                 </Border>
                             </Grid>
@@ -1117,20 +1157,22 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Width" Value="45"/>
+            <Setter Property="Width" Value="34"/>
             <Setter Property="Height" Value="30"/>
-            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
             <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" Name="buttonBorder">
+                        <Border Background="{TemplateBinding Background}" Name="buttonBorder" CornerRadius="8">
                             <TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="buttonBorder" Property="Background" Value="#1FFFFFFF"/>
+                                <Setter TargetName="buttonBorder" Property="Background" Value="#1AFFFFFF"/>
                                 <Setter Property="Foreground" Value="White"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -1143,12 +1185,12 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" Name="buttonBorder">
+                        <Border Background="{TemplateBinding Background}" Name="buttonBorder" CornerRadius="8">
                             <TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="buttonBorder" Property="Background" Value="#E81123"/>
+                                <Setter TargetName="buttonBorder" Property="Background" Value="#E11D48"/>
                                 <Setter Property="Foreground" Value="White"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -1160,7 +1202,7 @@
 
     <Border x:Name="MainWindowRootBorder"
             Background="{StaticResource BackgroundBrush}"
-            CornerRadius="16"
+            CornerRadius="20"
             Effect="{StaticResource WindowShadow}"
             ClipToBounds="True"
             BorderThickness="1" 
@@ -1181,12 +1223,12 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0">
                         <TextBlock Text="Universal Downloader" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="14"/>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" WindowChrome.IsHitTestVisibleInChrome="True">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,16,0" WindowChrome.IsHitTestVisibleInChrome="True">
                         <!-- Update Available Notification Button (Visible when update exists) -->
                         <Button x:Name="UpdateAvailableButton" 
                                 Style="{StaticResource ModernButton}" 
                                 Height="30" 
-                                Margin="0,10,12,0" 
+                                Margin="0,0,12,0" 
                                 Padding="12,0" 
                                 FontSize="11.5" 
                                 Background="#059669" 
@@ -1226,7 +1268,7 @@
 
                         <!-- URL Input Container -->
                         <Border Background="{StaticResource SurfaceBrush}" 
-                                CornerRadius="12" 
+                                CornerRadius="18" 
                                 Padding="24" 
                                 Margin="0,0,0,32" 
                                 BorderThickness="1"
@@ -1249,7 +1291,7 @@
                         <StackPanel Margin="0,0,0,32" VerticalAlignment="Stretch">
 
                             <!-- Download Location -->
-                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
                                 <StackPanel>
                                     <TextBlock Text="SAVE LOCATION" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
                                     <Grid>
@@ -1264,7 +1306,7 @@
                             </Border>
 
                             <!-- Quality Selection -->
-                            <Border x:Name="QualitySection" Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
+                            <Border x:Name="QualitySection" Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
                                 <StackPanel>
                                     <Grid Margin="0,0,0,16">
                                         <Grid.ColumnDefinitions>
@@ -1279,7 +1321,7 @@
                             </Border>
 
                             <!-- Playlist Section (only visible for playlist URLs) -->
-                            <Border x:Name="PlaylistSection" Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
+                            <Border x:Name="PlaylistSection" Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
                                 <StackPanel>
                                     <!-- Header row -->
                                     <Grid Margin="0,0,0,12">
@@ -1304,7 +1346,7 @@
                                         <ItemsControl x:Name="PlaylistItemsControl">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="#0DFFFFFF" CornerRadius="8" Padding="12,10" Margin="0,0,0,6" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
+                                                    <Border Background="#0DFFFFFF" CornerRadius="12" Padding="12,10" Margin="0,0,0,6" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
                                                         <Grid>
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="Auto"/>
@@ -1326,13 +1368,13 @@
                                                             <ComboBox Grid.Column="3" 
                                                                       ItemsSource="{Binding AvailableQualities}" 
                                                                       SelectedIndex="{Binding SelectedQualityIndex, Mode=TwoWay}" 
-                                                                      DisplayMemberPath="Label"
+                                                                      DisplayMemberPath="Label" 
                                                                       Style="{StaticResource ModernComboBox}" 
                                                                       Width="150" 
-                                                                      Padding="8,6"
-                                                                      FontSize="12"
-                                                                      MaxDropDownHeight="200"
-                                                                      VerticalAlignment="Center"
+                                                                      Padding="8,6" 
+                                                                      FontSize="12" 
+                                                                      MaxDropDownHeight="200" 
+                                                                      VerticalAlignment="Center" 
                                                                       PreviewMouseLeftButtonDown="YouTubeQualityComboBox_PreviewMouseLeftButtonDown"/>
                                                         </Grid>
                                                     </Border>
@@ -1344,7 +1386,7 @@
                             </Border>
 
                             <!-- Trimming Section -->
-                            <Border x:Name="TrimmingSection" Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
+                            <Border x:Name="TrimmingSection" Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Visibility="Collapsed" Margin="0,0,0,24">
                                 <StackPanel>
                                     <Grid Margin="0,0,0,16">
                                         <Grid.ColumnDefinitions>
@@ -1406,14 +1448,14 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <Button x:Name="DownloadButton" Grid.Column="0" Style="{StaticResource ModernButton}" Content="Start Download" Click="DownloadButton_Click" IsEnabled="False" Width="180" Height="46" Margin="0,0,10,0"/>
-                            <Button x:Name="AddToQueueButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="➕ Add to Queue" Click="AddToQueueButton_Click" IsEnabled="False" Width="150" Height="46"/>
+                            <Button x:Name="AddToQueueButton" Grid.Column="1" Style="{StaticResource PillSecondaryButton}" Content="➕ Add to Queue" Click="AddToQueueButton_Click" IsEnabled="False" Width="150" Height="46"/>
                             <Button x:Name="CancelDownloadButton" Grid.Column="2" Style="{StaticResource MinimalistCancelButton}" Click="CancelDownloadButton_Click" Visibility="Collapsed" Margin="10,0,0,0" Height="46" Width="46"/>
                         </Grid>
 
                         <!-- Status Display -->
                         <Border x:Name="StatusPanel"
                                 Background="{StaticResource GlassGradient}" 
-                                CornerRadius="16" 
+                                CornerRadius="18" 
                                 Padding="28,24"
                                 BorderThickness="1"
                                 BorderBrush="{StaticResource BorderBrush}">
@@ -1460,7 +1502,7 @@
                                    Margin="0,0,0,32"/>
                         <StackPanel>
                             <!-- General Settings -->
-                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
                                 <StackPanel>
                                     <TextBlock Text="GENERAL PREFERENCES" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
                                     
@@ -1485,7 +1527,7 @@
                             </Border>
 
                             <!-- Default Save Location -->
-                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
                                 <StackPanel>
                                     <TextBlock Text="DEFAULT SAVE LOCATION" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
                                     <Grid>
@@ -1500,7 +1542,7 @@
                             </Border>
 
                             <!-- Custom Filename Template -->
-                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
                                 <StackPanel>
                                     <TextBlock Text="CUSTOM FILENAME TEMPLATE" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,8"/>
                                     <TextBlock Text="Customize how downloaded files are named using placeholders:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,12"/>
@@ -1523,7 +1565,7 @@
                                     </WrapPanel>
 
                                     <!-- Live Preview -->
-                                    <Border Background="#121214" CornerRadius="8" Padding="12,10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                    <Border Background="#121214" CornerRadius="10" Padding="12,10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
@@ -1537,7 +1579,7 @@
                             </Border>
 
                             <!-- Hotkeys Section -->
-                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,0,0,24">
                                 <StackPanel>
                                     <TextBlock Text="HOTKEYS &amp; SHORTCUTS" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
                                     <Grid Margin="0,0,0,4">
@@ -1551,7 +1593,7 @@
                                         </StackPanel>
                                         <ComboBox x:Name="LiveStreamHotkeyComboBox" 
                                                   Grid.Column="1" 
-                                                  Style="{StaticResource ModernComboBox}"
+                                                  Style="{StaticResource ModernComboBox}" 
                                                   Width="150" 
                                                   Height="36" 
                                                   SelectionChanged="LiveStreamHotkeyComboBox_SelectionChanged">
@@ -1568,7 +1610,7 @@
                             </Border>
 
                             <!-- Dependencies Section -->
-                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}">
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}">
                                 <StackPanel>
                                     <Grid Margin="0,0,0,16">
                                         <Grid.ColumnDefinitions>
@@ -1605,7 +1647,7 @@
                             </Border>
 
                             <!-- App Updates Section -->
-                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,24,0,0">
+                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="24" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Effect="{StaticResource CardShadow}" Margin="0,24,0,0">
                                 <StackPanel>
                                     <TextBlock Text="APPLICATION UPDATES" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,16"/>
                                     
@@ -4449,10 +4491,17 @@
                 <Border x:Name="SpotifyDrawerBorder"
                         HorizontalAlignment="Right"
                         Width="320"
-                        Background="#161619"
-                        BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="1,0,0,0"
                         Panel.ZIndex="20">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#0F0F14" Offset="0"/>
+                            <GradientStop Color="#0A0A0E" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <Border.BorderBrush>
+                        <SolidColorBrush Color="#20202C"/>
+                    </Border.BorderBrush>
                     <Border.RenderTransform>
                         <TranslateTransform x:Name="DrawerTransform" X="260"/>
                     </Border.RenderTransform>
@@ -4470,7 +4519,7 @@
                                     Cursor="Hand">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
-                                        <Border x:Name="border" Background="#1E1E24" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="22">
+                                        <Border x:Name="border" Background="#14141E" BorderBrush="#252536" BorderThickness="1" CornerRadius="22">
                                             <!-- Modern Magnifier / Search SVG Icon -->
                                             <Path Width="18" Height="18" Stretch="Uniform" Fill="#FAFAFA" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                   Data="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
@@ -4531,7 +4580,7 @@
                                     Cursor="Hand">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
-                                        <Border x:Name="border" Background="#1E1E24" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="22">
+                                        <Border x:Name="border" Background="#14141E" BorderBrush="#252536" BorderThickness="1" CornerRadius="22">
                                             <!-- Modern Radio / Broadcast Stream SVG Icon -->
                                             <Path Width="20" Height="20" Stretch="Uniform" Fill="#FAFAFA" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                   Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-2-8c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2zm6.24-4.24l-1.42 1.42C15.54 9.9 16 10.9 16 12s-.46 2.1-1.18 2.82l1.42 1.42C17.27 15.21 18 13.7 18 12s-.73-3.21-1.76-4.24zM7.18 9.18L5.76 7.76C4.73 8.79 4 10.3 4 12s.73 3.21 1.76 4.24l1.42-1.42C6.46 14.1 6 13.1 6 12s.46-2.1 1.18-2.82z"/>
@@ -4590,7 +4639,7 @@
                                     Cursor="Hand">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
-                                        <Border x:Name="border" Background="#1E1E24" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="22">
+                                        <Border x:Name="border" Background="#14141E" BorderBrush="#252536" BorderThickness="1" CornerRadius="22">
                                             <!-- Modern History / Clock SVG Icon -->
                                             <Path Width="20" Height="20" Stretch="Uniform" Fill="#FAFAFA" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                   Data="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
@@ -4621,7 +4670,7 @@
                                     Cursor="Hand">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
-                                        <Border x:Name="border" Background="#1E1E24" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="22">
+                                        <Border x:Name="border" Background="#14141E" BorderBrush="#252536" BorderThickness="1" CornerRadius="22">
                                             <!-- Modern Convert / Repeat SVG Icon -->
                                             <Path Width="18" Height="18" Stretch="Uniform" Fill="#FAFAFA" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                   Data="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
@@ -4652,7 +4701,7 @@
                                     Cursor="Hand">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
-                                        <Border x:Name="border" Background="#1E1E24" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="22">
+                                        <Border x:Name="border" Background="#14141E" BorderBrush="#252536" BorderThickness="1" CornerRadius="22">
                                             <!-- Modern Compress / Shrink / Arrows Inward SVG Icon -->
                                             <Path Width="18" Height="18" Stretch="Uniform" Fill="#FAFAFA" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                   Data="M4 4h4v2H6v2H4V4zm16 0h-4v2h2v2h2V4zM4 20h4v-2H6v-2H4v4zm16 0h-4v-2h2v-2h2v4zm-7-11h-2v3H8v2h3v3h2v-3h3v-2h-3V9z"/>
@@ -4683,7 +4732,7 @@
                                     Cursor="Hand">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
-                                        <Border x:Name="border" Background="#1E1E24" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="22">
+                                        <Border x:Name="border" Background="#14141E" BorderBrush="#252536" BorderThickness="1" CornerRadius="22">
                                             <!-- Modern Filmstrip / Scissors / Clip SVG Icon -->
                                             <Path Width="18" Height="18" Stretch="Uniform" Fill="#FAFAFA" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                   Data="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/>
@@ -4713,7 +4762,7 @@
                                         Cursor="Hand">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
-                                            <Border x:Name="border" Background="#1E1E24" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="22">
+                                            <Border x:Name="border" Background="#14141E" BorderBrush="#252536" BorderThickness="1" CornerRadius="22">
                                                 <!-- Modern Queue / Layers SVG Icon -->
                                                 <Path Width="18" Height="18" Stretch="Uniform" Fill="#FAFAFA" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                       Data="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/>
@@ -4801,7 +4850,7 @@
                                     <TextBlock Text="Загрузка плейлистов любого размера через экспорт CSV." Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,20" TextWrapping="Wrap"/>
 
                                     <!-- Step 1: Open Exportify -->
-                                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="16" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Margin="0,0,0,16">
+                                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="14" Padding="16" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Margin="0,0,0,16">
                                         <StackPanel>
                                             <TextBlock Text="ШАГ 1: ЭКСПОРТ CSV" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
                                             <TextBlock Text="Откройте бесплатный сервис Exportify и скачайте CSV файл вашего плейлиста." Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,12" TextWrapping="Wrap"/>
@@ -4810,7 +4859,7 @@
                                     </Border>
 
                                     <!-- Step 2: Load CSV -->
-                                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="16" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Margin="0,0,0,20">
+                                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="14" Padding="16" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Margin="0,0,0,20">
                                         <StackPanel>
                                             <TextBlock Text="ШАГ 2: ИМПОРТ ФАЙЛА" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
                                             <Button Style="{StaticResource ModernButton}" Content="Выбрать CSV файл" Click="ImportSpotifyCsvButton_Click" Padding="10,8" FontSize="11" HorizontalAlignment="Stretch"/>
@@ -4818,7 +4867,7 @@
                                     </Border>
 
                                     <!-- CSV Info / Status Panel -->
-                                    <Border x:Name="SpotifyCsvInfoBorder" Background="#0DFFFFFF" CornerRadius="8" Padding="16" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Visibility="Collapsed" Margin="0,0,0,16">
+                                    <Border x:Name="SpotifyCsvInfoBorder" Background="#0DFFFFFF" CornerRadius="14" Padding="16" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Visibility="Collapsed" Margin="0,0,0,16">
                                         <StackPanel>
                                             <TextBlock Text="ТЕКУЩИЙ ИМПОРТ" Foreground="{StaticResource SuccessBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
                                             <TextBlock x:Name="SpotifyCsvNameText" Text="Playlist Name" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
@@ -4827,7 +4876,7 @@
                                     </Border>
 
                                     <!-- Previous Imports Section -->
-                                    <Border x:Name="SpotifyImportsBorder" Background="#0DFFFFFF" CornerRadius="8" Padding="16" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Margin="0,0,0,16" Visibility="Collapsed">
+                                    <Border x:Name="SpotifyImportsBorder" Background="#0DFFFFFF" CornerRadius="14" Padding="16" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Margin="0,0,0,16" Visibility="Collapsed">
                                         <StackPanel>
                                             <TextBlock Text="ИМПОРТЫ" Foreground="{StaticResource PrimaryBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,12"/>
                                             <ItemsControl x:Name="SpotifyImportsItemsControl">
